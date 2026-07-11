@@ -20,10 +20,12 @@ policy-based trimming and removed-section tracking. T-009 and T-010 add the mock
 LLM runtime and metadata-only traces. T-011 adds fallback handling for predictable
 degraded results.
 
-M4 has started with T-012 Workflow State Machine. The system can now model
-workflow states, enforce legal transitions, record state history, and restore a
-workflow snapshot. It still does not implement Agent Executor, Workers, automatic
-code generation, or Workflow orchestration beyond state management.
+M4 is in progress. T-012 Workflow State Machine is complete, and T-013 Agent
+Executor is complete. The system can now model workflow states, enforce legal
+transitions, record state history, restore workflow snapshots, execute abstract
+step handlers deterministically, and fail honestly with structured execution
+results. It still does not implement Workers, automatic code generation, or
+Workflow orchestration beyond deterministic state and step advancement.
 
 ## T-001 foundation boundary
 
@@ -69,6 +71,14 @@ in `created` and may move through `analyzing`, `generating`, `reviewing`, and
 `completed`, with `failed` available from active states. Illegal transitions and
 terminal-state transitions are rejected, while accepted transitions are recorded
 in ordered state history.
+
+## Agent Executor
+
+The Agent Executor defines the second M4 boundary. It maps workflow states to
+abstract steps, calls fake/stub `StepHandler` implementations, advances the
+Workflow State Machine only through legal transitions, records structured
+`ExecutionResult` values, and converts handler failures into explicit `failed`
+workflow results. Real Workers remain deferred to T-014 and later tasks.
 
 ## Prerequisites
 
