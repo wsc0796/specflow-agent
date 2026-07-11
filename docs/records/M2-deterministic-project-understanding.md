@@ -34,6 +34,7 @@ match string.
 - `5894e83` — T-005: evidence-backed PROJECT_CONTEXT.md generation.
 - `9b06079` — T-005.1: determinism, evidence traceability, path sanitization.
 - `924ec7d` — T-005.2: secret redaction, control-character stripping, hash semantics.
+- `b60dd7a` — M2 closure: updated T-004 report, hardened evidence redaction test.
 
 ## Validation
 
@@ -54,6 +55,28 @@ Repository Path
   → PROJECT_CONTEXT.md     (deterministic, no absolute path, no secrets)
 ```
 
+## User flow
+
+```text
+Local Repository
+  → RepositoryScanner          (T-003: path validation, allowed-root enforce,
+  → ScanResult                    ignore policy, file/size limits)
+  → SafeFileAccessor           (T-004.1: reads only files that passed safety scan)
+  → TechnologyStackDetector    (T-004: dependency parsing + source analysis)
+  → TechnologyStack + Evidence (every conclusion backed by file + match string)
+  → ProjectContextGenerator    (T-005: combine scan + tech into structured model)
+  → Secret Redaction           (T-005.2: strip URL credentials, API keys, JWTs)
+  → Sanitization               (T-005.2: strip control characters from all text)
+  → PROJECT_CONTEXT.md         (T-005.1: deterministic, time-invariant, no abs path)
+  → content_hash               (T-005.1: JSON-based, path-independent)
+  → source_hash                (T-005.2: content_hash + root_path for dedup)
+```
+
+The system can now register a project via the HTTP API, safely scan its
+repository, identify the Python/FastAPI technology stack, and produce a
+deterministic, evidence-backed, sanitized `PROJECT_CONTEXT.md` — all without
+calling an LLM.
+
 ## Known limitations
 
 - No HTTP scan endpoint — scanner and detector are library capabilities.
@@ -61,8 +84,8 @@ Repository Path
 - `ProjectContext` not yet persisted to database.
 - Technology detection is limited to the supported Python/FastAPI stack.
 - Entry candidates use substring matching (no AST-based comment awareness).
-- The weak integration test for evidence redaction (noted in review) should be
-  hardened with explicit `Evidence` injection in a future cleanup pass.
+- End-to-end evidence-redaction test hardened with explicit tainted `Evidence`
+  injection (URL credentials, API key, JWT) in `b60dd7a`.
 
 ## What was deliberately excluded
 
