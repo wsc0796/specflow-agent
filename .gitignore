@@ -7,4 +7,4 @@ __pycache__/
 htmlcov/
 .env
 *.sqlite3
-
+data/

@@ -2,9 +2,9 @@
 
 ## Current phase
 
-The project is in Milestone 0, task T-001. The only implemented behavior is the
-FastAPI health endpoint. Future task IDs are not permission to implement future
-features.
+The project is in Milestone 1, task T-002. The implemented behavior is the
+health endpoint and Project persistence API. Future task IDs are not permission
+to implement future features.
 
 ## Mandatory workflow
 
@@ -18,9 +18,11 @@ features.
 ## Architecture constraints
 
 - Use the `src/` layout.
-- Do not add database models, repositories, scanners, prompts, workers, LLM calls,
-  workflow orchestration, Redis, LangGraph, vector stores, MCP, Java support, or
-  automatic code changes before their explicitly assigned task.
+- T-002 permits models and the Project repository/service/API boundary only for
+  `Project`, `ProjectScan`, and `WorkflowRun`.
+- Do not add scanners, prompts, workers, LLM calls, workflow orchestration, Redis,
+  LangGraph, vector stores, MCP, Java support, or automatic code changes before
+  their explicitly assigned task.
 - Keep HTTP-boundary code separate from future business and persistence layers.
 - Never weaken tests merely to make them pass.
 
@@ -33,4 +35,3 @@ uv run pytest -v
 uv run ruff check .
 uv run ruff format --check .
 ```
-
