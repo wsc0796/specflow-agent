@@ -15,7 +15,8 @@ M3 is in progress. T-006 adds a file-based Prompt Registry with versioned prompt
 metadata, strict Jinja2 rendering, template-variable validation, and stable
 prompt hashes. T-007 adds deterministic context assembly that combines sanitized
 project context, prompt definitions, and user requirements into a `BuiltContext`
-without calling an LLM. Next: T-008 — Token Budget Manager.
+without calling an LLM. T-008 adds deterministic token budget control with
+policy-based trimming and removed-section tracking. Next: T-009 — LLM Client.
 
 ## T-001 foundation boundary
 
@@ -39,6 +40,13 @@ The Context Builder combines a sanitized `ProjectContext`, a versioned
 It tracks sources, carries prompt and project hashes, estimates token count, and
 rejects empty or secret-like inputs. It does not scan repositories, call LLMs,
 write databases, or modify workflow state.
+
+## Token Budget
+
+The Token Budget Manager accepts a `BuiltContext`, applies a `BudgetPolicy`,
+estimates input size deterministically, trims low-priority sections when needed,
+records `removed_sections`, and returns a stable `BudgetResult`. It does not
+call LLMs, summarize content, use embeddings/RAG, or modify workflow state.
 
 ## Prerequisites
 

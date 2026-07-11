@@ -16,8 +16,8 @@
 4. The quality gate requires tests, Ruff, documentation synchronization, and
    explicit acceptance evidence.
 
-## Current task
+## Historical baseline task note
 
-T-003 implements safe, metadata-only repository traversal after T-002 persistence.
-It must not perform technology recognition, generate project context, call an LLM,
-or mutate workflow state.
+At the time this frozen baseline file was created, T-003 implemented safe,
+metadata-only repository traversal after T-002 persistence. Current phase status
+is tracked in `AGENTS.md`, task specs, completion reports, and milestone records.
