@@ -2,10 +2,11 @@
 
 ## Current phase
 
-The project has completed Milestone 3 (Agent Runtime Foundation) and Milestone 4
-(Agent Workflow). T-012 Workflow State Machine, T-013 Agent
+The project has completed Milestone 3 (Agent Runtime Foundation), Milestone 4
+(Agent Workflow), and started Milestone 5 (Tool Use & Repository Intelligence).
+T-012 Workflow State Machine, T-013 Agent
 Executor, T-014 Worker Framework, T-015 Analyze Worker, T-016 Generate Worker,
-and T-017 Review Worker are completed. Implemented:
+T-017 Review Worker, and T-018 Tool Framework are completed. Implemented:
 health endpoint, Project persistence API, safe scanning, deterministic technology
 identification with evidence, sanitized PROJECT_CONTEXT.md generation, Prompt
 Registry, Context Builder, Token Budget Manager, LLM Client abstraction, Trace
@@ -13,8 +14,8 @@ System, Fallback System, deterministic workflow state transitions, and
 deterministic Agent Executor step advancement, Worker Framework contracts, the
 first real requirement-analysis Worker, a generation Worker that consumes
 AnalysisOutput, and a review Worker that distinguishes business REJECT from
-execution failure.
-The next permitted milestone is M5. No M5 implementation has started.
+execution failure, and explicit Tool models, Registry, and Executor contracts.
+The next permitted task is T-019 Read-only Repository Tools.
 Future task IDs are not permission to implement future features.
 
 ## Mandatory workflow
