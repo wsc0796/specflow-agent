@@ -263,21 +263,60 @@ def test_redact_secrets_preserves_dependency_specifiers():
     assert result == "fastapi==0.115 pydantic>=2.0"
 
 
-def test_evidence_with_url_credentials_is_redacted_in_context(tmp_path: Path) -> None:
+def test_tainted_evidence_is_redacted_in_full_pipeline(tmp_path: Path) -> None:
+    """T-005.2: inject URL credentials, API key, JWT into TechnologyStack.evidence
+    and verify the full generate → render pipeline redacts them.
+
+    The old version of this test relied on normal TechStackDetector output (no
+    secrets present). This version injects real tainted Evidence and asserts
+    that raw secrets are absent from both the ProjectContext model AND the
+    rendered markdown.
+    """
     _add_file(tmp_path, "pyproject.toml",
-              "[project]\ndependencies = ['fastapi']\n")
+              "[project]\ndependencies = ['fastapi', 'pydantic']\n")
     _add_file(tmp_path, "main.py", "print('ok')")
 
     scan, tech = _scan_tech(tmp_path)
-    # Simulate a dependency line containing URL credentials
-    tech = TechnologyStackDetector().detect(scan)
 
-    ctx = _generate(_generator(), "safe-name", scan, tech)
+    # Inject tainted evidence that the detector would NOT normally produce
+    tech.evidence.extend([
+        Evidence(
+            file="pyproject.toml",
+            matched="pkg @ https://deployer:s3cret-pass@private.repo.com/pkg.whl",
+        ),
+        Evidence(
+            file="config.ini",
+            matched="api_key=sk-proj-abc123def456ghi789jkl",
+        ),
+        Evidence(
+            file="auth.py",
+            matched="eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhZG1pbiJ9.signed",
+        ),
+    ])
+
+    ctx = _generate(_generator(), "secret-test", scan, tech)
     md = _generator().render_markdown(ctx)
 
-    # No raw secrets should appear anywhere in rendered output
-    assert "user:pass" not in md
-    assert "sk-" not in md.lower() or "sk-<redacted>" in md
+    # Raw secrets MUST NOT appear in the model evidence
+    all_evidence_text = "|".join(
+        f"{e.file}|{e.matched}" for e in ctx.technology_evidence
+    )
+    for secret in ["deployer:s3cret-pass", "sk-proj-abc123", "eyJhbGciOiJIUzI1NiJ9"]:
+        assert secret not in all_evidence_text, (
+            f"Raw secret leaked into ProjectContext: {secret}"
+        )
+
+    # Raw secrets MUST NOT appear in rendered markdown
+    for secret in ["deployer:s3cret-pass", "sk-proj-abc123", "eyJhbGciOiJIUzI1NiJ9"]:
+        assert secret not in md, f"Raw secret leaked into markdown: {secret}"
+
+    # Redacted placeholders MUST be present
+    assert "<credentials>" in md
+    assert "api_key=<redacted>" in md
+    assert "<jwt>" in md
+
+    # Also verify the raw secrets aren't hiding behind redacted markers
+    assert "sk-proj-abc123" not in md
 
 
 # ── T-005.2: control character stripping ───────────────────────
