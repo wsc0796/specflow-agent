@@ -2,11 +2,12 @@
 
 ## Current phase
 
-The project has completed Milestone 2 (deterministic project understanding)
-and T-006 (Prompt Registry). Implemented: health endpoint, Project persistence
-API, safe scanning, deterministic technology identification with evidence,
-sanitized PROJECT_CONTEXT.md generation, and a file-based Prompt Registry.
-The next task is T-007 (Context Builder).
+The project has completed Milestone 2 (deterministic project understanding),
+T-006 (Prompt Registry), and T-007 (Context Builder). Implemented: health
+endpoint, Project persistence API, safe scanning, deterministic technology
+identification with evidence, sanitized PROJECT_CONTEXT.md generation, a
+file-based Prompt Registry, and deterministic context assembly.
+The next task is T-008 (Token Budget Manager).
 Future task IDs are not permission to implement future features.
 
 ## Mandatory workflow
@@ -27,9 +28,9 @@ Future task IDs are not permission to implement future features.
 ## Architecture constraints
 
 - Use the `src/` layout.
-- T-007 may begin the Context Builder. It must consume deterministic project
-  context and prompt definitions without calling an LLM or introducing Worker
-  orchestration.
+- T-008 may begin the Token Budget Manager. It must consume built context and
+  estimate or trim context deterministically without calling an LLM or
+  introducing Worker orchestration.
 - Do not add prompts, workers, LLM calls, workflow orchestration, Redis,
   LangGraph, vector stores, MCP, Java support, or automatic code changes before
   their explicitly assigned task.

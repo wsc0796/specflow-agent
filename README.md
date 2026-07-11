@@ -13,7 +13,9 @@ deterministic, sanitized `PROJECT_CONTEXT.md` artifact.
 
 M3 is in progress. T-006 adds a file-based Prompt Registry with versioned prompt
 metadata, strict Jinja2 rendering, template-variable validation, and stable
-prompt hashes. Next: T-007 — Context Builder.
+prompt hashes. T-007 adds deterministic context assembly that combines sanitized
+project context, prompt definitions, and user requirements into a `BuiltContext`
+without calling an LLM. Next: T-008 — Token Budget Manager.
 
 ## T-001 foundation boundary
 
@@ -29,6 +31,14 @@ can be reviewed as ordinary diffs. The current registry supports loading a
 prompt by name and version, validating YAML metadata, checking template variables
 against declared `required_variables`, rendering with Jinja2 `StrictUndefined`,
 and producing a stable `prompt_hash`.
+
+## Context Builder
+
+The Context Builder combines a sanitized `ProjectContext`, a versioned
+`PromptDefinition`, and a user requirement into a deterministic `BuiltContext`.
+It tracks sources, carries prompt and project hashes, estimates token count, and
+rejects empty or secret-like inputs. It does not scan repositories, call LLMs,
+write databases, or modify workflow state.
 
 ## Prerequisites
 
