@@ -16,11 +16,22 @@ _SENSITIVE_KEY_RE = re.compile(
     r"(api[_-]?key|access[_-]?token|authorization|password|secret|token)",
     re.IGNORECASE,
 )
+_JSON_CONTROL_RE = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f]")
 
 
 def sanitize_tool_text(text: str) -> str:
     """Redact common credential patterns and strip control characters."""
-    cleaned = _strip_control(_redact_secrets(text))
+    cleaned = _strip_control(_redact_tool_secrets(text))
+    return cleaned
+
+
+def sanitize_json_text(text: str) -> str:
+    """Redact JSON string values while retaining meaningful line structure."""
+    return _JSON_CONTROL_RE.sub("", _redact_tool_secrets(text))
+
+
+def _redact_tool_secrets(text: str) -> str:
+    cleaned = _redact_secrets(text)
     cleaned = _BEARER_RE.sub("Bearer <redacted>", cleaned)
     cleaned = _AUTHORIZATION_RE.sub("authorization=<redacted>", cleaned)
     cleaned = _ACCESS_TOKEN_RE.sub("access_token=<redacted>", cleaned)
@@ -40,7 +51,7 @@ def sanitize_mapping(mapping: Mapping[str, str]) -> MappingProxyType[str, str]:
 def sanitize_json_value(value: Any) -> Any:
     """Recursively sanitize JSON-like values while preserving structure."""
     if isinstance(value, str):
-        return sanitize_tool_text(value)
+        return sanitize_json_text(value)
     if isinstance(value, bool) or value is None or isinstance(value, int | float):
         return value
     if isinstance(value, Mapping):

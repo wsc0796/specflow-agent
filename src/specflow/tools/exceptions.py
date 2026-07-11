@@ -23,3 +23,23 @@ class ToolNotFoundError(ToolError):
 
 class ToolExecutionError(ToolError):
     """Raised when tool execution contract is violated."""
+
+
+class RepositoryToolError(ToolError):
+    """Base error for repository-bound Tool failures."""
+
+
+class RepositoryPathError(RepositoryToolError):
+    """Raised when a repository path is missing, unsafe, or escapes its root."""
+
+
+class SensitiveFileError(RepositoryToolError):
+    """Raised when a repository Tool is asked to expose a sensitive file."""
+
+
+class BinaryFileError(RepositoryToolError):
+    """Raised when a repository Tool is asked to return binary content."""
+
+
+class RepositoryLimitError(RepositoryToolError):
+    """Raised when a repository operation exceeds a configured safety limit."""

@@ -32,11 +32,14 @@ consume `AnalysisOutput` to produce a bounded `GenerationOutput`. It still does
 review `GenerationOutput` and distinguish business `REJECT` from execution
 failure. It still does not implement automatic code generation or M5 behavior.
 
-M5 is in progress. T-018 Tool Framework & Registry is complete. The system can
+M5 is in progress. T-018 Tool Framework & Registry and T-019 Safe Read-only
+Repository Tools are complete. The system can
 now define Tool metadata, represent explicit Tool calls and results, register
-tools deterministically, and execute one registered Tool through a structured
-executor. It still does not include real repository tools, Permission Policy,
-Worker Tool Integration, shell access, file writes, Git actions, or Tool loops.
+tools deterministically, execute one registered Tool through a structured
+executor, list allowed repository files, search text code, and read bounded text
+files inside one validated repository root. It still does not include a real LLM
+provider, repository-aware Worker integration, shell access, file writes, Git
+actions, or Tool loops.
 
 ## T-001 foundation boundary
 
@@ -135,9 +138,17 @@ input failures still fail the workflow.
 
 The Tool Framework starts M5. It provides `ToolMetadata`, `ToolCall`,
 `ToolResult`, `ToolStatus`, a Tool Protocol, explicit `ToolRegistry`, and
-`ToolExecutor`. T-018 includes only fake-tool tests; real read-only repository
-tools are deferred to T-019, Permission Policy to T-020, and Worker Tool
-Integration to T-021.
+`ToolExecutor`. T-018 includes only fake-tool tests and keeps Tool execution
+independent of workflow state, retries, and automatic selection.
+
+## Safe Repository Tools
+
+T-019 adds `list_files`, `search_code`, and `read_file` as explicit Tools bound
+to one validated repository root. Access rejects absolute paths, traversal,
+symlink/reparse-point paths, ignored dependency/cache directories, sensitive
+filenames, binary reads, and unbounded output. Search is literal and implemented
+in Python without shell or subprocess use. Returned paths are relative and file
+content is sanitized. These tools are read-only and cannot modify a repository.
 
 ## Prerequisites
 
