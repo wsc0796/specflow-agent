@@ -20,12 +20,14 @@ policy-based trimming and removed-section tracking. T-009 and T-010 add the mock
 LLM runtime and metadata-only traces. T-011 adds fallback handling for predictable
 degraded results.
 
-M4 is in progress. T-012 Workflow State Machine, T-013 Agent Executor, and T-014
-Worker Framework are complete. The system can now model workflow states, enforce
-legal transitions, record state history, restore workflow snapshots, execute
-abstract step handlers deterministically, define Worker contracts, register
-Workers explicitly, and adapt Worker results into Executor steps. It still does
-not implement real Analyze/Generate/Review Workers or automatic code generation.
+M4 is in progress. T-012 Workflow State Machine, T-013 Agent Executor, T-014
+Worker Framework, and T-015 Analyze Worker are complete. The system can now
+model workflow states, enforce legal transitions, record state history, restore
+workflow snapshots, execute abstract step handlers deterministically, define
+Worker contracts, register Workers explicitly, adapt Worker results into
+Executor steps, and run the first real requirement-analysis Worker using the
+existing Prompt, Context, Budget, LLM, Trace, and Fallback layers. It still does
+not implement Generate/Review Workers or automatic code generation.
 
 ## T-001 foundation boundary
 
@@ -85,7 +87,18 @@ workflow results. Real Workers remain deferred to T-014 and later tasks.
 The Worker Framework defines the third M4 boundary. It provides `WorkerRole`,
 `WorkerContext`, `WorkerResult`, Worker metadata, explicit `WorkerRegistry`
 registration, and a `WorkerStepHandler` adapter for the existing Agent Executor.
-It does not include real Analyze, Generate, or Review Worker implementations.
+It now includes `AnalyzeWorker`, the first real business Worker, which produces a
+structured `AnalysisOutput` while preserving the Executor/Workflow boundary. It
+does not include Generate or Review Worker implementations.
+
+## Analyze Worker
+
+The Analyze Worker consumes a user requirement and validated `ProjectContext`,
+renders the versioned `analyze_requirement` prompt through the Context Builder,
+applies token budgeting, calls the provider-neutral LLM abstraction, records a
+metadata-only trace, and falls back to an honest degraded analysis when runtime
+execution or structured parsing fails. Its output is a stable JSON
+`AnalysisOutput` plus `analysis_hash`.
 
 ## Prerequisites
 

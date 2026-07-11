@@ -8,9 +8,17 @@ User requirement:
 
 {{ user_requirement }}
 
-Return JSON with:
+Return strict JSON with exactly these fields:
 
-- goal
-- constraints
-- out_of_scope
-- acceptance_criteria
+- requirement_summary: string
+- goals: array of strings
+- non_goals: array of strings
+- assumptions: array of strings
+- affected_components: array of strings
+- risks: array of strings
+- acceptance_criteria: array of strings
+- evidence: array of strings
+- requires_review: boolean
+- degraded: boolean
+
+Do not include prose outside the JSON object.

@@ -1,6 +1,7 @@
 """Worker Framework public API."""
 
 from specflow.workers.adapter import WorkerStepHandler
+from specflow.workers.analyze import AnalysisOutput, AnalyzeWorker
 from specflow.workers.base import BaseWorker, Worker
 from specflow.workers.exceptions import (
     DuplicateWorkerError,
@@ -21,6 +22,8 @@ from specflow.workers.registry import WorkerRegistry
 
 __all__ = [
     "BaseWorker",
+    "AnalysisOutput",
+    "AnalyzeWorker",
     "DuplicateWorkerError",
     "Worker",
     "WorkerContext",
