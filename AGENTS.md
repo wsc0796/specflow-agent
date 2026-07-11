@@ -14,6 +14,12 @@ to implement future features.
 4. Before completion, run `uv run pytest -v`, `uv run ruff check .`, and
    `uv run ruff format --check .`.
 5. Write a completion report in `docs/reports/` and make one focused Git commit.
+6. After every completed task, update its completion report. After every completed
+   milestone, add a dated milestone record under `docs/records/` covering delivered
+   capabilities, validation evidence, commit IDs, known limits, and the next gate.
+7. After the milestone quality gate passes, push its reviewed commits and milestone
+   record to the configured GitHub `origin`. Never push without a configured remote
+   or after a failed quality gate; report that configuration blocker instead.
 
 ## Architecture constraints
 
