@@ -2,9 +2,10 @@
 
 ## Current phase
 
-The project is in Milestone 1, task T-005. The implemented behavior is the health
-endpoint, Project persistence API, safe scanning, deterministic technology
-identification, and evidence-backed PROJECT_CONTEXT.md generation.
+The project has completed Milestone 2 (deterministic project understanding).
+Implemented: health endpoint, Project persistence API, safe scanning,
+deterministic technology identification with evidence, and sanitized
+PROJECT_CONTEXT.md generation. The next task is T-006 (Prompt Registry).
 Future task IDs are not permission to implement future features.
 
 ## Mandatory workflow
@@ -25,9 +26,9 @@ Future task IDs are not permission to implement future features.
 ## Architecture constraints
 
 - Use the `src/` layout.
-- T-005 permits deterministic PROJECT_CONTEXT.md generation from a ScanResult
-  and TechnologyStack. It must not call an LLM, implement Context Builder,
-  or read files outside the safety scan boundary.
+- T-006 permits the Prompt Registry (file-based, Git-managed prompts with
+  Jinja2 rendering). It must not call an LLM, implement Context Builder,
+  or introduce Worker orchestration.
 - Do not add prompts, workers, LLM calls, workflow orchestration, Redis,
   LangGraph, vector stores, MCP, Java support, or automatic code changes before
   their explicitly assigned task.

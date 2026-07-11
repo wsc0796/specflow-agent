@@ -7,10 +7,11 @@ deterministic quality gate.
 
 ## Current milestone
 
-T-005 combines safe repository scanning and technology detection into a
-deterministic, evidence-backed `PROJECT_CONTEXT.md` artifact. The generator
-never re-traverses files outside the safety scan boundary. LLM integrations,
-workflow execution, and Prompt Registry remain deferred.
+Milestone 2 is complete — the system can safely scan a repository, identify its
+Python/FastAPI technology stack with concrete evidence, and generate a
+deterministic, sanitized `PROJECT_CONTEXT.md` artifact. 69 tests pass.
+
+Next: M3 — Agent Infrastructure (Prompt Registry, Context Builder, LLM Client).
 
 ## Prerequisites
 
