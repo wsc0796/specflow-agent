@@ -9,10 +9,11 @@ deterministic quality gate.
 
 Milestone 2 is complete — the system can safely scan a repository, identify its
 Python/FastAPI technology stack with concrete evidence, and generate a
-deterministic, sanitized `PROJECT_CONTEXT.md` artifact. All tests and Ruff
-quality gates pass — run the verification commands below for the current result.
+deterministic, sanitized `PROJECT_CONTEXT.md` artifact.
 
-Next: M3 — Agent Infrastructure (Prompt Registry, Context Builder, LLM Client).
+M3 is in progress. T-006 adds a file-based Prompt Registry with versioned prompt
+metadata, strict Jinja2 rendering, template-variable validation, and stable
+prompt hashes. Next: T-007 — Context Builder.
 
 ## T-001 foundation boundary
 
@@ -20,6 +21,14 @@ T-001 included only the FastAPI application package, `GET /health`, pytest, Ruff
 and setup/development-rule documentation. It deliberately excluded persistence,
 project APIs, scanning, technology detection, project-context generation, prompts,
 LLMs, workers, and workflow logic; later tasks added those capabilities incrementally.
+
+## Prompt Registry
+
+Prompt assets live under `prompts/` and are managed by Git so behavior changes
+can be reviewed as ordinary diffs. The current registry supports loading a
+prompt by name and version, validating YAML metadata, checking template variables
+against declared `required_variables`, rendering with Jinja2 `StrictUndefined`,
+and producing a stable `prompt_hash`.
 
 ## Prerequisites
 

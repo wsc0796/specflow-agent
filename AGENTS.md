@@ -2,10 +2,11 @@
 
 ## Current phase
 
-The project has completed Milestone 2 (deterministic project understanding).
-Implemented: health endpoint, Project persistence API, safe scanning,
-deterministic technology identification with evidence, and sanitized
-PROJECT_CONTEXT.md generation. The next task is T-006 (Prompt Registry).
+The project has completed Milestone 2 (deterministic project understanding)
+and T-006 (Prompt Registry). Implemented: health endpoint, Project persistence
+API, safe scanning, deterministic technology identification with evidence,
+sanitized PROJECT_CONTEXT.md generation, and a file-based Prompt Registry.
+The next task is T-007 (Context Builder).
 Future task IDs are not permission to implement future features.
 
 ## Mandatory workflow
@@ -26,9 +27,9 @@ Future task IDs are not permission to implement future features.
 ## Architecture constraints
 
 - Use the `src/` layout.
-- T-006 permits the Prompt Registry (file-based, Git-managed prompts with
-  Jinja2 rendering). It must not call an LLM, implement Context Builder,
-  or introduce Worker orchestration.
+- T-007 may begin the Context Builder. It must consume deterministic project
+  context and prompt definitions without calling an LLM or introducing Worker
+  orchestration.
 - Do not add prompts, workers, LLM calls, workflow orchestration, Redis,
   LangGraph, vector stores, MCP, Java support, or automatic code changes before
   their explicitly assigned task.
