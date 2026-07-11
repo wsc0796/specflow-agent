@@ -9,8 +9,8 @@ deterministic quality gate.
 
 Milestone 2 is complete — the system can safely scan a repository, identify its
 Python/FastAPI technology stack with concrete evidence, and generate a
-deterministic, sanitized `PROJECT_CONTEXT.md` artifact. Current verification:
-`74 passed, 1 skipped` (`uv run pytest -v`); rerun the command after changes.
+deterministic, sanitized `PROJECT_CONTEXT.md` artifact. All tests and Ruff
+quality gates pass — run the verification commands below for the current result.
 
 Next: M3 — Agent Infrastructure (Prompt Registry, Context Builder, LLM Client).
 
