@@ -20,6 +20,8 @@ class LLMTrace:
     output_tokens: int
     status: str
     error_type: str | None = None
+    fallback_level: str | None = None
+    retry_count: int = 0
     metadata: dict[str, str] = field(default_factory=dict)
 
     def as_dict(self) -> dict[str, object]:
@@ -35,5 +37,7 @@ class LLMTrace:
             "output_tokens": self.output_tokens,
             "status": self.status,
             "error_type": self.error_type,
+            "fallback_level": self.fallback_level,
+            "retry_count": self.retry_count,
             "metadata": dict(sorted(self.metadata.items())),
         }

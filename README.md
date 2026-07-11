@@ -16,7 +16,9 @@ metadata, strict Jinja2 rendering, template-variable validation, and stable
 prompt hashes. T-007 adds deterministic context assembly that combines sanitized
 project context, prompt definitions, and user requirements into a `BuiltContext`
 without calling an LLM. T-008 adds deterministic token budget control with
-policy-based trimming and removed-section tracking. Next: T-009 — LLM Client.
+policy-based trimming and removed-section tracking. T-009 and T-010 add the mock
+LLM runtime and metadata-only traces. T-011 adds fallback handling for predictable
+degraded results. Next: M4 — Agent Workflow.
 
 ## T-001 foundation boundary
 
@@ -47,6 +49,13 @@ The Token Budget Manager accepts a `BuiltContext`, applies a `BudgetPolicy`,
 estimates input size deterministically, trims low-priority sections when needed,
 records `removed_sections`, and returns a stable `BudgetResult`. It does not
 call LLMs, summarize content, use embeddings/RAG, or modify workflow state.
+
+## Runtime Foundation
+
+The runtime foundation now supports provider-neutral LLM requests, deterministic
+mock responses, metadata-only trace files, and fallback handling for retry, JSON
+repair, and honest degraded baselines. It still does not implement Workers,
+Agent Loop, Workflow orchestration, RAG, embeddings, Redis, or LangGraph.
 
 ## Prerequisites
 
