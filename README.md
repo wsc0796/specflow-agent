@@ -7,10 +7,10 @@ deterministic quality gate.
 
 ## Current milestone
 
-T-004 adds deterministic, evidence-backed Python/FastAPI technology detection after
-safe repository scanning. It identifies supported dependencies and entry candidates
-from explicit files; project-context generation, LLM integrations, and workflow
-execution remain deferred.
+T-005 combines safe repository scanning and technology detection into a
+deterministic, evidence-backed `PROJECT_CONTEXT.md` artifact. The generator
+never re-traverses files outside the safety scan boundary. LLM integrations,
+workflow execution, and Prompt Registry remain deferred.
 
 ## Prerequisites
 

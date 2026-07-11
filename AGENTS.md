@@ -2,9 +2,9 @@
 
 ## Current phase
 
-The project is in Milestone 1, task T-004. The implemented behavior is the health
-endpoint, Project persistence API, safe scanning, and deterministic technology
-identification.
+The project is in Milestone 1, task T-005. The implemented behavior is the health
+endpoint, Project persistence API, safe scanning, deterministic technology
+identification, and evidence-backed PROJECT_CONTEXT.md generation.
 Future task IDs are not permission to implement future features.
 
 ## Mandatory workflow
@@ -25,8 +25,9 @@ Future task IDs are not permission to implement future features.
 ## Architecture constraints
 
 - Use the `src/` layout.
-- T-004 permits deterministic technology detection from explicit repository files.
-  It must report evidence and must not generate project context or call an LLM.
+- T-005 permits deterministic PROJECT_CONTEXT.md generation from a ScanResult
+  and TechnologyStack. It must not call an LLM, implement Context Builder,
+  or read files outside the safety scan boundary.
 - Do not add prompts, workers, LLM calls, workflow orchestration, Redis,
   LangGraph, vector stores, MCP, Java support, or automatic code changes before
   their explicitly assigned task.
