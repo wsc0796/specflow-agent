@@ -20,12 +20,12 @@ policy-based trimming and removed-section tracking. T-009 and T-010 add the mock
 LLM runtime and metadata-only traces. T-011 adds fallback handling for predictable
 degraded results.
 
-M4 is in progress. T-012 Workflow State Machine is complete, and T-013 Agent
-Executor is complete. The system can now model workflow states, enforce legal
-transitions, record state history, restore workflow snapshots, execute abstract
-step handlers deterministically, and fail honestly with structured execution
-results. It still does not implement Workers, automatic code generation, or
-Workflow orchestration beyond deterministic state and step advancement.
+M4 is in progress. T-012 Workflow State Machine, T-013 Agent Executor, and T-014
+Worker Framework are complete. The system can now model workflow states, enforce
+legal transitions, record state history, restore workflow snapshots, execute
+abstract step handlers deterministically, define Worker contracts, register
+Workers explicitly, and adapt Worker results into Executor steps. It still does
+not implement real Analyze/Generate/Review Workers or automatic code generation.
 
 ## T-001 foundation boundary
 
@@ -79,6 +79,13 @@ abstract steps, calls fake/stub `StepHandler` implementations, advances the
 Workflow State Machine only through legal transitions, records structured
 `ExecutionResult` values, and converts handler failures into explicit `failed`
 workflow results. Real Workers remain deferred to T-014 and later tasks.
+
+## Worker Framework
+
+The Worker Framework defines the third M4 boundary. It provides `WorkerRole`,
+`WorkerContext`, `WorkerResult`, Worker metadata, explicit `WorkerRegistry`
+registration, and a `WorkerStepHandler` adapter for the existing Agent Executor.
+It does not include real Analyze, Generate, or Review Worker implementations.
 
 ## Prerequisites
 
