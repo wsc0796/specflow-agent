@@ -1,12 +1,13 @@
 name: generate_spec
 version: 1.0.0
-description: Generate a bounded task specification from project context and requirement analysis.
+description: Generate a bounded implementation plan from project context and requirement analysis.
 purpose: spec_generation
 template_path: template.md
 required_variables:
   - project_context
+  - user_requirement
   - requirement_analysis
 output_format:
-  type: markdown
+  type: json
 owner: system
 created_at: 2026-07-11

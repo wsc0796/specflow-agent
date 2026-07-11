@@ -11,6 +11,7 @@ from specflow.workers.exceptions import (
     WorkerRegistrationError,
     WorkerValidationError,
 )
+from specflow.workers.generate import GenerateWorker, GenerationOutput
 from specflow.workers.models import (
     WorkerContext,
     WorkerMetadata,
@@ -25,6 +26,8 @@ __all__ = [
     "AnalysisOutput",
     "AnalyzeWorker",
     "DuplicateWorkerError",
+    "GenerateWorker",
+    "GenerationOutput",
     "Worker",
     "WorkerContext",
     "WorkerError",

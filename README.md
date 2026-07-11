@@ -21,13 +21,14 @@ LLM runtime and metadata-only traces. T-011 adds fallback handling for predictab
 degraded results.
 
 M4 is in progress. T-012 Workflow State Machine, T-013 Agent Executor, T-014
-Worker Framework, and T-015 Analyze Worker are complete. The system can now
+Worker Framework, T-015 Analyze Worker, and T-016 Generate Worker are complete. The system can now
 model workflow states, enforce legal transitions, record state history, restore
 workflow snapshots, execute abstract step handlers deterministically, define
 Worker contracts, register Workers explicitly, adapt Worker results into
 Executor steps, and run the first real requirement-analysis Worker using the
-existing Prompt, Context, Budget, LLM, Trace, and Fallback layers. It still does
-not implement Generate/Review Workers or automatic code generation.
+existing Prompt, Context, Budget, LLM, Trace, and Fallback layers. It can also
+consume `AnalysisOutput` to produce a bounded `GenerationOutput`. It still does
+not implement Review Worker or automatic code generation.
 
 ## T-001 foundation boundary
 
@@ -89,7 +90,9 @@ The Worker Framework defines the third M4 boundary. It provides `WorkerRole`,
 registration, and a `WorkerStepHandler` adapter for the existing Agent Executor.
 It now includes `AnalyzeWorker`, the first real business Worker, which produces a
 structured `AnalysisOutput` while preserving the Executor/Workflow boundary. It
-does not include Generate or Review Worker implementations.
+also includes `GenerateWorker`, which consumes `AnalysisOutput` and produces a
+structured `GenerationOutput`. It does not include a Review Worker
+implementation.
 
 ## Analyze Worker
 
@@ -99,6 +102,15 @@ applies token budgeting, calls the provider-neutral LLM abstraction, records a
 metadata-only trace, and falls back to an honest degraded analysis when runtime
 execution or structured parsing fails. Its output is a stable JSON
 `AnalysisOutput` plus `analysis_hash`.
+
+## Generate Worker
+
+The Generate Worker consumes the original user requirement, validated
+`ProjectContext`, and prior `AnalysisOutput`. It renders the versioned
+`generate_spec` prompt, applies token budgeting, calls the provider-neutral LLM
+abstraction, records a metadata-only trace, and falls back to an honest degraded
+generation result when runtime execution or structured parsing fails. Its output
+is a stable JSON `GenerationOutput` plus `generation_hash`.
 
 ## Prerequisites
 
