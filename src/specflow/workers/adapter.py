@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
 from specflow.executor import ExecutionContext, StepResult
 from specflow.workers.base import Worker
 from specflow.workers.exceptions import WorkerExecutionError
@@ -13,14 +15,19 @@ RESERVED_STEP_METADATA_KEYS = frozenset({"worker_name", "worker_role", "worker_v
 class WorkerStepHandler:
     """Adapt one Worker to the T-013 StepHandler protocol."""
 
-    def __init__(self, worker: Worker, worker_context: WorkerContext) -> None:
+    def __init__(
+        self,
+        worker: Worker,
+        worker_context: WorkerContext | Callable[[ExecutionContext], WorkerContext],
+    ) -> None:
         self._worker = worker
         self._worker_context = worker_context
 
     def execute(self, execution_context: ExecutionContext) -> StepResult:
         """Execute the worker and convert WorkerResult into StepResult."""
         try:
-            result = self._worker.execute(self._worker_context)
+            worker_context = self._resolve_worker_context(execution_context)
+            result = self._worker.execute(worker_context)
         except Exception as exc:
             message = sanitize_worker_text(str(exc))
             raise WorkerExecutionError(message) from exc
@@ -48,3 +55,12 @@ class WorkerStepHandler:
         for key, value in result.output:
             metadata[f"output.{key}"] = value
         return StepResult(metadata=metadata)
+
+    def _resolve_worker_context(self, execution_context: ExecutionContext) -> WorkerContext:
+        if callable(self._worker_context):
+            context = self._worker_context(execution_context)
+        else:
+            context = self._worker_context
+        if not isinstance(context, WorkerContext):
+            raise WorkerExecutionError("Worker context factory must return WorkerContext")
+        return context

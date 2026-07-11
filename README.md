@@ -20,7 +20,7 @@ policy-based trimming and removed-section tracking. T-009 and T-010 add the mock
 LLM runtime and metadata-only traces. T-011 adds fallback handling for predictable
 degraded results.
 
-M4 is in progress. T-012 Workflow State Machine, T-013 Agent Executor, T-014
+M4 is complete. T-012 Workflow State Machine, T-013 Agent Executor, T-014
 Worker Framework, T-015 Analyze Worker, T-016 Generate Worker, and T-017 Review
 Worker are complete. The system can now
 model workflow states, enforce legal transitions, record state history, restore
@@ -30,7 +30,7 @@ Executor steps, and run the first real requirement-analysis Worker using the
 existing Prompt, Context, Budget, LLM, Trace, and Fallback layers. It can also
 consume `AnalysisOutput` to produce a bounded `GenerationOutput`. It still does
 review `GenerationOutput` and distinguish business `REJECT` from execution
-failure. It still does not implement automatic code generation.
+failure. It still does not implement automatic code generation or M5 behavior.
 
 ## T-001 foundation boundary
 
