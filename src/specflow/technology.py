@@ -48,9 +48,7 @@ class SafeFileAccessor:
 
     def __init__(self, scan: ScanResult) -> None:
         self._root = Path(scan.root).resolve()
-        self._allowed: set[str] = {
-            f.path for f in scan.files if not f.is_oversized
-        }
+        self._allowed: set[str] = {f.path for f in scan.files if not f.is_oversized}
 
     @property
     def root(self) -> Path:
@@ -115,9 +113,13 @@ class TechnologyStackDetector:
             deps.extend(self._requirements_deps(accessor, evidence))
 
         # ── language detection ──
-        has_python = bool(accessor.python_files()) or bool(dep_files)
+        py_files = accessor.python_files()
+        has_python = bool(py_files) or bool(dep_files)
         if has_python:
-            evidence.append(Evidence("repository", "*.py or Python dependency metadata"))
+            # Use the first real Python file as evidence, not a synthetic file name
+            first_py = py_files[0] if py_files else (dep_files[0] if dep_files else None)
+            if first_py:
+                evidence.append(Evidence(first_py, "*.py"))
 
         names = {name for name, _ in deps}
 
@@ -129,7 +131,10 @@ class TechnologyStackDetector:
         lint_tools = ["ruff"] if "ruff" in names else []
 
         # ── database: confirmed from dependencies only ──
+        # File-content SQLite patterns are recorded as evidence but do NOT
+        # change the conclusion (prevents false positives from comments/docs).
         database = "sqlite" if any(n in {"sqlite", "aiosqlite"} for n in names) else None
+        self._sqlite_file_evidence(accessor, evidence)
 
         # ── entry-point scanning (uses SafeFileAccessor, not raw rglob) ──
         entries = self._entry_candidates(accessor, evidence)
@@ -216,6 +221,35 @@ class TechnologyStackDetector:
                 items.append((name, entry))
                 evidence.append(Evidence("requirements.txt", entry))
         return items
+
+    # ── file-content evidence (does not change conclusions) ──────
+
+    _SQLITE_PATTERNS = [
+        re.compile(r"\bimport\s+sqlite3\b"),
+        re.compile(r"\bfrom\s+sqlite3\b"),
+        re.compile(r"\bimport\s+aiosqlite\b"),
+        re.compile(r"\bfrom\s+aiosqlite\b"),
+        re.compile(r"sqlite://"),
+        re.compile(r"\.db\b"),
+    ]
+
+    @staticmethod
+    def _sqlite_file_evidence(
+        accessor: SafeFileAccessor,
+        evidence: list[Evidence],
+    ) -> None:
+        """Scan safe Python files for SQLite usage patterns.
+
+        These patterns are recorded as *evidence* only and do NOT alter the
+        ``database`` conclusion (which remains dependency-based to avoid
+        false positives from comments and documentation strings).
+        """
+        for rel_path in accessor.python_files():
+            content = accessor.read_text(rel_path)
+            for pattern in TechnologyStackDetector._SQLITE_PATTERNS:
+                if pattern.search(content):
+                    evidence.append(Evidence(rel_path, pattern.pattern))
+                    break  # one evidence entry per file
 
     # ── entry-point scanning ────────────────────────────────────
 

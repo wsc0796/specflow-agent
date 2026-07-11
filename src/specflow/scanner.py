@@ -56,14 +56,21 @@ class RepositoryScanner:
         for current_root, directory_names, file_names in self._walk(root):
             current = Path(current_root)
             relative_current = current.relative_to(root)
-            directories.extend((relative_current / name).as_posix() for name in directory_names)
+
+            safe_dirs = []
+            for name in directory_names:
+                candidate = current / name
+                if candidate.is_symlink() and not self._is_within(candidate.resolve(), root):
+                    continue
+                safe_dirs.append(name)
+                directories.append((relative_current / name).as_posix())
             ignored.extend(
                 (relative_current / name).as_posix()
                 for name in directory_names
                 if name in self.ignored_directory_names
             )
             directory_names[:] = [
-                name for name in directory_names if name not in self.ignored_directory_names
+                name for name in safe_dirs if name not in self.ignored_directory_names
             ]
 
             for name in file_names:

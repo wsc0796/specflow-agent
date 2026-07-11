@@ -16,7 +16,7 @@ router = APIRouter(prefix="/api/v1/projects", tags=["projects"])
 
 
 class ProjectCreate(BaseModel):
-    name: str = Field(min_length=1, max_length=200)
+    name: str = Field(min_length=1, max_length=200, pattern=r"\S")
     repository_path: str = Field(min_length=1, max_length=1024)
 
 

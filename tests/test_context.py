@@ -20,6 +20,7 @@ _FIXED_TIME = datetime(2026, 7, 11, 12, 0, 0, tzinfo=UTC)
 
 # ── helpers ────────────────────────────────────────────────────
 
+
 def _add_file(base: Path, relative: str, content: str = "") -> None:
     full = base / relative
     full.parent.mkdir(parents=True, exist_ok=True)
@@ -42,10 +43,14 @@ def _generate(ctx_gen, name, scan, tech):
 
 # ── normal FastAPI project ─────────────────────────────────────
 
+
 def test_normal_fastapi_project_produces_complete_context(tmp_path: Path) -> None:
-    _add_file(tmp_path, "pyproject.toml",
-              "[project]\ndependencies = ['fastapi', 'pydantic', 'sqlalchemy', 'aiosqlite']\n"
-              "[dependency-groups]\ndev = ['pytest', 'ruff']\n")
+    _add_file(
+        tmp_path,
+        "pyproject.toml",
+        "[project]\ndependencies = ['fastapi', 'pydantic', 'sqlalchemy', 'aiosqlite']\n"
+        "[dependency-groups]\ndev = ['pytest', 'ruff']\n",
+    )
     _add_file(tmp_path, "app/main.py", "from fastapi import FastAPI\napp = FastAPI()\n")
     _add_file(tmp_path, "app/routers/users.py", "print('ok')")
     _add_file(tmp_path, "tests/test_app.py", "def test(): pass")
@@ -66,6 +71,7 @@ def test_normal_fastapi_project_produces_complete_context(tmp_path: Path) -> Non
 
 # ── unknown project ────────────────────────────────────────────
 
+
 def test_unknown_project_clearly_states_unknown(tmp_path: Path) -> None:
     scan, tech = _scan_tech(tmp_path)
     ctx = _generate(_generator(), "empty-repo", scan, tech)
@@ -76,6 +82,7 @@ def test_unknown_project_clearly_states_unknown(tmp_path: Path) -> None:
 
 
 # ── corrupted pyproject warning ─────────────────────────────────
+
 
 def test_corrupted_pyproject_warning_appears_in_document(tmp_path: Path) -> None:
     _add_file(tmp_path, "pyproject.toml", "{{{ not toml")
@@ -91,10 +98,10 @@ def test_corrupted_pyproject_warning_appears_in_document(tmp_path: Path) -> None
 
 # ── .venv isolation ────────────────────────────────────────────
 
+
 def test_venv_is_ignored_in_context(tmp_path: Path) -> None:
     _add_file(tmp_path, ".venv/lib/fastapi/__init__.py", "")
-    _add_file(tmp_path, "pyproject.toml",
-              "[project]\ndependencies = ['fastapi']\n")
+    _add_file(tmp_path, "pyproject.toml", "[project]\ndependencies = ['fastapi']\n")
     _add_file(tmp_path, "src/main.py", "print('hello')")
 
     scan, tech = _scan_tech(tmp_path)
@@ -107,9 +114,9 @@ def test_venv_is_ignored_in_context(tmp_path: Path) -> None:
 
 # ── deterministic output ────────────────────────────────────────
 
+
 def test_same_input_produces_identical_markdown(tmp_path: Path) -> None:
-    _add_file(tmp_path, "pyproject.toml",
-              "[project]\ndependencies = ['fastapi', 'pydantic']\n")
+    _add_file(tmp_path, "pyproject.toml", "[project]\ndependencies = ['fastapi', 'pydantic']\n")
     _add_file(tmp_path, "main.py", "from fastapi import FastAPI\napp = FastAPI()\n")
 
     scan, tech = _scan_tech(tmp_path)
@@ -136,6 +143,7 @@ def test_different_timestamps_produce_same_markdown(tmp_path: Path) -> None:
 
 # ── content_hash vs source_hash (T-005.2) ──────────────────────
 
+
 def test_content_hash_excludes_root_path(tmp_path: Path) -> None:
     """content_hash identifies the document, not the deployment path."""
     _add_file(tmp_path, "main.py", "print(1)")
@@ -148,6 +156,7 @@ def test_content_hash_excludes_root_path(tmp_path: Path) -> None:
 
     # Manually construct same content with a different root_path
     from dataclasses import replace
+
     ctx2 = replace(ctx, root_path="/other/path")
     h2 = ctx2.content_hash()
 
@@ -161,6 +170,7 @@ def test_source_hash_differs_for_different_paths(tmp_path: Path) -> None:
     gen = _generator()
 
     from dataclasses import replace
+
     ctx_a = _generate(gen, "p", scan, tech)
     ctx_b = replace(ctx_a, root_path="/other/path")
 
@@ -170,9 +180,9 @@ def test_source_hash_differs_for_different_paths(tmp_path: Path) -> None:
 
 # ── evidence traceability ──────────────────────────────────────
 
+
 def test_technology_evidence_preserved_in_context(tmp_path: Path) -> None:
-    _add_file(tmp_path, "pyproject.toml",
-              "[project]\ndependencies = ['fastapi', 'pydantic']\n")
+    _add_file(tmp_path, "pyproject.toml", "[project]\ndependencies = ['fastapi', 'pydantic']\n")
     _add_file(tmp_path, "main.py", "from fastapi import FastAPI\napp = FastAPI()\n")
 
     scan, tech = _scan_tech(tmp_path)
@@ -180,16 +190,17 @@ def test_technology_evidence_preserved_in_context(tmp_path: Path) -> None:
     md = _generator().render_markdown(ctx)
 
     assert ctx.technology_evidence
-    assert any(e.file == "pyproject.toml" and "fastapi" in e.matched
-               for e in ctx.technology_evidence)
+    assert any(
+        e.file == "pyproject.toml" and "fastapi" in e.matched for e in ctx.technology_evidence
+    )
     assert "## Detection Evidence" in md
 
 
 # ── absolute path is NOT in rendered markdown ──────────────────
 
+
 def test_absolute_root_path_not_in_markdown(tmp_path: Path) -> None:
-    _add_file(tmp_path, "pyproject.toml",
-              "[project]\ndependencies = ['fastapi']\n")
+    _add_file(tmp_path, "pyproject.toml", "[project]\ndependencies = ['fastapi']\n")
     _add_file(tmp_path, "main.py", "print('ok')")
 
     scan, tech = _scan_tech(tmp_path)
@@ -203,9 +214,9 @@ def test_absolute_root_path_not_in_markdown(tmp_path: Path) -> None:
 
 # ── markdown escaping ──────────────────────────────────────────
 
+
 def test_pipe_in_project_name_does_not_break_table(tmp_path: Path) -> None:
-    _add_file(tmp_path, "pyproject.toml",
-              "[project]\ndependencies = ['fastapi']\n")
+    _add_file(tmp_path, "pyproject.toml", "[project]\ndependencies = ['fastapi']\n")
     _add_file(tmp_path, "main.py", "print('ok')")
 
     scan, tech = _scan_tech(tmp_path)
@@ -220,6 +231,7 @@ def test_pipe_in_project_name_does_not_break_table(tmp_path: Path) -> None:
 
 # ── artifact path safety ───────────────────────────────────────
 
+
 def test_artifact_is_written_to_controlled_directory(tmp_path: Path) -> None:
     _add_file(tmp_path, "main.py", "print('hello')")
     scan, tech = _scan_tech(tmp_path)
@@ -230,9 +242,16 @@ def test_artifact_is_written_to_controlled_directory(tmp_path: Path) -> None:
     assert out.name == "PROJECT_CONTEXT.md"
 
 
-@pytest.mark.parametrize("bad_id", [
-    "../escape", "sub/../../etc", "..\\windows", "", "  ",
-])
+@pytest.mark.parametrize(
+    "bad_id",
+    [
+        "../escape",
+        "sub/../../etc",
+        "..\\windows",
+        "",
+        "  ",
+    ],
+)
 def test_path_escape_is_rejected(tmp_path: Path, bad_id: str) -> None:
     _add_file(tmp_path, "main.py", "print(1)")
     scan, tech = _scan_tech(tmp_path)
@@ -244,13 +263,21 @@ def test_path_escape_is_rejected(tmp_path: Path, bad_id: str) -> None:
 
 # ── T-005.2: secret redaction ──────────────────────────────────
 
-@pytest.mark.parametrize("raw,expected_contains,expected_absent", [
-    ("https://user:pass@example.com/repo.git", "https://<credentials>@example.com", "user:pass"),
-    ("sk-abc123def456ghi789jkl012mno345pqr678stu", "sk-<redacted>", "abc123def"),
-    ("token=ghp_abcdef123456789", "token=<redacted>", "ghp_abcdef"),
-    ("api_key=secret123", "api_key=<redacted>", "secret123"),
-    ("eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dozjgNryP4", "<jwt>", "eyJhbGci"),
-])
+
+@pytest.mark.parametrize(
+    "raw,expected_contains,expected_absent",
+    [
+        (
+            "https://user:pass@example.com/repo.git",
+            "https://<credentials>@example.com",
+            "user:pass",
+        ),
+        ("sk-abc123def456ghi789jkl012mno345pqr678stu", "sk-<redacted>", "abc123def"),
+        ("token=ghp_abcdef123456789", "token=<redacted>", "ghp_abcdef"),
+        ("api_key=secret123", "api_key=<redacted>", "secret123"),
+        ("eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dozjgNryP4", "<jwt>", "eyJhbGci"),
+    ],
+)
 def test_redact_secrets_strips_credentials(raw, expected_contains, expected_absent):
     result = _redact_secrets(raw)
     assert expected_contains in result
@@ -272,39 +299,36 @@ def test_tainted_evidence_is_redacted_in_full_pipeline(tmp_path: Path) -> None:
     that raw secrets are absent from both the ProjectContext model AND the
     rendered markdown.
     """
-    _add_file(tmp_path, "pyproject.toml",
-              "[project]\ndependencies = ['fastapi', 'pydantic']\n")
+    _add_file(tmp_path, "pyproject.toml", "[project]\ndependencies = ['fastapi', 'pydantic']\n")
     _add_file(tmp_path, "main.py", "print('ok')")
 
     scan, tech = _scan_tech(tmp_path)
 
     # Inject tainted evidence that the detector would NOT normally produce
-    tech.evidence.extend([
-        Evidence(
-            file="pyproject.toml",
-            matched="pkg @ https://deployer:s3cret-pass@private.repo.com/pkg.whl",
-        ),
-        Evidence(
-            file="config.ini",
-            matched="api_key=sk-proj-abc123def456ghi789jkl",
-        ),
-        Evidence(
-            file="auth.py",
-            matched="eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhZG1pbiJ9.signed",
-        ),
-    ])
+    tech.evidence.extend(
+        [
+            Evidence(
+                file="pyproject.toml",
+                matched="pkg @ https://deployer:s3cret-pass@private.repo.com/pkg.whl",
+            ),
+            Evidence(
+                file="config.ini",
+                matched="api_key=sk-proj-abc123def456ghi789jkl",
+            ),
+            Evidence(
+                file="auth.py",
+                matched="eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhZG1pbiJ9.signed",
+            ),
+        ]
+    )
 
     ctx = _generate(_generator(), "secret-test", scan, tech)
     md = _generator().render_markdown(ctx)
 
     # Raw secrets MUST NOT appear in the model evidence
-    all_evidence_text = "|".join(
-        f"{e.file}|{e.matched}" for e in ctx.technology_evidence
-    )
+    all_evidence_text = "|".join(f"{e.file}|{e.matched}" for e in ctx.technology_evidence)
     for secret in ["deployer:s3cret-pass", "sk-proj-abc123", "eyJhbGciOiJIUzI1NiJ9"]:
-        assert secret not in all_evidence_text, (
-            f"Raw secret leaked into ProjectContext: {secret}"
-        )
+        assert secret not in all_evidence_text, f"Raw secret leaked into ProjectContext: {secret}"
 
     # Raw secrets MUST NOT appear in rendered markdown
     for secret in ["deployer:s3cret-pass", "sk-proj-abc123", "eyJhbGciOiJIUzI1NiJ9"]:
@@ -320,6 +344,7 @@ def test_tainted_evidence_is_redacted_in_full_pipeline(tmp_path: Path) -> None:
 
 
 # ── T-005.2: control character stripping ───────────────────────
+
 
 def test_newlines_stripped_from_project_name(tmp_path: Path) -> None:
     _add_file(tmp_path, "main.py", "print(1)")
@@ -370,10 +395,10 @@ def test_sanitize_evidence_strips_control_and_secrets():
 
 # ── T-005.2: markdown injection via newlines ────────────────────
 
+
 def test_newlines_in_evidence_do_not_inject_markdown(tmp_path: Path) -> None:
     """A newline in evidence must not create fake headings or table rows."""
-    _add_file(tmp_path, "pyproject.toml",
-              "[project]\ndependencies = ['fastapi']\n")
+    _add_file(tmp_path, "pyproject.toml", "[project]\ndependencies = ['fastapi']\n")
     _add_file(tmp_path, "main.py", "print('ok')")
 
     scan, tech = _scan_tech(tmp_path)
@@ -387,6 +412,7 @@ def test_newlines_in_evidence_do_not_inject_markdown(tmp_path: Path) -> None:
 
 
 # ── partial project ────────────────────────────────────────────
+
 
 def test_partial_project_lists_missing_tools_as_unknowns(tmp_path: Path) -> None:
     _add_file(tmp_path, "requirements.txt", "fastapi\n")
@@ -403,6 +429,7 @@ def test_partial_project_lists_missing_tools_as_unknowns(tmp_path: Path) -> None
 
 # ── .gitignore verification ────────────────────────────────────
 
+
 def test_artifacts_directory_is_gitignored():
     gitignore = Path(__file__).parent.parent / ".gitignore"
     assert "artifacts/" in gitignore.read_text()
@@ -410,10 +437,10 @@ def test_artifacts_directory_is_gitignored():
 
 # ── oversized files ────────────────────────────────────────────
 
+
 def test_oversized_files_recorded_not_read(tmp_path: Path) -> None:
     scanner = RepositoryScanner([tmp_path], ScanLimits(max_file_size_bytes=10))
-    _add_file(tmp_path, "pyproject.toml",
-              "[project]\ndependencies = ['fastapi']\n")
+    _add_file(tmp_path, "pyproject.toml", "[project]\ndependencies = ['fastapi']\n")
     _add_file(tmp_path, "small.py", "print('ok')")
     (tmp_path / "huge.py").write_bytes(b"x" * 100)
 
@@ -429,9 +456,9 @@ def test_oversized_files_recorded_not_read(tmp_path: Path) -> None:
 
 # ── multiple entry candidates ──────────────────────────────────
 
+
 def test_multiple_entry_candidates_all_listed(tmp_path: Path) -> None:
-    _add_file(tmp_path, "pyproject.toml",
-              "[project]\ndependencies = ['fastapi']\n")
+    _add_file(tmp_path, "pyproject.toml", "[project]\ndependencies = ['fastapi']\n")
     _add_file(tmp_path, "api/v1/users.py", "from fastapi import FastAPI\napp = FastAPI()\n")
     _add_file(tmp_path, "api/v1/orders.py", "from fastapi import FastAPI\nrouter = FastAPI()\n")
 
@@ -446,6 +473,7 @@ def test_multiple_entry_candidates_all_listed(tmp_path: Path) -> None:
 
 # ── different project name changes hash ────────────────────────
 
+
 def test_different_project_name_changes_hash(tmp_path: Path) -> None:
     _add_file(tmp_path, "main.py", "print(1)")
     scan, tech = _scan_tech(tmp_path)
@@ -459,9 +487,9 @@ def test_different_project_name_changes_hash(tmp_path: Path) -> None:
 
 # ── content hash stability ─────────────────────────────────────
 
+
 def test_content_hash_is_stable(tmp_path: Path) -> None:
-    _add_file(tmp_path, "pyproject.toml",
-              "[project]\ndependencies = ['fastapi']\n")
+    _add_file(tmp_path, "pyproject.toml", "[project]\ndependencies = ['fastapi']\n")
     _add_file(tmp_path, "main.py", "from fastapi import FastAPI\napp = FastAPI()\n")
 
     scan, tech = _scan_tech(tmp_path)
@@ -483,6 +511,7 @@ def test_different_fields_produce_different_hashes(tmp_path: Path) -> None:
 
 
 # ── unit tests for sanitization primitives ─────────────────────
+
 
 def test_strip_control_leaves_printable_text():
     assert _strip_control("hello world") == "hello world"

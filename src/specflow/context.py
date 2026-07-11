@@ -77,6 +77,7 @@ def _sanitize_text(value: str) -> str:
 
 # ── ProjectContext ─────────────────────────────────────────────
 
+
 @dataclass(frozen=True)
 class ProjectContext:
     """Structured, evidence-backed project context.
@@ -140,9 +141,7 @@ class ProjectContext:
         Two identical repos cloned to different paths produce the same
         content_hash but different source_hash.
         """
-        return hashlib.sha256(
-            f"{self.content_hash()}|{self.root_path}".encode()
-        ).hexdigest()
+        return hashlib.sha256(f"{self.content_hash()}|{self.root_path}".encode()).hexdigest()
 
 
 class ContextGenerationError(Exception):
@@ -150,6 +149,7 @@ class ContextGenerationError(Exception):
 
 
 # ── ProjectContextGenerator ────────────────────────────────────
+
 
 class ProjectContextGenerator:
     """Generate ProjectContext from scan + technology, render to Markdown,
@@ -173,20 +173,10 @@ class ProjectContextGenerator:
         """
         timestamp = (generated_at or datetime.now(UTC)).isoformat()
         top_dirs = sorted(
-            {
-                d.split("/", 1)[0]
-                for d in scan.directories
-                if d and "/" not in d
-            }
-            | {
-                f.path.split("/", 1)[0]
-                for f in scan.files
-                if "/" in f.path
-            }
+            {d.split("/", 1)[0] for d in scan.directories if d and "/" not in d}
+            | {f.path.split("/", 1)[0] for f in scan.files if "/" in f.path}
         )
-        oversized = sorted(
-            f.path for f in scan.files if f.is_oversized
-        )
+        oversized = sorted(f.path for f in scan.files if f.is_oversized)
 
         safe_name = _sanitize_text(project_name)
         safe_evidence = _sanitize_evidence(list(tech.evidence))
@@ -372,17 +362,13 @@ class ProjectContextGenerator:
         """
         safe_id = project_id.strip()
         if not safe_id or ".." in safe_id or "/" in safe_id or "\\" in safe_id:
-            raise ContextGenerationError(
-                f"Invalid project_id for artifact path: {project_id!r}"
-            )
+            raise ContextGenerationError(f"Invalid project_id for artifact path: {project_id!r}")
 
         target_dir = (artifacts_root / safe_id).resolve()
         try:
             target_dir.relative_to(artifacts_root.resolve())
         except ValueError:
-            raise ContextGenerationError(
-                f"Artifact path escapes root: {project_id!r}"
-            )
+            raise ContextGenerationError(f"Artifact path escapes root: {project_id!r}")
 
         target_dir.mkdir(parents=True, exist_ok=True)
         output_path = target_dir / "PROJECT_CONTEXT.md"

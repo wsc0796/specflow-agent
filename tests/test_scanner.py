@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 import pytest
@@ -75,3 +76,20 @@ def test_enforces_file_count_limit(tmp_path: Path) -> None:
     (repository / "two.txt").write_text("2")
     with pytest.raises(FileLimitExceededError):
         scanner(tmp_path, max_files=1).scan(repository)
+
+
+@pytest.mark.skipif(os.name == "nt", reason="directory symlinks require admin on Windows")
+def test_skips_directory_symlink_escaping_repo(tmp_path: Path) -> None:
+    repository = tmp_path / "repo"
+    repository.mkdir()
+    (repository / "safe_dir").mkdir()
+    (repository / "safe.py").write_text("x")
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    symlink = repository / "escape_dir"
+    symlink.symlink_to(outside, target_is_directory=True)
+
+    result = scanner(tmp_path).scan(repository)
+
+    assert symlink.name not in result.directories
+    assert "safe_dir" in result.directories
