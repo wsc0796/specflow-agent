@@ -2,8 +2,9 @@
 
 ## Current phase
 
-The project is in Milestone 1, task T-003. The implemented behavior is the
-health endpoint, Project persistence API, and deterministic repository scanning.
+The project is in Milestone 1, task T-004. The implemented behavior is the health
+endpoint, Project persistence API, safe scanning, and deterministic technology
+identification.
 Future task IDs are not permission to implement future features.
 
 ## Mandatory workflow
@@ -24,8 +25,8 @@ Future task IDs are not permission to implement future features.
 ## Architecture constraints
 
 - Use the `src/` layout.
-- T-003 permits a deterministic, metadata-only repository scanner. It must not
-  write the database or introduce a scanning API.
+- T-004 permits deterministic technology detection from explicit repository files.
+  It must report evidence and must not generate project context or call an LLM.
 - Do not add prompts, workers, LLM calls, workflow orchestration, Redis,
   LangGraph, vector stores, MCP, Java support, or automatic code changes before
   their explicitly assigned task.

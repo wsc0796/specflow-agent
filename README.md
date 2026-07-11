@@ -7,9 +7,9 @@ deterministic quality gate.
 
 ## Current milestone
 
-T-003 adds a deterministic, metadata-only repository scanner. It validates allowed
-roots, rejects escaped paths, skips common generated directories, and enforces file
-count and size limits. Technology recognition, LLM integrations, and workflow
+T-004 adds deterministic, evidence-backed Python/FastAPI technology detection after
+safe repository scanning. It identifies supported dependencies and entry candidates
+from explicit files; project-context generation, LLM integrations, and workflow
 execution remain deferred.
 
 ## Prerequisites
