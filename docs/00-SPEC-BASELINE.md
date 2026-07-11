@@ -18,7 +18,6 @@
 
 ## Current task
 
-T-001 initializes the repository with a FastAPI application, `GET /health`, pytest,
-Ruff, a README, and these engineering rules. It must not introduce later-stage
-architecture.
-
+T-003 implements safe, metadata-only repository traversal after T-002 persistence.
+It must not perform technology recognition, generate project context, call an LLM,
+or mutate workflow state.

@@ -7,8 +7,10 @@ deterministic quality gate.
 
 ## Current milestone
 
-T-002 provides a SQLite-backed Project registration API. Repository scanning, LLM
-integrations, and workflow execution are deliberately deferred to their task specs.
+T-003 adds a deterministic, metadata-only repository scanner. It validates allowed
+roots, rejects escaped paths, skips common generated directories, and enforces file
+count and size limits. Technology recognition, LLM integrations, and workflow
+execution remain deferred.
 
 ## Prerequisites
 

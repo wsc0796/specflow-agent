@@ -2,9 +2,9 @@
 
 ## Current phase
 
-The project is in Milestone 1, task T-002. The implemented behavior is the
-health endpoint and Project persistence API. Future task IDs are not permission
-to implement future features.
+The project is in Milestone 1, task T-003. The implemented behavior is the
+health endpoint, Project persistence API, and deterministic repository scanning.
+Future task IDs are not permission to implement future features.
 
 ## Mandatory workflow
 
@@ -24,9 +24,9 @@ to implement future features.
 ## Architecture constraints
 
 - Use the `src/` layout.
-- T-002 permits models and the Project repository/service/API boundary only for
-  `Project`, `ProjectScan`, and `WorkflowRun`.
-- Do not add scanners, prompts, workers, LLM calls, workflow orchestration, Redis,
+- T-003 permits a deterministic, metadata-only repository scanner. It must not
+  write the database or introduce a scanning API.
+- Do not add prompts, workers, LLM calls, workflow orchestration, Redis,
   LangGraph, vector stores, MCP, Java support, or automatic code changes before
   their explicitly assigned task.
 - Keep HTTP-boundary code separate from future business and persistence layers.
