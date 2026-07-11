@@ -1,14 +1,20 @@
-"""T-005.1 — Project context generator (determinism & evidence hardening).
+"""T-005.2 — Project context generator (security hardening).
 
 Combines a T-003 ScanResult with a T-004 TechnologyStack and renders a
 deterministic, evidence-backed PROJECT_CONTEXT.md.  Never re-traverses
 or reads files outside the safety scan boundary.
+
+T-005.2 adds:
+- Evidence redaction (URL credentials, tokens, API keys)
+- Control-character stripping (project_name, warnings, evidence)
+- Clarified content_hash (document identity; excludes root_path)
 """
 
 from __future__ import annotations
 
 import hashlib
 import json
+import re
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -16,6 +22,60 @@ from pathlib import Path
 from specflow.scanner import ScanResult
 from specflow.technology import Evidence, TechnologyStack
 
+# ── sanitization patterns ──────────────────────────────────────
+
+# URL credentials: https://user:pass@host → https://<credentials>@host
+_URL_CREDENTIALS = re.compile(r"(https?://)[^/@]+:[^/@]+@")
+
+# Common token / key patterns
+_TOKEN_PATTERNS = [
+    (re.compile(r"sk-[a-zA-Z0-9_-]{20,}"), "sk-<redacted>"),
+    (re.compile(r"eyJ[a-zA-Z0-9_-]{12,}\.[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]*"), "<jwt>"),
+    (re.compile(r"token[=:]\s*\S+", re.IGNORECASE), "token=<redacted>"),
+    (re.compile(r"api_key[=:]\s*\S+", re.IGNORECASE), "api_key=<redacted>"),
+    (re.compile(r"secret[=:]\s*\S+", re.IGNORECASE), "secret=<redacted>"),
+    (re.compile(r"password[=:]\s*\S+", re.IGNORECASE), "password=<redacted>"),
+]
+
+# Control characters to strip (keep printable + space + common Unicode)
+_CONTROL_RE = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f]")
+
+
+def _redact_secrets(text: str) -> str:
+    """Remove URL credentials and token patterns from *text*.
+
+    Does NOT redact dependency version specifiers (e.g. ``fastapi==0.115``).
+    """
+    text = _URL_CREDENTIALS.sub(r"\1<credentials>@", text)
+    for pattern, replacement in _TOKEN_PATTERNS:
+        text = pattern.sub(replacement, text)
+    return text
+
+
+def _strip_control(text: str) -> str:
+    """Replace newlines/tabs with space; remove other C0 control characters."""
+    text = text.replace("\r\n", " ").replace("\n", " ").replace("\r", " ")
+    text = text.replace("\t", " ")
+    return _CONTROL_RE.sub("", text)
+
+
+def _sanitize_evidence(raw: list[Evidence]) -> list[Evidence]:
+    """Return a copy of *raw* with secrets redacted and control chars stripped."""
+    return [
+        Evidence(
+            file=_strip_control(_redact_secrets(e.file)),
+            matched=_strip_control(_redact_secrets(e.matched)),
+        )
+        for e in raw
+    ]
+
+
+def _sanitize_text(value: str) -> str:
+    """Strip control characters from a single text value."""
+    return _strip_control(value)
+
+
+# ── ProjectContext ─────────────────────────────────────────────
 
 @dataclass(frozen=True)
 class ProjectContext:
@@ -45,14 +105,14 @@ class ProjectContext:
     generated_at: str = ""
 
     def content_hash(self) -> str:
-        """Stable SHA-256 digest of all content-significant fields.
+        """SHA-256 digest of content-significant fields.
 
-        Uses canonical JSON to avoid delimiter collision.
-        Excludes *generated_at* so the hash is time-invariant.
+        Represents the identity of the *document content* — two contexts
+        with identical content but different root_path produce the same hash.
+        Excludes: root_path, generated_at (both are deployment/runtime details).
         """
         payload: dict[str, object] = {
             "project_name": self.project_name,
-            "root_path": self.root_path,
             "language": self.language,
             "frameworks": sorted(self.frameworks),
             "validation_library": self.validation_library,
@@ -74,10 +134,22 @@ class ProjectContext:
         raw = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
         return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
+    def source_hash(self) -> str:
+        """SHA-256 of content_hash + root_path — for project-level dedup.
+
+        Two identical repos cloned to different paths produce the same
+        content_hash but different source_hash.
+        """
+        return hashlib.sha256(
+            f"{self.content_hash()}|{self.root_path}".encode()
+        ).hexdigest()
+
 
 class ContextGenerationError(Exception):
     """Raised when the generator cannot produce a safe artifact."""
 
+
+# ── ProjectContextGenerator ────────────────────────────────────
 
 class ProjectContextGenerator:
     """Generate ProjectContext from scan + technology, render to Markdown,
@@ -94,9 +166,10 @@ class ProjectContextGenerator:
     ) -> ProjectContext:
         """Build a ProjectContext from a safety scan and technology stack.
 
-        *generated_at* is injected for test determinism; when omitted the
-        current UTC time is used for the model field but NEVER rendered
-        into the Markdown output.
+        Sanitization (secret redaction, control-character stripping) is
+        applied to *project_name*, *warnings*, and *evidence* before the
+        context is stored — so no downstream consumer (artifact writer or
+        future LLM Context Builder) can accidentally expose raw values.
         """
         timestamp = (generated_at or datetime.now(UTC)).isoformat()
         top_dirs = sorted(
@@ -115,8 +188,12 @@ class ProjectContextGenerator:
             f.path for f in scan.files if f.is_oversized
         )
 
+        safe_name = _sanitize_text(project_name)
+        safe_evidence = _sanitize_evidence(list(tech.evidence))
+        safe_warnings = [_sanitize_text(w) for w in tech.parse_warnings]
+
         return ProjectContext(
-            project_name=project_name,
+            project_name=safe_name,
             root_path=scan.root,
             language=tech.language,
             frameworks=sorted(tech.frameworks),
@@ -126,13 +203,13 @@ class ProjectContextGenerator:
             test_framework=tech.test_framework,
             lint_tools=sorted(tech.lint_tools),
             dependency_files=sorted(tech.dependency_files),
-            entry_candidates=tech.application_entry_candidates,
+            entry_candidates=sorted(tech.application_entry_candidates),
             top_level_directories=top_dirs,
             total_files=scan.total_files,
             ignored_directories=scan.ignored_directories,
             oversized_files=oversized,
-            parse_warnings=tech.parse_warnings,
-            technology_evidence=list(tech.evidence),
+            parse_warnings=safe_warnings,
+            technology_evidence=safe_evidence,
             generated_at=timestamp,
         )
 
@@ -141,8 +218,7 @@ class ProjectContextGenerator:
 
         Sections appear in a fixed order.  Empty lists and ``None`` values
         are represented explicitly.  The output never includes the absolute
-        *root_path* or time-varying *generated_at* — those belong in the
-        database or artifact metadata, not in the rendered document.
+        *root_path* or time-varying *generated_at*.
         """
         lines: list[str] = []
         _ = lines.append

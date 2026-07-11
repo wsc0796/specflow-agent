@@ -7,54 +7,51 @@ T-004 `TechnologyStack` into a deterministic, evidence-backed `PROJECT_CONTEXT.m
 artifact. The generator never re-traverses or reads files outside the safety scan
 boundary.
 
-T-005.1 hardened determinism (time-invariant markdown), evidence traceability
-(Detection Evidence section), path sanitization (no absolute paths in output),
-content hash via canonical JSON, and markdown escaping.
+## Revision history
 
-## Files changed
+| Version | Changes |
+| --- | --- |
+| T-005 | Initial implementation: `ProjectContext`, `ProjectContextGenerator`, 7-section Markdown, artifact writer, 16 tests |
+| T-005.1 | Determinism (time-invariant markdown), evidence traceability (`## Detection Evidence`), path sanitization, JSON content_hash, markdown escaping, 22 tests |
+| T-005.2 | Secret redaction (URL credentials, tokens, API keys, JWT), control-character stripping for markdown injection prevention, clarified content_hash vs source_hash semantics, 33 tests |
 
-- `src/specflow/context.py`: `ProjectContext` model with `technology_evidence`,
-  JSON-based `content_hash`, `ProjectContextGenerator` with injected `generated_at`,
-  sanitized markdown rendering, `## Detection Evidence` section, `_esc` helper.
-- `tests/test_context.py`: 22 tests including time-invariance, evidence preservation,
-  path sanitization, pipe escaping, hash collision protection, gitignore verification.
-- `.gitignore`: added `artifacts/`.
-- `docs/tasks/T-005-project-context-generator.md`: task scope and acceptance contract.
-- `AGENTS.md`, `README.md`: advance current task boundary to T-005.
+## T-005.2 hardening (applied 2026-07-11)
+
+1. **Secret redaction** — `_redact_secrets()` strips URL credentials (`user:pass@host`),
+   API keys (`sk-...`), JWT tokens, `token=`/`api_key=`/`secret=`/`password=` patterns.
+   Applied to all Evidence before storage. Does NOT redact dependency version specifiers.
+2. **Control-character stripping** — `_sanitize_text()` and `_strip_control()` remove
+   `\r`, `\n`, `\t`, and C0 control characters from project_name, warnings, and evidence.
+   Prevents markdown injection via embedded newlines.
+3. **content_hash semantics** — `content_hash()` now excludes `root_path` (identifies
+   document content). `source_hash()` = `hash(content_hash + root_path)` for project-level
+   dedup across different clone paths.
+4. **Sanitization happens at context creation** — `generate()` applies redaction before
+   returning the `ProjectContext`, so no downstream consumer can expose raw values.
 
 ## Acceptance evidence
 
 | Requirement | Evidence |
 | --- | --- |
-| Normal FastAPI → complete context | 8 sections present with correct values |
-| Unknown project → "Unknown" stated | `language=unknown` and warning in markdown |
-| Corrupted pyproject → warning in doc | `parse_warnings` in `## Scan Limits & Warnings` |
-| .venv ignored | `.venv` recorded as ignored, no leaked entries |
-| Oversized files not read | Recorded in context, not content-read |
-| Multiple entry candidates listed | 2 entries + disclaimer in markdown |
-| Time-invariant markdown | 2 tests: same input → identical output; different timestamps → same markdown |
-| Evidence preserved | `technology_evidence` field populated, `## Detection Evidence` section present |
-| Absolute path NOT in markdown | `str(tmp_path)` absent; no `C:` or `Users` in output |
-| Pipe in name doesn't break table | `\|` escaping verified in table rows |
-| JSON-based hash | SHA-256 of canonical JSON; pipe-in-name produces different hash |
-| Artifact path escape rejected | 5 parametrized `bad_id` values raise error |
-| artifacts/ gitignored | `.gitignore` assertion passes |
-| Quality gate | `pytest -v`: 52 passed; `ruff check .`: passed |
+| URL credentials redacted | `user:pass@host` → `<credentials>` in output |
+| API key / token redacted | `sk-xxx`, `token=xxx`, `api_key=xxx`, JWT all masked |
+| Dependency specifiers preserved | `fastapi==0.115` unchanged |
+| Control chars stripped from names | `\n`, `\r`, `\t`, `\x00` removed from project_name |
+| Control chars stripped from warnings | Parse warnings free of control characters |
+| Evidence sanitized before storage | Both file and matched fields cleaned |
+| Markdown injection prevented | Newlines in evidence cannot create fake headings |
+| content_hash excludes root_path | Same content, different path → same hash |
+| source_hash includes root_path | Different path → different source_hash |
+| Quality gate | `pytest -v`: 69 passed; `ruff check .`: passed |
 
-## T-005.1 hardening (applied 2026-07-11)
+## Files changed
 
-1. **Determinism** — `generated_at` removed from markdown output; injected via
-   parameter in tests for reproducibility.
-2. **Evidence traceability** — `technology_evidence: list[Evidence]` added to
-   `ProjectContext`; `## Detection Evidence` section renders file & match pairs.
-3. **Path sanitization** — absolute `root_path` kept in model for internal use
-   but never rendered into markdown.
-4. **artifacts/ gitignored** — prevents accidental push of generated files
-   containing local paths.
-5. **JSON content hash** — replaces delimiter-based string concatenation with
-   `json.dumps(sort_keys=True)` to eliminate collision risk.
-6. **Markdown escaping** — `_esc()` handles `|` and backtick characters in
-   table values and inline code.
+- `src/specflow/context.py`: `_redact_secrets`, `_strip_control`, `_sanitize_evidence`,
+  `_sanitize_text`, `source_hash()`, updated `content_hash()`, integrated sanitization into `generate()`.
+- `tests/test_context.py`: 33 tests covering redaction, control chars, hash semantics, injection prevention.
+- `.gitignore`: `artifacts/` (T-005.1).
+- `docs/tasks/T-005-project-context-generator.md`: task scope.
+- `AGENTS.md`, `README.md`: current task boundary.
 
 ## Next prerequisite
 
