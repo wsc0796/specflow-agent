@@ -7,7 +7,8 @@ The project has completed Milestone 3 (Agent Runtime Foundation), Milestone 4
 T-012 Workflow State Machine, T-013 Agent
 Executor, T-014 Worker Framework, T-015 Analyze Worker, T-016 Generate Worker,
 T-017 Review Worker, T-018 Tool Framework, T-019 Read-only Repository Tools,
-and T-020 OpenAI-compatible LLM Provider are completed. Implemented:
+T-020 OpenAI-compatible LLM Provider, and T-021 Repository-aware Agent
+Integration are completed. Implemented:
 health endpoint, Project persistence API, safe scanning, deterministic technology
 identification with evidence, sanitized PROJECT_CONTEXT.md generation, Prompt
 Registry, Context Builder, Token Budget Manager, LLM Client abstraction, Trace
@@ -18,8 +19,10 @@ AnalysisOutput, a review Worker that distinguishes business REJECT from
 execution failure, explicit Tool models, Registry, and Executor contracts, plus
 repository-root-bound `list_files`, `search_code`, and `read_file` tools with
 bounded, sanitized output, plus one configurable Provider that maps a single
-OpenAI-compatible HTTP completion into the existing LLM contracts.
-The next permitted task is T-021 Repository-aware Agent Integration.
+OpenAI-compatible HTTP completion into the existing LLM contracts, and a bounded
+deterministic evidence collection pipeline that uses the Tool Framework to feed
+real repository evidence into the Analyze/Generate/Review Worker chain.
+The next permitted task is T-022 CLI and Artifact Delivery.
 Future task IDs are not permission to implement future features.
 
 ## Mandatory workflow

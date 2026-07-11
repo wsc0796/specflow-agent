@@ -159,6 +159,18 @@ performs one `/chat/completions` request, and maps the response into the existin
 `LLMResponse` and `LLMUsage` models. It does not retry, call fallback, log prompts,
 or expose provider error bodies. `MockLLMClient` remains the default test double.
 
+## Repository Evidence Pipeline
+
+T-021 adds a bounded, deterministic evidence collection pipeline that bridges the
+Tool Framework with the M4 Agent Workflow. The `EvidenceCollector` extracts
+search keywords from the requirement, uses `list_files` / `search_code` /
+`read_file` tools to gather real repository evidence, ranks files by match
+relevance, and produces a stable `EvidenceBundle` with a deterministic hash.
+The serialized evidence is injected into `WorkerContext.project_context` for
+consumption by the Analyze/Generate/Review Worker chain. All tool calls are
+recorded as sanitized `ToolCallRecord` entries. The pipeline enforces hard
+limits on keywords, tool calls, selected files, and total evidence characters.
+
 Example process configuration (use your own provider values and never commit the
 real key):
 
