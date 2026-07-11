@@ -1,4 +1,4 @@
-"""T-005 — Project context generator.
+"""T-005.1 — Project context generator (determinism & evidence hardening).
 
 Combines a T-003 ScanResult with a T-004 TechnologyStack and renders a
 deterministic, evidence-backed PROJECT_CONTEXT.md.  Never re-traverses
@@ -8,12 +8,13 @@ or reads files outside the safety scan boundary.
 from __future__ import annotations
 
 import hashlib
+import json
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 
 from specflow.scanner import ScanResult
-from specflow.technology import TechnologyStack
+from specflow.technology import Evidence, TechnologyStack
 
 
 @dataclass(frozen=True)
@@ -40,24 +41,38 @@ class ProjectContext:
     ignored_directories: list[str] = field(default_factory=list)
     oversized_files: list[str] = field(default_factory=list)
     parse_warnings: list[str] = field(default_factory=list)
+    technology_evidence: list[Evidence] = field(default_factory=list)
     generated_at: str = ""
 
     def content_hash(self) -> str:
-        """Stable SHA-256 digest of all context fields."""
-        raw = (
-            f"{self.project_name}|{self.root_path}|{self.language}|"
-            f"{','.join(sorted(self.frameworks))}|"
-            f"{self.validation_library}|{self.orm}|{self.database}|"
-            f"{self.test_framework}|{','.join(sorted(self.lint_tools))}|"
-            f"{','.join(sorted(self.dependency_files))}|"
-            f"{','.join(sorted(self.entry_candidates))}|"
-            f"{','.join(sorted(self.top_level_directories))}|"
-            f"{self.total_files}|"
-            f"{','.join(sorted(self.ignored_directories))}|"
-            f"{','.join(sorted(self.oversized_files))}|"
-            f"{','.join(sorted(self.parse_warnings))}"
-        )
-        return hashlib.sha256(raw.encode()).hexdigest()
+        """Stable SHA-256 digest of all content-significant fields.
+
+        Uses canonical JSON to avoid delimiter collision.
+        Excludes *generated_at* so the hash is time-invariant.
+        """
+        payload: dict[str, object] = {
+            "project_name": self.project_name,
+            "root_path": self.root_path,
+            "language": self.language,
+            "frameworks": sorted(self.frameworks),
+            "validation_library": self.validation_library,
+            "orm": self.orm,
+            "database": self.database,
+            "test_framework": self.test_framework,
+            "lint_tools": sorted(self.lint_tools),
+            "dependency_files": sorted(self.dependency_files),
+            "entry_candidates": sorted(self.entry_candidates),
+            "top_level_directories": sorted(self.top_level_directories),
+            "total_files": self.total_files,
+            "ignored_directories": sorted(self.ignored_directories),
+            "oversized_files": sorted(self.oversized_files),
+            "parse_warnings": sorted(self.parse_warnings),
+            "technology_evidence": sorted(
+                f"{e.file}|{e.matched}" for e in self.technology_evidence
+            ),
+        }
+        raw = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+        return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
 
 class ContextGenerationError(Exception):
@@ -75,8 +90,15 @@ class ProjectContextGenerator:
         project_name: str,
         scan: ScanResult,
         tech: TechnologyStack,
+        generated_at: datetime | None = None,
     ) -> ProjectContext:
-        """Build a ProjectContext from a safety scan and technology stack."""
+        """Build a ProjectContext from a safety scan and technology stack.
+
+        *generated_at* is injected for test determinism; when omitted the
+        current UTC time is used for the model field but NEVER rendered
+        into the Markdown output.
+        """
+        timestamp = (generated_at or datetime.now(UTC)).isoformat()
         top_dirs = sorted(
             {
                 d.split("/", 1)[0]
@@ -110,24 +132,24 @@ class ProjectContextGenerator:
             ignored_directories=scan.ignored_directories,
             oversized_files=oversized,
             parse_warnings=tech.parse_warnings,
-            generated_at=datetime.now(UTC).isoformat(),
+            technology_evidence=list(tech.evidence),
+            generated_at=timestamp,
         )
 
     def render_markdown(self, ctx: ProjectContext) -> str:
         """Render a ProjectContext to deterministic Markdown.
 
         Sections appear in a fixed order.  Empty lists and ``None`` values
-        are represented explicitly so the output never silently omits
-        information.
+        are represented explicitly.  The output never includes the absolute
+        *root_path* or time-varying *generated_at* — those belong in the
+        database or artifact metadata, not in the rendered document.
         """
         lines: list[str] = []
         _ = lines.append
 
         _("# Project Context")
         _("")
-        _(f"**Project:** {ctx.project_name}")
-        _(f"**Root:** {ctx.root_path}")
-        _(f"**Generated:** {ctx.generated_at}")
+        _(f"**Project:** {self._esc(ctx.project_name)}")
         _("")
 
         # ── Project Overview ──
@@ -135,22 +157,25 @@ class ProjectContextGenerator:
         _("")
         _("| Field | Value |")
         _("| --- | --- |")
-        _(f"| Language | {ctx.language} |")
-        _(f"| Frameworks | {self._list_value(ctx.frameworks)} |")
-        _(f"| Validation | {self._opt(ctx.validation_library)} |")
-        _(f"| ORM | {self._opt(ctx.orm)} |")
-        _(f"| Database | {self._opt(ctx.database)} |")
+        _(f"| Language | {self._esc(ctx.language)} |")
+        _(f"| Frameworks | {self._esc(self._list_value(ctx.frameworks))} |")
+        _(f"| Validation | {self._esc(self._opt(ctx.validation_library))} |")
+        _(f"| ORM | {self._esc(self._opt(ctx.orm))} |")
+        _(f"| Database | {self._esc(self._opt(ctx.database))} |")
         _("")
 
         # ── Directory Summary ──
         _("## Directory Summary")
         _("")
         _(f"- **Total files (scanned):** {ctx.total_files}")
-        _(f"- **Top-level directories:** {self._list_value(ctx.top_level_directories)}")
+        _(f"- **Top-level directories:** {self._esc(self._list_value(ctx.top_level_directories))}")
         if ctx.ignored_directories:
-            _(f"- **Ignored directories:** {self._list_value(ctx.ignored_directories)}")
+            _(f"- **Ignored directories:** {self._esc(self._list_value(ctx.ignored_directories))}")
         if ctx.oversized_files:
-            _(f"- **Oversized files (not read):** {self._list_value(ctx.oversized_files)}")
+            _(
+                f"- **Oversized files (not read):** "
+                f"{self._esc(self._list_value(ctx.oversized_files))}"
+            )
         _("")
 
         # ── Technology Stack ──
@@ -162,14 +187,32 @@ class ProjectContextGenerator:
         else:
             _("| Component | Detected |")
             _("| --- | --- |")
-            _(f"| Language | {ctx.language} |")
-            _(f"| Frameworks | {self._list_value(ctx.frameworks)} |")
-            _(f"| Validation library | {self._opt(ctx.validation_library)} |")
-            _(f"| ORM | {self._opt(ctx.orm)} |")
-            _(f"| Database | {self._opt(ctx.database)} |")
-            _(f"| Test framework | {self._opt(ctx.test_framework)} |")
-            _(f"| Lint tools | {self._list_value(ctx.lint_tools)} |")
+            _(f"| Language | {self._esc(ctx.language)} |")
+            _(f"| Frameworks | {self._esc(self._list_value(ctx.frameworks))} |")
+            _(f"| Validation library | {self._esc(self._opt(ctx.validation_library))} |")
+            _(f"| ORM | {self._esc(self._opt(ctx.orm))} |")
+            _(f"| Database | {self._esc(self._opt(ctx.database))} |")
+            _(f"| Test framework | {self._esc(self._opt(ctx.test_framework))} |")
+            _(f"| Lint tools | {self._esc(self._list_value(ctx.lint_tools))} |")
             _("")
+
+        # ── Detection Evidence ──
+        _("## Detection Evidence")
+        _("")
+        _("_Every conclusion below is backed by a concrete file and match string._")
+        _("")
+        if ctx.technology_evidence:
+            _("| File | Matched |")
+            _("| --- | --- |")
+            seen: set[tuple[str, str]] = set()
+            for ev in ctx.technology_evidence:
+                key = (ev.file, ev.matched)
+                if key not in seen:
+                    seen.add(key)
+                    _(f"| `{self._esc(ev.file)}` | `{self._esc(ev.matched)}` |")
+        else:
+            _("- _No detection evidence recorded_")
+        _("")
 
         # ── Application Entry Candidates ──
         _("## Application Entry Candidates")
@@ -181,7 +224,7 @@ class ProjectContextGenerator:
         _("")
         if ctx.entry_candidates:
             for path in ctx.entry_candidates:
-                _(f"- `{path}`")
+                _(f"- `{self._esc(path)}`")
         else:
             _("- _None detected_")
         _("")
@@ -191,7 +234,7 @@ class ProjectContextGenerator:
         _("")
         if ctx.dependency_files:
             for path in ctx.dependency_files:
-                _(f"- `{path}`")
+                _(f"- `{self._esc(path)}`")
         else:
             _("- _None detected_")
         _("")
@@ -199,8 +242,8 @@ class ProjectContextGenerator:
         # ── Testing & Linting ──
         _("## Testing & Linting")
         _("")
-        _(f"- **Test framework:** {self._opt(ctx.test_framework)}")
-        _(f"- **Lint tools:** {self._list_value(ctx.lint_tools)}")
+        _(f"- **Test framework:** {self._esc(self._opt(ctx.test_framework))}")
+        _(f"- **Lint tools:** {self._esc(self._list_value(ctx.lint_tools))}")
         _("")
 
         # ── Scan Limits & Warnings ──
@@ -211,7 +254,7 @@ class ProjectContextGenerator:
                 _("### Parse Warnings")
                 _("")
                 for w in ctx.parse_warnings:
-                    _(f"- {w}")
+                    _(f"- {self._esc(w)}")
                 _("")
             if ctx.oversized_files:
                 _("### Oversized Files")
@@ -219,13 +262,13 @@ class ProjectContextGenerator:
                 _("The following files exceeded the size limit and were not read:")
                 _("")
                 for f in ctx.oversized_files:
-                    _(f"- `{f}`")
+                    _(f"- `{self._esc(f)}`")
                 _("")
             if ctx.ignored_directories:
                 _("### Ignored Directories")
                 _("")
                 for d in ctx.ignored_directories:
-                    _(f"- `{d}`")
+                    _(f"- `{self._esc(d)}`")
                 _("")
 
         # ── Unknowns ──
@@ -234,7 +277,7 @@ class ProjectContextGenerator:
         unknowns = self._collect_unknowns(ctx)
         if unknowns:
             for u in unknowns:
-                _(f"- {u}")
+                _(f"- {self._esc(u)}")
         else:
             _("- _All supported dimensions were detected._")
         _("")
@@ -281,6 +324,11 @@ class ProjectContextGenerator:
         if not items:
             return "_None_"
         return ", ".join(items)
+
+    @staticmethod
+    def _esc(value: str) -> str:
+        """Escape ``|`` and backticks so values don't break Markdown tables."""
+        return value.replace("|", "\\|").replace("`", "\\`")
 
     @staticmethod
     def _collect_unknowns(ctx: ProjectContext) -> list[str]:
