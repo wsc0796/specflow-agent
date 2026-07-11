@@ -21,14 +21,16 @@ LLM runtime and metadata-only traces. T-011 adds fallback handling for predictab
 degraded results.
 
 M4 is in progress. T-012 Workflow State Machine, T-013 Agent Executor, T-014
-Worker Framework, T-015 Analyze Worker, and T-016 Generate Worker are complete. The system can now
+Worker Framework, T-015 Analyze Worker, T-016 Generate Worker, and T-017 Review
+Worker are complete. The system can now
 model workflow states, enforce legal transitions, record state history, restore
 workflow snapshots, execute abstract step handlers deterministically, define
 Worker contracts, register Workers explicitly, adapt Worker results into
 Executor steps, and run the first real requirement-analysis Worker using the
 existing Prompt, Context, Budget, LLM, Trace, and Fallback layers. It can also
 consume `AnalysisOutput` to produce a bounded `GenerationOutput`. It still does
-not implement Review Worker or automatic code generation.
+review `GenerationOutput` and distinguish business `REJECT` from execution
+failure. It still does not implement automatic code generation.
 
 ## T-001 foundation boundary
 
@@ -91,8 +93,9 @@ registration, and a `WorkerStepHandler` adapter for the existing Agent Executor.
 It now includes `AnalyzeWorker`, the first real business Worker, which produces a
 structured `AnalysisOutput` while preserving the Executor/Workflow boundary. It
 also includes `GenerateWorker`, which consumes `AnalysisOutput` and produces a
-structured `GenerationOutput`. It does not include a Review Worker
-implementation.
+structured `GenerationOutput`. It now includes `ReviewWorker`, which produces a
+structured `ReviewOutput` and preserves the rule that `REJECT` is not a runtime
+failure.
 
 ## Analyze Worker
 
@@ -111,6 +114,16 @@ The Generate Worker consumes the original user requirement, validated
 abstraction, records a metadata-only trace, and falls back to an honest degraded
 generation result when runtime execution or structured parsing fails. Its output
 is a stable JSON `GenerationOutput` plus `generation_hash`.
+
+## Review Worker
+
+The Review Worker consumes the original user requirement, validated
+`ProjectContext`, prior `AnalysisOutput`, and prior `GenerationOutput`. It
+renders the versioned `review_generation` prompt, applies token budgeting, calls
+the provider-neutral LLM abstraction, records a metadata-only trace, and returns
+a stable JSON `ReviewOutput` plus `review_hash`. A business `REJECT` remains a
+successful Worker execution and allows the workflow to complete; runtime or
+input failures still fail the workflow.
 
 ## Prerequisites
 

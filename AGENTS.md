@@ -4,16 +4,17 @@
 
 The project has completed Milestone 3 (Agent Runtime Foundation) and has started
 Milestone 4 (Agent Workflow). T-012 Workflow State Machine, T-013 Agent
-Executor, T-014 Worker Framework, T-015 Analyze Worker, and T-016 Generate
-Worker are completed. Implemented:
+Executor, T-014 Worker Framework, T-015 Analyze Worker, T-016 Generate Worker,
+and T-017 Review Worker are completed. Implemented:
 health endpoint, Project persistence API, safe scanning, deterministic technology
 identification with evidence, sanitized PROJECT_CONTEXT.md generation, Prompt
 Registry, Context Builder, Token Budget Manager, LLM Client abstraction, Trace
 System, Fallback System, deterministic workflow state transitions, and
 deterministic Agent Executor step advancement, Worker Framework contracts, the
-first real requirement-analysis Worker, and a generation Worker that consumes
-AnalysisOutput.
-The next permitted task is T-017 Review Worker.
+first real requirement-analysis Worker, a generation Worker that consumes
+AnalysisOutput, and a review Worker that distinguishes business REJECT from
+execution failure.
+The next permitted task is M4 end-to-end integration and milestone record.
 Future task IDs are not permission to implement future features.
 
 ## Mandatory workflow

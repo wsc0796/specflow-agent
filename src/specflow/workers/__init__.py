@@ -20,6 +20,7 @@ from specflow.workers.models import (
     sanitize_worker_text,
 )
 from specflow.workers.registry import WorkerRegistry
+from specflow.workers.review import ReviewDecision, ReviewIssue, ReviewOutput, ReviewWorker
 
 __all__ = [
     "BaseWorker",
@@ -28,6 +29,10 @@ __all__ = [
     "DuplicateWorkerError",
     "GenerateWorker",
     "GenerationOutput",
+    "ReviewDecision",
+    "ReviewIssue",
+    "ReviewOutput",
+    "ReviewWorker",
     "Worker",
     "WorkerContext",
     "WorkerError",
