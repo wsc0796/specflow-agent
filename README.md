@@ -9,9 +9,17 @@ deterministic quality gate.
 
 Milestone 2 is complete — the system can safely scan a repository, identify its
 Python/FastAPI technology stack with concrete evidence, and generate a
-deterministic, sanitized `PROJECT_CONTEXT.md` artifact. 69 tests pass.
+deterministic, sanitized `PROJECT_CONTEXT.md` artifact. Current verification:
+`74 passed, 1 skipped` (`uv run pytest -v`); rerun the command after changes.
 
 Next: M3 — Agent Infrastructure (Prompt Registry, Context Builder, LLM Client).
+
+## T-001 foundation boundary
+
+T-001 included only the FastAPI application package, `GET /health`, pytest, Ruff,
+and setup/development-rule documentation. It deliberately excluded persistence,
+project APIs, scanning, technology detection, project-context generation, prompts,
+LLMs, workers, and workflow logic; later tasks added those capabilities incrementally.
 
 ## Prerequisites
 

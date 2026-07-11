@@ -8,6 +8,7 @@ ignored directories).
 
 from __future__ import annotations
 
+import ast
 import re
 import tomllib
 from dataclasses import dataclass, field
@@ -130,11 +131,10 @@ class TechnologyStackDetector:
         test_framework = "pytest" if "pytest" in names else None
         lint_tools = ["ruff"] if "ruff" in names else []
 
-        # ── database: confirmed from dependencies only ──
-        # File-content SQLite patterns are recorded as evidence but do NOT
-        # change the conclusion (prevents false positives from comments/docs).
+        # ── database: supported dependencies or explicit Python code evidence ──
         database = "sqlite" if any(n in {"sqlite", "aiosqlite"} for n in names) else None
-        self._sqlite_file_evidence(accessor, evidence)
+        if self._sqlite_file_evidence(accessor, evidence):
+            database = "sqlite"
 
         # ── entry-point scanning (uses SafeFileAccessor, not raw rglob) ──
         entries = self._entry_candidates(accessor, evidence)
@@ -222,34 +222,49 @@ class TechnologyStackDetector:
                 evidence.append(Evidence("requirements.txt", entry))
         return items
 
-    # ── file-content evidence (does not change conclusions) ──────
+    # ── explicit SQLite code evidence ───────────────────────────
 
-    _SQLITE_PATTERNS = [
-        re.compile(r"\bimport\s+sqlite3\b"),
-        re.compile(r"\bfrom\s+sqlite3\b"),
-        re.compile(r"\bimport\s+aiosqlite\b"),
-        re.compile(r"\bfrom\s+aiosqlite\b"),
-        re.compile(r"sqlite://"),
-        re.compile(r"\.db\b"),
-    ]
+    _SQLITE_URL = re.compile(r"sqlite://")
 
     @staticmethod
     def _sqlite_file_evidence(
         accessor: SafeFileAccessor,
         evidence: list[Evidence],
-    ) -> None:
-        """Scan safe Python files for SQLite usage patterns.
-
-        These patterns are recorded as *evidence* only and do NOT alter the
-        ``database`` conclusion (which remains dependency-based to avoid
-        false positives from comments and documentation strings).
-        """
+    ) -> bool:
+        """Detect SQLite only from imports, connect calls, or SQLite URLs in code."""
+        detected = False
         for rel_path in accessor.python_files():
             content = accessor.read_text(rel_path)
-            for pattern in TechnologyStackDetector._SQLITE_PATTERNS:
-                if pattern.search(content):
-                    evidence.append(Evidence(rel_path, pattern.pattern))
-                    break  # one evidence entry per file
+            try:
+                tree = ast.parse(content)
+            except SyntaxError:
+                continue
+            for node in ast.walk(tree):
+                source = ast.get_source_segment(content, node) or ""
+                if isinstance(node, ast.Import):
+                    for alias in node.names:
+                        if alias.name in {"sqlite3", "aiosqlite"}:
+                            evidence.append(Evidence(rel_path, source))
+                            detected = True
+                elif isinstance(node, ast.ImportFrom) and node.module in {"sqlite3", "aiosqlite"}:
+                    evidence.append(Evidence(rel_path, source))
+                    detected = True
+                elif isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
+                    if (
+                        isinstance(node.func.value, ast.Name)
+                        and node.func.value.id in {"sqlite3", "aiosqlite"}
+                        and node.func.attr == "connect"
+                    ):
+                        match = re.search(r"(?:sqlite3|aiosqlite)\.connect", source)
+                        if match:
+                            evidence.append(Evidence(rel_path, match.group(0)))
+                            detected = True
+                elif isinstance(node, ast.Constant) and isinstance(node.value, str):
+                    match = TechnologyStackDetector._SQLITE_URL.search(node.value)
+                    if match:
+                        evidence.append(Evidence(rel_path, match.group(0)))
+                        detected = True
+        return detected
 
     # ── entry-point scanning ────────────────────────────────────
 

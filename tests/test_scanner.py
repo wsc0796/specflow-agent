@@ -1,5 +1,5 @@
 import os
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 
 import pytest
 
@@ -93,3 +93,10 @@ def test_skips_directory_symlink_escaping_repo(tmp_path: Path) -> None:
 
     assert symlink.name not in result.directories
     assert "safe_dir" in result.directories
+
+
+def test_windows_path_containment_boundary_is_rejected_without_symlink(tmp_path: Path) -> None:
+    del tmp_path
+    assert not RepositoryScanner._is_within(
+        PureWindowsPath(r"C:\outside"), PureWindowsPath(r"C:\allowed")
+    )

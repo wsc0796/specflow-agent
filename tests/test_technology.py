@@ -233,32 +233,49 @@ def test_python_evidence_uses_real_file_not_synthetic(tmp_path: Path) -> None:
 # ── code-review fix: SQLite file-content evidence ───────────────
 
 
-def test_sqlite_pattern_in_file_content_adds_evidence(tmp_path: Path) -> None:
+def test_sqlite_import_confirms_database_with_actual_match(tmp_path: Path) -> None:
     _add_file(tmp_path, "pyproject.toml", "[project]\ndependencies = ['fastapi']\n")
     _add_file(tmp_path, "src/db.py", "import sqlite3\nconn = sqlite3.connect(':memory:')\n")
 
     tech = TechnologyStackDetector().detect(_scan(tmp_path))
 
-    # SQLite is in file content but not in dependencies → evidence exists
-    sqlite_evidence = [e for e in tech.evidence if "sqlite" in e.matched.lower()]
-    assert sqlite_evidence, "SQLite file-content evidence should be recorded"
-    assert sqlite_evidence[0].file == "src/db.py"
+    assert tech.database == "sqlite"
+    assert any(e.file == "src/db.py" and e.matched == "import sqlite3" for e in tech.evidence)
 
 
-def test_sqlite_file_evidence_does_not_change_database_conclusion(
-    tmp_path: Path,
-) -> None:
-    """File-content SQLite patterns add evidence but do NOT confirm the database."""
+def test_sqlite_url_confirms_database_with_actual_match(tmp_path: Path) -> None:
     _add_file(tmp_path, "requirements.txt", "fastapi\n")
     _add_file(
         tmp_path,
         "app.py",
-        "sqlite:///data.db\nfrom fastapi import FastAPI\n",
+        'DATABASE_URL = "sqlite:///data.db"\nfrom fastapi import FastAPI\n',
     )
 
     tech = TechnologyStackDetector().detect(_scan(tmp_path))
 
-    # Evidence from file content
-    assert any("sqlite" in e.matched.lower() for e in tech.evidence)
-    # But database is NOT confirmed (no aiosqlite/sqlite dependency)
+    assert tech.database == "sqlite"
+    assert any(e.matched == "sqlite://" for e in tech.evidence)
+
+
+def test_sqlite_comment_or_unrelated_word_does_not_confirm_database(tmp_path: Path) -> None:
+    _add_file(tmp_path, "app.py", "# sqlite is not a database configuration\nlabel = 'sqlite'\n")
+    tech = TechnologyStackDetector().detect(_scan(tmp_path))
     assert tech.database is None
+
+
+@pytest.mark.parametrize(
+    ("source", "expected_match"),
+    [
+        ("from sqlite3 import connect\n", "from sqlite3 import connect"),
+        ("import aiosqlite\n", "import aiosqlite"),
+        ("from aiosqlite import connect\n", "from aiosqlite import connect"),
+        ("import aiosqlite\nconnection = aiosqlite.connect('db')\n", "aiosqlite.connect"),
+    ],
+)
+def test_explicit_sqlite_code_patterns_confirm_database(
+    tmp_path: Path, source: str, expected_match: str
+) -> None:
+    _add_file(tmp_path, "db.py", source)
+    tech = TechnologyStackDetector().detect(_scan(tmp_path))
+    assert tech.database == "sqlite"
+    assert any(e.matched == expected_match for e in tech.evidence)

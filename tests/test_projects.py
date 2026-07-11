@@ -42,6 +42,12 @@ def test_project_input_errors(tmp_path: Path) -> None:
         payload = {"name": "Demo", "repository_path": "C:/demo"}
         assert client.post("/api/v1/projects", json=payload).status_code == 201
         assert client.post("/api/v1/projects", json=payload).status_code == 409
+        assert (
+            client.post(
+                "/api/v1/projects", json={"name": "Demo", "repository_path": "   "}
+            ).status_code
+            == 422
+        )
         assert client.get("/api/v1/projects/missing").status_code == 404
 
 
