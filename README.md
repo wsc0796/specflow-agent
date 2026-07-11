@@ -11,14 +11,19 @@ Milestone 2 is complete — the system can safely scan a repository, identify it
 Python/FastAPI technology stack with concrete evidence, and generate a
 deterministic, sanitized `PROJECT_CONTEXT.md` artifact.
 
-M3 is in progress. T-006 adds a file-based Prompt Registry with versioned prompt
+M3 is complete. T-006 adds a file-based Prompt Registry with versioned prompt
 metadata, strict Jinja2 rendering, template-variable validation, and stable
 prompt hashes. T-007 adds deterministic context assembly that combines sanitized
 project context, prompt definitions, and user requirements into a `BuiltContext`
 without calling an LLM. T-008 adds deterministic token budget control with
 policy-based trimming and removed-section tracking. T-009 and T-010 add the mock
 LLM runtime and metadata-only traces. T-011 adds fallback handling for predictable
-degraded results. Next: M4 — Agent Workflow.
+degraded results.
+
+M4 has started with T-012 Workflow State Machine. The system can now model
+workflow states, enforce legal transitions, record state history, and restore a
+workflow snapshot. It still does not implement Agent Executor, Workers, automatic
+code generation, or Workflow orchestration beyond state management.
 
 ## T-001 foundation boundary
 
@@ -56,6 +61,14 @@ The runtime foundation now supports provider-neutral LLM requests, deterministic
 mock responses, metadata-only trace files, and fallback handling for retry, JSON
 repair, and honest degraded baselines. It still does not implement Workers,
 Agent Loop, Workflow orchestration, RAG, embeddings, Redis, or LangGraph.
+
+## Workflow State Machine
+
+The Workflow State Machine defines the first M4 boundary. A workflow run starts
+in `created` and may move through `analyzing`, `generating`, `reviewing`, and
+`completed`, with `failed` available from active states. Illegal transitions and
+terminal-state transitions are rejected, while accepted transitions are recorded
+in ordered state history.
 
 ## Prerequisites
 

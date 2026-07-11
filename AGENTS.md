@@ -2,12 +2,13 @@
 
 ## Current phase
 
-The project has completed Milestone 3 (Agent Runtime Foundation). Implemented:
+The project has completed Milestone 3 (Agent Runtime Foundation) and has started
+Milestone 4 (Agent Workflow) with T-012 Workflow State Machine. Implemented:
 health endpoint, Project persistence API, safe scanning, deterministic technology
 identification with evidence, sanitized PROJECT_CONTEXT.md generation, Prompt
 Registry, Context Builder, Token Budget Manager, LLM Client abstraction, Trace
-System, and Fallback System.
-The next milestone is M4 (Agent Workflow).
+System, Fallback System, and deterministic workflow state transitions.
+The next task is T-013 Agent Executor.
 Future task IDs are not permission to implement future features.
 
 ## Mandatory workflow
@@ -28,8 +29,8 @@ Future task IDs are not permission to implement future features.
 ## Architecture constraints
 
 - Use the `src/` layout.
-- M4 may begin Agent Workflow work only after a new task spec is created. Do not
-  introduce Worker orchestration without an explicit active M4 task spec.
+- M4 work must proceed one task spec at a time. Do not introduce Worker
+  orchestration without an explicit active Worker/Executor task spec.
 - Do not add prompts, workers, LLM calls, workflow orchestration, Redis,
   LangGraph, vector stores, MCP, Java support, or automatic code changes before
   their explicitly assigned task.
