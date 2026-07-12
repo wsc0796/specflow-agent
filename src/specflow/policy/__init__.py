@@ -5,6 +5,7 @@ from specflow.policy.validator import PolicyValidator
 
 __all__ = [
     "DEFAULT_POLICY",
+    "ExecutionBudget",
     "ErrorCategory",
     "ErrorCode",
     "ExecutionPolicy",
@@ -12,3 +13,4 @@ __all__ = [
     "RunStatus",
     "error_category",
 ]
+from specflow.policy.budget import ExecutionBudget

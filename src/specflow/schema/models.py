@@ -10,11 +10,17 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
+
+
+class StrictAgentInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
 
 # ── Repository Analyst ────────────────────────────────────────
 
-class RepositoryAnalystInput(BaseModel):
+
+class RepositoryAnalystInput(StrictAgentInput):
     requirement: str = ""
     repository_evidence: str = ""
     repository_root: str = ""
@@ -28,7 +34,8 @@ class RepositoryAnalystOutput(BaseModel):
 
 # ── Design ────────────────────────────────────────────────────
 
-class DesignInput(BaseModel):
+
+class DesignInput(StrictAgentInput):
     requirement: str = ""
     repository_analysis: dict[str, Any] = Field(default_factory=dict)
 
@@ -41,7 +48,8 @@ class DesignOutput(BaseModel):
 
 # ── Test Strategy ─────────────────────────────────────────────
 
-class TestStrategyInput(BaseModel):
+
+class TestStrategyInput(StrictAgentInput):
     requirement: str = ""
     repository_analysis: dict[str, Any] = Field(default_factory=dict)
 
@@ -54,7 +62,8 @@ class TestStrategyOutput(BaseModel):
 
 # ── Risk Review ───────────────────────────────────────────────
 
-class RiskReviewInput(BaseModel):
+
+class RiskReviewInput(StrictAgentInput):
     requirement: str = ""
     repository_analysis: dict[str, Any] = Field(default_factory=dict)
 
@@ -67,7 +76,8 @@ class RiskReviewOutput(BaseModel):
 
 # ── Synthesis ─────────────────────────────────────────────────
 
-class SynthesisInput(BaseModel):
+
+class SynthesisInput(StrictAgentInput):
     requirement: str = ""
     design_output: dict[str, Any] = Field(default_factory=dict)
     test_strategy_output: dict[str, Any] = Field(default_factory=dict)
@@ -82,7 +92,8 @@ class SynthesisOutput(BaseModel):
 
 # ── Review ────────────────────────────────────────────────────
 
-class ReviewInput(BaseModel):
+
+class ReviewInput(StrictAgentInput):
     requirement: str = ""
     synthesis_output: dict[str, Any] = Field(default_factory=dict)
 

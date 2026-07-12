@@ -33,6 +33,4 @@ class PolicyValidator:
         for field_name, max_allowed in limits:
             value = getattr(policy, field_name)
             if value > max_allowed:
-                raise ValueError(
-                    f"Policy {field_name}={value} exceeds system limit {max_allowed}"
-                )
+                raise ValueError(f"Policy {field_name}={value} exceeds system limit {max_allowed}")
