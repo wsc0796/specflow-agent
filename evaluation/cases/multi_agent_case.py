@@ -1,4 +1,5 @@
 from pathlib import Path
+
 from specflow.evaluation.models import EvaluationCase
 
 MULTI_AGENT_EVAL_CASE = EvaluationCase(
