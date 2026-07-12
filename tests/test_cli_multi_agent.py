@@ -30,3 +30,20 @@ class TestMultiAgentRunner:
         assert len(manifest["semantic_brief_hash"]) == 64
         assert len(manifest["effective_plan_hash"]) == 64
         assert manifest["enriched"] is True
+
+    def test_mock_run_persists_outputs_handoffs_and_traces(self, tmp_path: Path) -> None:
+        repo = tmp_path / "test-repo"
+        repo.mkdir()
+        (repo / "README.md").write_text("# Test")
+        output = tmp_path / "output"
+
+        assert run_multi_agent(repo=repo, requirement="Test", output=output, mock=True) == 0
+
+        prefix = next(output.glob("*-manifest.json")).name.removesuffix("-manifest.json")
+        outputs = json.loads((output / f"{prefix}-agent-outputs.json").read_text())
+        handoffs = json.loads((output / f"{prefix}-handoffs.json").read_text())
+        traces = json.loads((output / f"{prefix}-traces.json").read_text())
+        assert len(outputs) == 6
+        assert len(handoffs) == 7
+        assert len(traces) == 6
+        assert len({trace["parent_span_id"] for trace in traces}) == 1
