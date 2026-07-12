@@ -3,7 +3,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum
 
-from specflow.agents.models import AgentConstraints, AgentDependency, AgentIdentity, RevisionPolicy
+from specflow.agents.models import (
+    AgentConstraints,
+    AgentDependency,
+    AgentIdentity,
+    AgentRole,
+    RevisionPolicy,
+)
 from specflow.plan.exceptions import PlanCompilationError, PlanValidationError
 
 
@@ -121,3 +127,55 @@ class SemanticTaskBrief:
             enrichment_status=EnrichmentStatus.DEGRADED,
             provenance=None,
         )
+
+
+@dataclass(frozen=True)
+class AgentTask:
+    """A single agent's task within an effective delegation plan.
+
+    Binds an :class:`AgentIdentity`-equivalent to its :class:`SemanticTaskBrief`,
+    execution stage, and constraints.  The ``enriched`` property is derived
+    from the brief — it is NOT an independent stored field.
+    """
+
+    agent_id: str
+    role: AgentRole
+    stage: int
+    depends_on: frozenset[str]
+    constraints: AgentConstraints
+    task_brief: SemanticTaskBrief
+
+    @property
+    def enriched(self) -> bool:
+        """Derived — ``True`` if the task brief was fully enriched."""
+        return self.task_brief.enrichment_status is EnrichmentStatus.ENRICHED
+
+
+@dataclass(frozen=True)
+class EffectiveDelegationPlan:
+    """The executable plan combining structural and semantic layers.
+
+    Carries all hashes needed for reproducibility and auditing.  The
+    ``degraded_agents`` and ``enriched`` properties are derived from the
+    tasks — they are NOT independent stored fields.
+    """
+
+    plan_id: str
+    run_id: str
+    structure_hash: str
+    semantic_brief_hash: str
+    effective_plan_hash: str
+    stages: tuple[tuple[str, ...], ...]
+    tasks: tuple[AgentTask, ...]
+    revision_policy: RevisionPolicy
+    generated_at: str
+
+    @property
+    def degraded_agents(self) -> tuple[str, ...]:
+        """Agent IDs whose task briefs are degraded (not enriched)."""
+        return tuple(t.agent_id for t in self.tasks if not t.enriched)
+
+    @property
+    def enriched(self) -> bool:
+        """Derived — ``True`` when *all* task briefs are enriched."""
+        return len(self.degraded_agents) == 0
