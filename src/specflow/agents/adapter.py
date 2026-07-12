@@ -82,10 +82,11 @@ class AgentRunner:
             data = json.loads(response.content)
 
             # Validate against agent's output schema if registered.
-            # Schema mismatches are recorded but do NOT block execution —
-            # the LLM output flows through and downstream agents handle it.
+            # Schema failure → FAILED (no raw pass-through).
             schema_validated = False
             if self._schema_registry is not None:
+                from specflow.schema.exceptions import SchemaNotFoundError
+
                 try:
                     output_model = self._schema_registry.get(
                         self._identity.output_schema_id
@@ -93,10 +94,20 @@ class AgentRunner:
                     validated = output_model.model_validate(data)
                     data = validated.model_dump()
                     schema_validated = True
-                except Exception:
-                    # Schema not registered or validation failed —
-                    # pass raw output through (best-effort)
-                    pass
+                except SchemaNotFoundError:
+                    pass  # no schema registered — accept raw output
+                except Exception as exc:
+                    return {
+                        "agent_id": self.agent_id,
+                        "role": self._identity.role.value,
+                        "success": False,
+                        "output": {
+                            "degraded": True,
+                            "error": f"Schema validation failed: {exc}",
+                        },
+                        "degraded": True,
+                        "schema_validated": False,
+                    }
 
             return {
                 "agent_id": self.agent_id,
