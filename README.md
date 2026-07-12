@@ -1,55 +1,40 @@
 # SpecFlow Agent
 
-SpecFlow Agent is a spec-driven development assistant for local Python/FastAPI
-projects. Its MVP will safely scan a repository, build evidence-backed project
-context, structure requirements, generate artifacts, review diffs, and enforce a
-deterministic quality gate.
+A **controlled multi-agent specification analysis system** for local Python
+repositories. Built from scratch without LangGraph or agent frameworks.
+
+## Highlights
+
+- **6-agent fixed topology** with Coordinator-driven deterministic orchestration
+- **Parallel specialist execution** — Design, Test Strategy, and Risk Review run concurrently
+- **Bounded Revision loop** — max 1 round, business rejection ≠ infrastructure failure
+- **Repository evidence pipeline** — read-only tools → evidence → agent prompts → traceable references
+- **Structured Agent Handoff** — schema-validated, canonical-JSON-hashed payloads between agents
+- **Agent-level trace topology** — stage timing, parent/child spans, submission/completion timestamps
+- **Dual pipeline** — legacy linear (Analyze→Generate→Review) preserved as A/B baseline
+- **Live Provider validated** — DeepSeek v4-flash on sky-takeout-python: 6/6 agents, 7 handoffs, PASS
+
+## Quick start
+
+```powershell
+# Legacy linear pipeline (default)
+uv run specflow run --repo . --requirement "Add a search endpoint" --output ./out --mock
+
+# Multi-agent pipeline (Live Provider)
+$env:SPECFLOW_LLM_BASE_URL = "https://api.deepseek.com"
+$env:SPECFLOW_LLM_API_KEY = "<key>"
+uv run specflow run --mode multi-agent --provider openai-compatible --model deepseek-v4-flash --repo . --requirement "Add a search endpoint" --output ./out
+```
 
 ## Current milestone
 
-Milestone 2 is complete — the system can safely scan a repository, identify its
-Python/FastAPI technology stack with concrete evidence, and generate a
-deterministic, sanitized `PROJECT_CONTEXT.md` artifact.
+**M6 (Multi-Agent Orchestration) — CLOSED.** 607 tests, Live Provider validated.
+See `docs/records/M6-multi-agent-orchestration.md`.
 
-M3 is complete. T-006 adds a file-based Prompt Registry with versioned prompt
-metadata, strict Jinja2 rendering, template-variable validation, and stable
-prompt hashes. T-007 adds deterministic context assembly that combines sanitized
-project context, prompt definitions, and user requirements into a `BuiltContext`
-without calling an LLM. T-008 adds deterministic token budget control with
-policy-based trimming and removed-section tracking. T-009 and T-010 add the mock
-LLM runtime and metadata-only traces. T-011 adds fallback handling for predictable
-degraded results.
-
-M4 is complete. T-012 Workflow State Machine, T-013 Agent Executor, T-014
-Worker Framework, T-015 Analyze Worker, T-016 Generate Worker, and T-017 Review
-Worker are complete. The system can now
-model workflow states, enforce legal transitions, record state history, restore
-workflow snapshots, execute abstract step handlers deterministically, define
-Worker contracts, register Workers explicitly, adapt Worker results into
-Executor steps, and run the first real requirement-analysis Worker using the
-existing Prompt, Context, Budget, LLM, Trace, and Fallback layers. It can also
-consume `AnalysisOutput` to produce a bounded `GenerationOutput`. It still does
-review `GenerationOutput` and distinguish business `REJECT` from execution
-failure. It still does not implement automatic code generation or M5 behavior.
-
-M5 is complete. T-018 Tool Framework & Registry, T-019 Safe Read-only
-Repository Tools, T-020 OpenAI-compatible LLM Provider, T-021 Repository
-Evidence Pipeline, T-022 CLI & Artifact Delivery, and T-023 Real Repository
-Cases & Evaluation are complete. The system can now define Tool metadata,
-represent explicit Tool calls and results, register tools deterministically,
-execute one registered Tool through a structured executor, list allowed
-repository files, search text code, read bounded text files inside one
-validated repository root, call one explicitly configured OpenAI-compatible
-completion endpoint, collect real repository evidence through the Tool Framework
-and feed it into the Analyze/Generate/Review Worker chain, run the full
-`specflow run` CLI with structured JSON + Markdown artifact delivery, evaluate
-pipeline contracts deterministically against repository-grounded cases, and
-safely import and validate user-supplied Live Provider artifacts. One real,
-non-mock Live Provider run has been validated (DeepSeek V4 Flash on
-sky-takeout-python). See `docs/records/M5-product-vertical-slice.md`.
-
-It still does not include shell access, file writes, Git actions, Tool loops,
-or scanner-to-runner integration (deferred to M6).
+M1–M5 milestones (project scanning, technology detection, prompt/context/token
+infrastructure, LLM client, trace/fallback, workflow state machine, worker
+framework, tool framework, CLI, evaluation) are also complete.
+See `docs/records/` for full history.
 
 ## T-001 foundation boundary
 

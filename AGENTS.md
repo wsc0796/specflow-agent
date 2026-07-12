@@ -5,8 +5,9 @@
 The project has completed Milestone 3 (Agent Runtime Foundation), Milestone 4
 (Agent Workflow), Milestone 5 (Tool Use & Repository Intelligence), and
 Milestone 6 (Multi-Agent Orchestration). M6 was closed on 2026-07-12 with
-593 passing tests, evidence-collection pipeline, AgentRunner adapter,
-HandoffValidator with real payload checks, and FAILED persistence.
+607 passing tests, a validated Live Provider multi-agent run (DeepSeek,
+sky-takeout-python, 6/6 agents, 7 handoffs, 52 files discovered), and
+full artifact persistence (manifest, agent-outputs, handoffs, traces, sources).
 
 All tasks T-001 through T-032 are completed. Implemented:
 health endpoint, Project persistence API, safe scanning, deterministic technology
