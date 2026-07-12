@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import json
+import time
 from collections.abc import Callable, Mapping
 from dataclasses import replace
+from datetime import UTC, datetime
 from hashlib import sha256
 from pathlib import Path
 from typing import Any
@@ -21,6 +23,7 @@ from specflow.agents.test_strategy import TestStrategyAgent
 from specflow.coordinator.coordinator import Coordinator
 from specflow.coordinator.scheduler import MultiAgentScheduler, StageExecutionResult
 from specflow.coordinator.state_machine import MultiAgentWorkflowState
+from specflow.evaluation.metrics import AgentMetrics, RunMetrics
 from specflow.evidence import EvidenceCollector
 from specflow.evidence.models import EvidenceCollectionConfig
 from specflow.handoff.models import AgentHandoff
@@ -50,6 +53,9 @@ def run_multi_agent(
     runtime contract prove REJECT → one revision → re-review without a network
     provider or a special production-only branch.
     """
+    started_at = datetime.now(UTC).isoformat()
+    t0 = time.monotonic()
+
     if not repo.is_dir() or not requirement.strip():
         return 2
 
@@ -263,6 +269,7 @@ def run_multi_agent(
             "handoffs": "handoffs.json",
             "traces": "traces.json",
             "sources": "sources.json",
+            "metrics": "metrics.json",
         },
         "discovered_files": discovered_files,
         "tool_call_count": len(tool_call_records),
@@ -286,6 +293,24 @@ def run_multi_agent(
             ensure_ascii=False, indent=2,
         ),
         encoding="utf-8",
+    )
+    # Persist unified metrics for A/B comparison
+    wall_ms = int((time.monotonic() - t0) * 1000)
+    metrics = _build_multi_agent_metrics(
+        plan=plan,
+        stages=stages,
+        coordinator=coordinator,
+        started_at=started_at,
+        wall_ms=wall_ms,
+        discovered_files=discovered_files,
+        tool_call_count=len(tool_call_records),
+        runtime_handoffs=runtime_handoffs,
+        revision_exhausted=revision_exhausted,
+        provider=provider,
+        model=model,
+    )
+    (run_dir / "metrics.json").write_text(
+        json.dumps(metrics.as_dict(), ensure_ascii=False, indent=2), encoding="utf-8"
     )
     return 0
 
@@ -547,6 +572,153 @@ def _persist_failed_run(
 
         logger = logging.getLogger(__name__)
         logger.debug("Failed to persist failed-run artifacts", exc_info=True)
+
+
+def _build_multi_agent_metrics(
+    plan: object,
+    stages: list[StageExecutionResult],
+    coordinator: Coordinator,
+    started_at: str,
+    wall_ms: int,
+    discovered_files: int,
+    tool_call_count: int,
+    runtime_handoffs: list[AgentHandoff],
+    revision_exhausted: bool,
+    provider: str,
+    model: str,
+) -> RunMetrics:
+    """Build unified RunMetrics from multi-agent execution data."""
+    agent_metrics: list[AgentMetrics] = []
+    total_in = 0
+    total_out = 0
+    fallback_count = 0
+    degraded_count = 0
+    schema_ok = 0
+    schema_fail = 0
+
+    for stage in stages:
+        for agent_id, result in stage.agent_results.items():
+            usage = result.get("usage", {})
+            tokens_in = usage.get("input_tokens", 0)
+            tokens_out = usage.get("output_tokens", 0)
+            total_in += tokens_in
+            total_out += tokens_out
+
+            degraded = result.get("degraded", False)
+            if degraded:
+                degraded_count += 1
+            if not result.get("success", True):
+                fallback_count += 1
+            if result.get("schema_validated", False):
+                schema_ok += 1
+            else:
+                schema_fail += 1
+
+            agent_metrics.append(
+                AgentMetrics(
+                    agent_id=agent_id,
+                    role=result.get("role", "unknown"),
+                    stage=stage.stage_index,
+                    duration_ms=_agent_wall_ms(stage, agent_id),
+                    input_tokens=tokens_in,
+                    output_tokens=tokens_out,
+                    llm_call_success=result.get("success", True),
+                    fallback_used=not result.get("success", True),
+                    degraded=degraded,
+                    schema_validated=result.get("schema_validated", False),
+                )
+            )
+
+    # Compute parallel speedup for stage 1 (specialists)
+    parallel_theoretical = 0
+    parallel_actual = 0
+    for am in agent_metrics:
+        if am.stage == 1:
+            parallel_theoretical += am.duration_ms
+            if am.duration_ms > parallel_actual:
+                parallel_actual = am.duration_ms
+    parallel_speedup = (
+        parallel_theoretical / parallel_actual
+        if parallel_actual > 0 and parallel_theoretical > 0
+        else 0.0
+    )
+
+    # Determine status
+    state = coordinator.engine.state.value if hasattr(coordinator.engine, "state") else "unknown"
+    if state == "completed":
+        status = "completed"
+    elif state == "failed":
+        status = "failed"
+    else:
+        status = "degraded"
+
+    review_agent_id = plan.stages[-1][0] if hasattr(plan, "stages") else ""
+    decision = _try_review_decision(
+        {s.stage_index: s.agent_results for s in stages}, review_agent_id
+    )
+
+    return RunMetrics(
+        mode="multi-agent",
+        provider=provider,
+        model=model,
+        status=status,
+        started_at=started_at,
+        completed_at=datetime.now(UTC).isoformat(),
+        wall_time_ms=wall_ms,
+        input_tokens=total_in,
+        output_tokens=total_out,
+        total_tokens=total_in + total_out,
+        llm_call_count=len(agent_metrics),
+        fallback_count=fallback_count,
+        degraded_count=degraded_count,
+        schema_validated_count=schema_ok,
+        schema_unvalidated_count=schema_fail,
+        discovered_file_count=discovered_files,
+        selected_file_count=0,
+        referenced_file_count=0,
+        tool_call_count=tool_call_count,
+        revision_count=coordinator.engine.revision_count,
+        revision_exhausted=revision_exhausted,
+        review_decision=decision,
+        agent_count=len(agent_metrics),
+        stage_count=len(plan.stages) if hasattr(plan, "stages") else 0,
+        parallel_stage_count=1,
+        handoff_count=len(runtime_handoffs),
+        agent_metrics=agent_metrics,
+        parallel_theoretical_ms=parallel_theoretical,
+        parallel_actual_ms=parallel_actual,
+        parallel_speedup=round(parallel_speedup, 2),
+    )
+
+
+def _agent_wall_ms(stage: StageExecutionResult, agent_id: str) -> int:
+    """Compute wall-clock duration for one agent from stage timing data."""
+    timing = stage.agent_timings.get(agent_id)
+    if timing is None or not timing.submitted_at or not timing.completed_at:
+        return 0
+    try:
+        from datetime import datetime as dt
+
+        start = dt.fromisoformat(timing.submitted_at)
+        end = dt.fromisoformat(timing.completed_at)
+        return int((end - start).total_seconds() * 1000)
+    except (ValueError, TypeError):
+        return 0
+
+
+def _try_review_decision(
+    stage_results: dict[int, dict[str, dict[str, Any]]], review_agent_id: str
+) -> str:
+    """Try to extract review decision without raising."""
+    try:
+        for stage_idx, results in stage_results.items():
+            if review_agent_id in results:
+                return _review_decision(
+                    {review_agent_id: results[review_agent_id]}, review_agent_id
+                )
+    except Exception:
+        pass
+    return "UNKNOWN"
 
 
 def _repo_summary(repo: Path) -> str:
