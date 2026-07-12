@@ -31,7 +31,7 @@ from specflow.handoff.models import AgentHandoff
 from specflow.handoff.validator import HandoffValidator
 from specflow.llm import LLMClient, OpenAICompatibleConfig, OpenAICompatibleLLMClient
 from specflow.plan.hash_utils import canonical_json_bytes
-from specflow.policy import DEFAULT_POLICY, ExecutionBudget, ExecutionPolicy, PolicyValidator
+from specflow.policy import DEFAULT_POLICY, ExecutionPolicy, PolicyValidator, RuntimeGuard
 from specflow.tools import ToolExecutor, ToolRegistry
 from specflow.tools.repository_tools import RepositoryToolSet
 from specflow.trace.models import AgentTraceSpan
@@ -60,7 +60,7 @@ def run_multi_agent(
     t0 = time.monotonic()
 
     PolicyValidator().validate(policy)
-    budget = ExecutionBudget(policy)
+    guard = RuntimeGuard(policy)
 
     if not repo.is_dir() or not requirement.strip():
         return 2
@@ -179,7 +179,7 @@ def run_multi_agent(
             prior_outputs,
             registry,
             schema_registry,
-            budget,
+            guard,
         )
         coordinator.engine.transition(MultiAgentWorkflowState.EXECUTING_SPECIALISTS, "specialists")
         runtime_handoffs.extend(
@@ -195,7 +195,7 @@ def run_multi_agent(
             prior_outputs,
             registry,
             schema_registry,
-            budget,
+            guard,
         )
         coordinator.engine.transition(MultiAgentWorkflowState.SYNTHESIZING, "synthesis")
         runtime_handoffs.extend(
@@ -211,7 +211,7 @@ def run_multi_agent(
             prior_outputs,
             registry,
             schema_registry,
-            budget,
+            guard,
         )
         coordinator.engine.transition(MultiAgentWorkflowState.REVIEWING, "review")
         runtime_handoffs.extend(
@@ -227,12 +227,12 @@ def run_multi_agent(
             prior_outputs,
             registry,
             schema_registry,
-            budget,
+            guard,
         )
 
         decision = _review_decision(prior_outputs, plan.stages[3][0])
         if decision == "REJECT":
-            budget.reserve_revision()
+            guard.consume_revision()
             controller = coordinator.revision_controller
             if controller is None:
                 raise RuntimeError("Coordinator did not initialize RevisionController")
@@ -267,7 +267,7 @@ def run_multi_agent(
                     prior_outputs,
                     registry,
                     schema_registry,
-                    budget,
+                    guard,
                 )
                 coordinator.engine.transition(
                     MultiAgentWorkflowState.SYNTHESIZING, "revision complete"
@@ -292,7 +292,7 @@ def run_multi_agent(
                     prior_outputs,
                     registry,
                     schema_registry,
-                    budget,
+                    guard,
                 )
                 coordinator.engine.transition(MultiAgentWorkflowState.REVIEWING, "re-review")
                 runtime_handoffs.extend(
@@ -315,7 +315,7 @@ def run_multi_agent(
                     prior_outputs,
                     registry,
                     schema_registry,
-                    budget,
+                    guard,
                 )
                 decision = _review_decision(prior_outputs, plan.stages[3][0])
                 revision_exhausted = decision == "REJECT" and controller.exhausted
@@ -349,10 +349,12 @@ def run_multi_agent(
     }
     handoffs = runtime_handoffs
     traces = _build_trace_tree(stages, registry, run_id, model, coordinator.engine.state.value)
+    policy_hash = policy.policy_hash()
     idempotency_key = sha256(
         f"{sha256(repo.resolve().as_uri().encode()).hexdigest()}"
         f"|{sha256(requirement.encode()).hexdigest()}"
         f"|{plan.structure_hash}"
+        f"|{policy_hash}"
         f"|{provider}|{model}".encode()
     ).hexdigest()
 
@@ -383,6 +385,19 @@ def run_multi_agent(
         },
         "discovered_files": discovered_files,
         "tool_call_count": len(tool_call_records),
+        "execution_policy": {
+            "policy_version": policy.policy_version,
+            "max_wall_time_seconds": policy.max_wall_time_seconds,
+            "max_llm_calls": policy.max_llm_calls,
+            "max_revisions": policy.max_revisions,
+        },
+        "execution_policy_hash": policy_hash,
+        "budget_usage": {
+            "llm_calls": guard.llm_calls,
+            "input_tokens": guard.total_input_tokens,
+            "output_tokens": guard.total_output_tokens,
+            "revision_count": guard.revision_count,
+        },
     }
     # Write stage checkpoints
     checkpoints = [
@@ -465,14 +480,14 @@ def _run_and_accumulate(
     prior_outputs: dict[str, dict[str, Any]],
     registry: AgentRegistry,
     schema_registry: object,
-    budget: ExecutionBudget,
+    guard: RuntimeGuard,
 ) -> None:
-    budget.check_wall_time()
+    guard.check_wall_time()
     validated_inputs = _validated_inputs(
         agent_ids, registry, schema_registry, context, prior_outputs
     )
     guarded_executors = {
-        agent_id: _budgeted_executor(executors[agent_id], validated_inputs[agent_id], budget)
+        agent_id: _budgeted_executor(executors[agent_id], validated_inputs[agent_id], guard)
         for agent_id in agent_ids
     }
     result = scheduler.execute(
@@ -485,11 +500,17 @@ def _run_and_accumulate(
 
 
 def _budgeted_executor(
-    executor: AgentExecutor, validated_input: dict[str, Any], budget: ExecutionBudget
+    executor: AgentExecutor, validated_input: dict[str, Any], guard: RuntimeGuard
 ) -> AgentExecutor:
     def run(context: dict[str, Any]) -> dict[str, Any]:
-        budget.reserve_llm_call()
-        return executor({**context, "validated_input": validated_input})
+        guard.consume_llm_call()
+        guard.check_wall_time()
+        result = executor({**context, "validated_input": validated_input})
+        usage = result.get("usage", {})
+        guard.consume_tokens(
+            usage.get("input_tokens", 0), usage.get("output_tokens", 0)
+        )
+        return result
 
     return run
 
@@ -724,6 +745,20 @@ def _build_trace_tree(
             )
             traces.append(span.as_dict())
     return traces
+
+
+def _safe_write(
+    run_dir: Path,
+    filename: str,
+    data: object,
+    guard: RuntimeGuard,
+    *,
+    sort_keys: bool = False,
+) -> None:
+    """Write artifact with size check before touching disk."""
+    content = json.dumps(data, ensure_ascii=False, indent=2, sort_keys=sort_keys)
+    guard.check_artifact_size(len(content.encode("utf-8")))
+    (run_dir / filename).write_text(content, encoding="utf-8")
 
 
 def _make_mock_llm_client() -> object:
