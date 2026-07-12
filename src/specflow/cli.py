@@ -10,17 +10,30 @@ from pathlib import Path
 def main(argv: list[str] | None = None) -> None:
     """Parse arguments and delegate to the runner."""
     args = _parse_args(argv or sys.argv[1:])
-    from specflow.runner import run
 
-    exit_code = run(
-        repo=Path(args.repo),
-        requirement=args.requirement,
-        output=Path(args.output),
-        provider=args.provider,
-        model=args.model or "",
-        mock=args.mock,
-        max_files=args.max_files,
-    )
+    if args.mode == "multi-agent":
+        from specflow.runner_multi import run_multi_agent
+
+        exit_code = run_multi_agent(
+            repo=Path(args.repo),
+            requirement=args.requirement,
+            output=Path(args.output),
+            mock=args.mock,
+            provider=args.provider,
+            model=args.model or "",
+        )
+    else:
+        from specflow.runner import run
+
+        exit_code = run(
+            repo=Path(args.repo),
+            requirement=args.requirement,
+            output=Path(args.output),
+            provider=args.provider,
+            model=args.model or "",
+            mock=args.mock,
+            max_files=args.max_files,
+        )
     raise SystemExit(exit_code)
 
 
@@ -51,6 +64,12 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
         "--mock",
         action="store_true",
         help="Force mock mode even if provider is configured",
+    )
+    run_parser.add_argument(
+        "--mode",
+        default="legacy",
+        choices=["legacy", "multi-agent"],
+        help="Execution mode: legacy or multi-agent (default: legacy)",
     )
 
     parsed = parser.parse_args(argv)
