@@ -206,14 +206,18 @@ def run_multi_agent(
             MultiAgentWorkflowState.COMPLETED,
             "review passed" if decision == "PASS" else "revision limit reached",
         )
-    except Exception:
-        if coordinator.engine.state not in {
-            MultiAgentWorkflowState.COMPLETED,
-            MultiAgentWorkflowState.FAILED,
-        }:
-            coordinator.engine.transition(
-                MultiAgentWorkflowState.FAILED, "runtime execution failure"
-            )
+    except Exception as exc:
+        _persist_failed_run(
+            output=output,
+            run_id=run_id,
+            coordinator=coordinator,
+            registry=registry,
+            model=model,
+            stages=stages,
+            plan=plan,
+            discovered_files=discovered_files,
+            error=str(exc),
+        )
         return 3
 
     run_dir = output / run_id
@@ -431,6 +435,52 @@ def _make_mock_llm_client() -> object:
             return MockResponse()
 
     return MockClient()
+
+
+def _persist_failed_run(
+    output: Path,
+    run_id: str,
+    coordinator: Coordinator,
+    registry: AgentRegistry,
+    model: str,
+    stages: list[StageExecutionResult],
+    plan: object,
+    discovered_files: int,
+    error: str,
+) -> None:
+    """Persist FAILED manifest, state history, and partial traces for audit."""
+    try:
+        if coordinator.engine.state not in {
+            MultiAgentWorkflowState.COMPLETED,
+            MultiAgentWorkflowState.FAILED,
+        }:
+            coordinator.engine.transition(
+                MultiAgentWorkflowState.FAILED, f"runtime failure: {error}"
+            )
+    except Exception:
+        pass
+
+    try:
+        run_dir = output / run_id
+        run_dir.mkdir(parents=True, exist_ok=True)
+        traces = _build_trace_tree(stages, registry, run_id, model, "failed")
+        failed_manifest = {
+            "run_id": run_id,
+            "plan_id": getattr(plan, "plan_id", "unknown"),
+            "workflow_state": "failed",
+            "workflow_history": list(coordinator.engine.history),
+            "error": error,
+            "stages_completed": len(stages),
+            "discovered_files": discovered_files,
+        }
+        (run_dir / "manifest.json").write_text(
+            json.dumps(failed_manifest, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+        (run_dir / "traces.json").write_text(
+            json.dumps(traces, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+    except Exception:
+        pass  # best-effort; don't hide the original error
 
 
 def _repo_summary(repo: Path) -> str:
