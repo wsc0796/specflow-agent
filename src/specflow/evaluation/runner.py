@@ -112,12 +112,12 @@ def validate_live_artifact_import(
     manifest_path = artifact_directory / "manifest.json"
     provider_type = ""
     model = ""
-    if manifest_path.is_file():
+    if manifest_path.is_file() and not manifest_path.is_symlink():
         try:
             manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
             provider_type = str(manifest.get("provider_type", ""))
             model = str(manifest.get("model", ""))
-        except json.JSONDecodeError:
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError):
             pass
     return LiveValidationRecord(
         status=EvaluationStatus.PASSED if not findings else EvaluationStatus.FAILED,

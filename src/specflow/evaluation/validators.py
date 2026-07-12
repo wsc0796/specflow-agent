@@ -60,7 +60,14 @@ def validate_artifacts(
     if (
         not isinstance(calls, list)
         or not calls
-        or any(not isinstance(c, dict) or c.get("tool_name") not in _TOOLS for c in calls)
+        or any(
+            not isinstance(c, dict)
+            or c.get("tool_name") not in _TOOLS
+            or c.get("status") != "success"
+            or not isinstance(c.get("call_id"), str)
+            or not c["call_id"].strip()
+            for c in calls
+        )
     ):
         findings.append(
             EvaluationFinding("tool_calls_missing", "Expected read-only tool call records.")
@@ -68,7 +75,7 @@ def validate_artifacts(
     _validate_sources(sources, repository_root, findings)
     for name in REQUIRED_ARTIFACTS:
         try:
-            if _SECRET.search((artifact_dir / name).read_text(encoding="utf-8")):
+            if _SECRET.search(_read_text(artifact_dir, name)):
                 findings.append(
                     EvaluationFinding("secret_detected", f"Sensitive pattern in {name}.")
                 )
@@ -92,10 +99,19 @@ def _safe_file(root: Path, name: str) -> bool:
 
 def _read_json(root: Path, findings: list[EvaluationFinding], name: str):
     try:
-        return json.loads((root / name).read_text(encoding="utf-8"))
+        return json.loads(_read_text(root, name))
     except (OSError, UnicodeDecodeError, json.JSONDecodeError):
         findings.append(EvaluationFinding("invalid_json", f"Invalid JSON: {name}."))
         return None
+
+
+def _read_text(root: Path, name: str) -> str:
+    """Read a declared artifact only after its containment check has passed."""
+
+    path = root / name
+    if not _safe_file(root, name):
+        raise OSError(f"Unsafe artifact path: {path}")
+    return path.read_text(encoding="utf-8")
 
 
 def _validate_manifest(value: object, findings: list[EvaluationFinding], live: bool) -> None:
@@ -134,6 +150,16 @@ def _validate_lineage(a: object, g: object, r: object, findings: list[Evaluation
             EvaluationFinding("hash_missing", "Worker hash lineage must contain SHA-256 hashes.")
         )
         return
+    analysis_hash = _payload_hash(a, excluded_field="analysis_hash")
+    generation_hash = _payload_hash(g, excluded_field="generation_hash")
+    if a["analysis_hash"] != analysis_hash or g["generation_hash"] != generation_hash:
+        findings.append(
+            EvaluationFinding(
+                "hash_content_invalid",
+                "Worker hashes do not match their canonical artifact payloads.",
+            )
+        )
+        return
     if g["analysis_hash"] != a["analysis_hash"]:
         findings.append(
             EvaluationFinding(
@@ -144,6 +170,17 @@ def _validate_lineage(a: object, g: object, r: object, findings: list[Evaluation
         findings.append(
             EvaluationFinding("review_lineage_invalid", "Review hash lineage is invalid.")
         )
+
+
+def _payload_hash(value: dict[str, object], *, excluded_field: str) -> str:
+    """Calculate a stable Worker payload hash without trusting an artifact claim."""
+
+    import hashlib
+
+    payload = dict(value)
+    payload.pop(excluded_field, None)
+    encoded = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
 
 
 def _validate_traces(value: object, findings: list[EvaluationFinding]) -> None:
