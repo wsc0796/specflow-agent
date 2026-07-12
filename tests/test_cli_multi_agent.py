@@ -69,7 +69,11 @@ class TestMultiAgentRunner:
             return {
                 "agent_id": "review-agent-v1",
                 "role": "review",
-                "output": {"decision": "REJECT", "target_agent_id": "design-agent-v1"},
+                "output": {
+                    "decision": "REJECT",
+                    "summary": "Explicit mock rejection for revision coverage.",
+                    "target_agent_id": "design-agent-v1",
+                },
             }
 
         assert (

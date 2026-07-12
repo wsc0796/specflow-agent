@@ -107,12 +107,18 @@ class DeterministicPlanner:
             AgentDependency(agent_id=review_id, depends_on=frozenset({synthesis_id})),
         )
 
+        _required = {
+            repo_id, synthesis_id, review_id,
+        }
+
         constraints = tuple(
             AgentConstraints(
                 agent_id=a_id,
                 max_execution_seconds=120,
                 max_token_budget=8192,
                 max_revision_rounds=1,
+                criticality="required" if a_id in _required else "optional",
+                fallback_allowed=(a_id not in _required),
             )
             for a_id in sorted(agent_ids)
         )

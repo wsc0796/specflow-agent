@@ -40,5 +40,12 @@ class ReviewAgent:
         return {
             "agent_id": self.agent_id,
             "role": self.role.value,
-            "output": {"decision": "PASS", "requires_revision": False, "findings": []},
+            "output": {
+                # This is an explicit deterministic mock fixture, not a Schema
+                # default. Real executions must supply and validate a decision.
+                "decision": "PASS",
+                "summary": "Deterministic mock review accepted the synthesis.",
+                "requires_revision": False,
+                "findings": [],
+            },
         }

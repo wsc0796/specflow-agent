@@ -10,13 +10,21 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
-class RepositoryAnalysisPayload(BaseModel):
+class StrictAgentPayload(BaseModel):
+    """Base contract for agent business payloads.
+
+    Agent output is an inter-agent API.  Unknown fields must be rejected so a
+    provider cannot silently change the data later stages rely on.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class RepositoryAnalysisPayload(StrictAgentPayload):
     """Output of the RepositoryAnalyst agent."""
-
-    model_config = ConfigDict(extra="allow")
 
     summary: str = Field(..., min_length=1, description="High-level analysis summary")
     affected_components: list[str] = Field(default_factory=list, description="Components touched")
@@ -25,10 +33,8 @@ class RepositoryAnalysisPayload(BaseModel):
     evidence_count: int = Field(default=0, ge=0, description="Number of evidence items found")
 
 
-class DesignPayload(BaseModel):
+class DesignPayload(StrictAgentPayload):
     """Output of the Design agent."""
-
-    model_config = ConfigDict(extra="allow")
 
     summary: str = Field(..., min_length=1, description="Design summary")
     architecture_changes: list[str] = Field(default_factory=list)
@@ -39,10 +45,8 @@ class DesignPayload(BaseModel):
     evidence_refs: list[str] = Field(default_factory=list)
 
 
-class TestStrategyPayload(BaseModel):
+class TestStrategyPayload(StrictAgentPayload):
     """Output of the TestStrategy agent."""
-
-    model_config = ConfigDict(extra="allow")
 
     summary: str = Field(..., min_length=1, description="Test strategy summary")
     test_scenarios: list[str] = Field(default_factory=list)
@@ -52,10 +56,8 @@ class TestStrategyPayload(BaseModel):
     evidence_refs: list[str] = Field(default_factory=list)
 
 
-class RiskReviewPayload(BaseModel):
+class RiskReviewPayload(StrictAgentPayload):
     """Output of the RiskReview agent."""
-
-    model_config = ConfigDict(extra="allow")
 
     summary: str = Field(..., min_length=1, description="Risk assessment summary")
     risks: list[str] = Field(default_factory=list)
@@ -67,10 +69,8 @@ class RiskReviewPayload(BaseModel):
     evidence_refs: list[str] = Field(default_factory=list)
 
 
-class SynthesisPayload(BaseModel):
+class SynthesisPayload(StrictAgentPayload):
     """Output of the Synthesis agent — merges Design, TestStrategy, and RiskReview."""
-
-    model_config = ConfigDict(extra="allow")
 
     summary: str = Field(..., min_length=1, description="Merged synthesis summary")
     consolidated_design: str = Field(default="")
@@ -80,10 +80,8 @@ class SynthesisPayload(BaseModel):
     open_questions: list[str] = Field(default_factory=list)
 
 
-class ReviewPayload(BaseModel):
+class ReviewPayload(StrictAgentPayload):
     """Output of the Review agent — MUST contain a PASS/REJECT decision."""
-
-    model_config = ConfigDict(extra="forbid")
 
     decision: Literal["PASS", "REJECT"] = Field(
         ..., description="Final review decision — no default, must be explicit"
@@ -96,3 +94,10 @@ class ReviewPayload(BaseModel):
         default="",
         description="Agent that must revise (required when decision=REJECT)",
     )
+
+    @model_validator(mode="after")
+    def reject_requires_target(self) -> ReviewPayload:
+        """A rejection is actionable only with an explicit revision target."""
+        if self.decision == "REJECT" and not self.target_agent_id.strip():
+            raise ValueError("target_agent_id is required when decision=REJECT")
+        return self

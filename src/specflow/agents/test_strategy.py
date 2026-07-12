@@ -34,4 +34,8 @@ class TestStrategyAgent:
         return self._identity
 
     def execute(self, context: dict[str, Any]) -> dict[str, Any]:
-        return {"agent_id": self.agent_id, "role": self.role.value, "output": {}}
+        return {
+            "agent_id": self.agent_id,
+            "role": self.role.value,
+            "output": {"summary": "Deterministic mock test strategy."},
+        }

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 import time
 from collections.abc import Callable, Mapping
 from dataclasses import replace
@@ -67,6 +68,8 @@ def run_multi_agent(
     evidence_text = ""
     tool_call_records: list[dict[str, Any]] = []
     discovered_files = 0
+    selected_file_count = 0
+    referenced_file_count = 0
     try:
         tool_registry = ToolRegistry()
         RepositoryToolSet(repo).register_into(tool_registry)
@@ -86,9 +89,11 @@ def run_multi_agent(
             for r in evidence.tool_call_records
         ]
         discovered_files = evidence.discovered_file_count
+        selected_file_count = len(evidence.selected_files)
+        referenced_file_count = len({excerpt.relative_path for excerpt in evidence.excerpts})
     except Exception:
         # Evidence collection is best-effort — proceed without it
-        evidence_text = f"Repository: {repo.name}\nPath: {repo.resolve()}"
+        evidence_text = f"Repository: {repo.name}"
 
     registry = _build_registry()
 
@@ -99,9 +104,9 @@ def run_multi_agent(
     else:
         try:
             llm_client = _create_real_llm_client(provider, model)
-        except Exception as exc:
+        except Exception:
             import sys
-            print(f"Provider configuration error: {exc}", file=sys.stderr)
+            print("Provider configuration error", file=sys.stderr)
             return 2
 
     # Build schema registry before Coordinator so PlanValidator can check schema IDs.
@@ -155,28 +160,28 @@ def run_multi_agent(
         coordinator.engine.transition(MultiAgentWorkflowState.PLANNING, "plan compiled")
         coordinator.engine.transition(MultiAgentWorkflowState.ANALYZING, "repository analysis")
         _run_and_accumulate(
-            stages, scheduler, plan.stages[0], 0, executors, base_context, prior_outputs
+            stages, scheduler, plan.stages[0], 0, executors, base_context, prior_outputs, registry, schema_registry
         )
         coordinator.engine.transition(MultiAgentWorkflowState.EXECUTING_SPECIALISTS, "specialists")
         runtime_handoffs.extend(
             _validate_stage_inputs(plan.tasks, plan.stages[1], registry, prior_outputs, requirement)
         )
         _run_and_accumulate(
-            stages, scheduler, plan.stages[1], 1, executors, base_context, prior_outputs
+            stages, scheduler, plan.stages[1], 1, executors, base_context, prior_outputs, registry, schema_registry
         )
         coordinator.engine.transition(MultiAgentWorkflowState.SYNTHESIZING, "synthesis")
         runtime_handoffs.extend(
             _validate_stage_inputs(plan.tasks, plan.stages[2], registry, prior_outputs, requirement)
         )
         _run_and_accumulate(
-            stages, scheduler, plan.stages[2], 2, executors, base_context, prior_outputs
+            stages, scheduler, plan.stages[2], 2, executors, base_context, prior_outputs, registry, schema_registry
         )
         coordinator.engine.transition(MultiAgentWorkflowState.REVIEWING, "review")
         runtime_handoffs.extend(
             _validate_stage_inputs(plan.tasks, plan.stages[3], registry, prior_outputs, requirement)
         )
         _run_and_accumulate(
-            stages, scheduler, plan.stages[3], 3, executors, base_context, prior_outputs
+            stages, scheduler, plan.stages[3], 3, executors, base_context, prior_outputs, registry, schema_registry
         )
 
         decision = _review_decision(prior_outputs, plan.stages[3][0])
@@ -203,17 +208,17 @@ def run_multi_agent(
                     4,
                     executors,
                     {**base_context, "revision_task": revision_task.__dict__},
-                    prior_outputs,
+                    prior_outputs, registry, schema_registry,
                 )
                 coordinator.engine.transition(
                     MultiAgentWorkflowState.SYNTHESIZING, "revision complete"
                 )
                 _run_and_accumulate(
-                    stages, scheduler, plan.stages[2], 5, executors, base_context, prior_outputs
+                    stages, scheduler, plan.stages[2], 5, executors, base_context, prior_outputs, registry, schema_registry
                 )
                 coordinator.engine.transition(MultiAgentWorkflowState.REVIEWING, "re-review")
                 _run_and_accumulate(
-                    stages, scheduler, plan.stages[3], 6, executors, base_context, prior_outputs
+                    stages, scheduler, plan.stages[3], 6, executors, base_context, prior_outputs, registry, schema_registry
                 )
                 decision = _review_decision(prior_outputs, plan.stages[3][0])
                 revision_exhausted = decision == "REJECT" and controller.exhausted
@@ -222,7 +227,7 @@ def run_multi_agent(
             MultiAgentWorkflowState.COMPLETED,
             "review passed" if decision == "PASS" else "revision limit reached",
         )
-    except Exception as exc:
+    except Exception:
         _persist_failed_run(
             output=output,
             run_id=run_id,
@@ -232,7 +237,7 @@ def run_multi_agent(
             stages=stages,
             plan=plan,
             discovered_files=discovered_files,
-            error=str(exc),
+            error="MULTI_AGENT_RUN_FAILED",
         )
         return 3
 
@@ -304,6 +309,8 @@ def run_multi_agent(
         wall_ms=wall_ms,
         discovered_files=discovered_files,
         tool_call_count=len(tool_call_records),
+        selected_file_count=selected_file_count,
+        referenced_file_count=referenced_file_count,
         runtime_handoffs=runtime_handoffs,
         revision_exhausted=revision_exhausted,
         provider=provider,
@@ -337,13 +344,55 @@ def _run_and_accumulate(
     executors: Mapping[str, AgentExecutor],
     context: Mapping[str, Any],
     prior_outputs: dict[str, dict[str, Any]],
+    registry: AgentRegistry,
+    schema_registry: object,
 ) -> None:
     result = scheduler.execute(
         (agent_ids,), dict(executors), {**context, "prior_outputs": dict(prior_outputs)}
     )[0]
     result = replace(result, stage_index=stage_index)
+    _validate_stage_results(result, registry, schema_registry)
     results.append(result)
     prior_outputs.update(result.agent_results)
+
+
+def _validate_stage_results(
+    stage: StageExecutionResult,
+    registry: AgentRegistry,
+    schema_registry: object,
+) -> None:
+    """Fail closed before outputs can become inter-agent handoffs."""
+    for agent_id, result in stage.agent_results.items():
+        if result.get("agent_id") != agent_id or not result.get("success", True):
+            raise ValueError("AGENT_EXECUTION_FAILED")
+        output = _sanitize_artifact_value(result.get("output"))
+        if not isinstance(output, dict):
+            raise ValueError("AGENT_OUTPUT_NOT_OBJECT")
+        identity = registry.get(agent_id).identity
+        try:
+            output_model = schema_registry.get(identity.output_schema_id)
+            result["output"] = output_model.model_validate(output).model_dump()
+        except Exception as exc:
+            raise ValueError("SCHEMA_VALIDATION_FAILED") from exc
+        result["schema_validated"] = True
+
+
+_ABSOLUTE_PATH_RE = re.compile(r"(?<!\w)(?:[A-Za-z]:[\\/]|/)[^\s\"']+")
+_SECRET_RE = re.compile(
+    r"(?i)\b(api[_-]?key|token|secret|password)\s*[:=]\s*[^\s,;]+"
+)
+
+
+def _sanitize_artifact_value(value: object) -> object:
+    """Remove secrets and absolute filesystem paths before persistence/handoff."""
+    if isinstance(value, str):
+        value = _SECRET_RE.sub(r"\1=<redacted>", value)
+        return _ABSOLUTE_PATH_RE.sub("<absolute-path-redacted>", value)
+    if isinstance(value, list):
+        return [_sanitize_artifact_value(item) for item in value]
+    if isinstance(value, dict):
+        return {str(key): _sanitize_artifact_value(item) for key, item in value.items()}
+    return value
 
 
 def _review_decision(outputs: Mapping[str, dict[str, Any]], review_id: str) -> str:
@@ -355,41 +404,10 @@ def _review_decision(outputs: Mapping[str, dict[str, Any]], review_id: str) -> s
     if not isinstance(output, dict):
         raise ValueError("Review agent output must be a dict")
 
-    # Try canonical key first, then fallback to searching all values
     value = output.get("decision")
-    if isinstance(value, str) and value.strip():
-        return _normalize_decision(value.strip())
-
-    for key in ("conclusion", "verdict", "recommendation", "result"):
-        value = output.get(key)
-        if isinstance(value, str) and value.strip():
-            return _normalize_decision(value.strip())
-
-    # Last resort: search any string value containing PASS/REJECT keywords
-    for v in output.values():
-        if isinstance(v, str) and v.strip():
-            try:
-                return _normalize_decision(v.strip())
-            except ValueError:
-                continue
-
-    raise ValueError(
-        "Review agent output must contain a recognizable PASS or REJECT decision. "
-        f"Got keys: {sorted(output.keys())}"
-    )
-
-
-def _normalize_decision(raw: str) -> str:
-    upper = raw.upper().strip()
-    if upper in {"PASS", "APPROVED", "通过", "批准", "ACCEPT", "APPROVE", "合格"}:
-        return "PASS"
-    if upper in {"REJECT", "REJECTED", "拒绝", "驳回", "不通过", "DECLINE", "DENY"}:
-        return "REJECT"
-    if "PASS" in upper:
-        return "PASS"
-    if "REJECT" in upper or "拒绝" in raw or "不通过" in raw:
-        return "REJECT"
-    raise ValueError(f"Cannot normalize decision: {raw!r}")
+    if value in {"PASS", "REJECT"}:
+        return value
+    raise ValueError("Review agent output must contain explicit PASS or REJECT decision")
 
 
 def _revision_target(outputs: Mapping[str, dict[str, Any]], review_id: str) -> str:
@@ -582,6 +600,8 @@ def _build_multi_agent_metrics(
     wall_ms: int,
     discovered_files: int,
     tool_call_count: int,
+    selected_file_count: int,
+    referenced_file_count: int,
     runtime_handoffs: list[AgentHandoff],
     revision_exhausted: bool,
     provider: str,
@@ -674,8 +694,8 @@ def _build_multi_agent_metrics(
         schema_validated_count=schema_ok,
         schema_unvalidated_count=schema_fail,
         discovered_file_count=discovered_files,
-        selected_file_count=0,
-        referenced_file_count=0,
+        selected_file_count=selected_file_count,
+        referenced_file_count=referenced_file_count,
         tool_call_count=tool_call_count,
         revision_count=coordinator.engine.revision_count,
         revision_exhausted=revision_exhausted,
