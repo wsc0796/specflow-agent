@@ -87,9 +87,9 @@ def run(
         return 2
 
     evidence_config = EvidenceCollectionConfig(
-        max_selected_files=min(max_files, policy.max_selected_files),
-        max_total_evidence_chars=policy.max_evidence_chars,
-        max_tool_calls=policy.max_tool_calls,
+        max_selected_files=min(max_files, policy.repository.max_selected_files),
+        max_total_evidence_chars=policy.repository.max_total_evidence_chars,
+        max_tool_calls=20,
     )
     tool_executor = ToolExecutor(registry)
     collector = EvidenceCollector(tool_executor, repo, config=evidence_config)

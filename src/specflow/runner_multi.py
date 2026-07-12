@@ -83,9 +83,9 @@ def run_multi_agent(
             tool_executor,
             repo,
             config=EvidenceCollectionConfig(
-                max_selected_files=min(10, policy.max_selected_files),
-                max_total_evidence_chars=policy.max_evidence_chars,
-                max_tool_calls=policy.max_tool_calls,
+                max_selected_files=min(10, policy.repository.max_selected_files),
+                max_total_evidence_chars=policy.repository.max_total_evidence_chars,
+                max_tool_calls=20,
             ),
         )
         evidence = collector.collect(
