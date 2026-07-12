@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from dataclasses import asdict, is_dataclass
 from pathlib import Path
 
 from specflow.artifacts import ArtifactStore, RunManifest
@@ -231,7 +232,10 @@ def run(
             generation_json=generation_json,
             review_json=review_json,
             tool_calls_json=json.dumps(
-                [r.as_dict() if hasattr(r, "as_dict") else {} for r in evidence.tool_call_records],
+                [
+                    r.as_dict() if hasattr(r, "as_dict") else asdict(r) if is_dataclass(r) else {}
+                    for r in evidence.tool_call_records
+                ],
                 ensure_ascii=False,
                 indent=2,
             ),
