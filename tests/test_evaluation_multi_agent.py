@@ -3,6 +3,7 @@ import json
 from specflow.evaluation.multi_agent_runner import (
     AB_DIMENSIONS,
     compare_legacy_vs_multi_agent,
+    run_mock_ab_case,
 )
 
 
@@ -68,7 +69,18 @@ class TestMultiAgentEvaluation:
         output = tmp_path / "multi-output"
         exit_code = run_multi_agent(repo=repo, requirement="Add X", output=output, mock=True)
         assert exit_code == 0
-        manifests = list(output.glob("*-manifest.json"))
-        assert len(manifests) == 1
-        manifest = json.loads(manifests[0].read_text())
+        manifest = json.loads((next(output.glob("run-multi-*")) / "manifest.json").read_text())
         assert len(manifest["stages"]) == 4
+
+    def test_mock_ab_runs_identical_input_through_both_pipelines(self, tmp_path):
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        (repo / "app.py").write_text("def health():\n    return 'ok'\n")
+
+        result = run_mock_ab_case(
+            repo=repo, requirement="Add health endpoint", output=tmp_path / "ab"
+        )
+
+        assert result.case_id == "mock-ab"
+        assert result.legacy_scores["artifact_completeness"] == 2
+        assert result.multi_agent_scores["artifact_completeness"] == 2
