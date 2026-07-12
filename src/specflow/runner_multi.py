@@ -92,7 +92,9 @@ def run_multi_agent(
     else:
         try:
             llm_client = _create_real_llm_client(provider, model)
-        except Exception:
+        except Exception as exc:
+            import sys
+            print(f"Provider configuration error: {exc}", file=sys.stderr)
             return 2
 
     coordinator = Coordinator(
