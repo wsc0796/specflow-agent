@@ -1,7 +1,7 @@
 # M6 Multi-Agent Orchestration
 
 **Date:** 2026-07-12
-**Status:** CLOSED
+**Status:** IN PROGRESS — execution closure pending
 **Previous milestone:** M5 Product Vertical Slice (v0.1.0)
 
 ## Delivered capabilities
@@ -120,19 +120,14 @@ git diff --check:             clean
 - `model` field reports "unknown" in manifest when `--model` not explicitly passed
 - Same-input `run_id` reuse can leave stale error artifacts (M5 carry-forward)
 
-## M6 closeout decision
+## Closeout decision
 
-**APPROVED.** All 9 M6 tasks (T-024–T-032) are complete with 578 passing tests.
-A new multi-agent orchestration pipeline coexists with the legacy linear pipeline
-via `--mode multi-agent`. The architecture implements:
+**Not approved.** The planning, registry, scheduler, trace-model and A/B
+foundations exist, but the executable runner is still being closed:
 
-- 1 Coordinator + 6 specialist agents with deterministic topology
-- 1 parallel execution stage (Design/Test/Risk)
-- Structured AgentHandoff with schema validation
-- 1 bounded Review → Revision cycle (max 1 round, revision_exhausted semantics)
-- Agent-level TraceSpan with stage timing fields
-- A/B evaluation framework with 10 comparison dimensions
-- SchemaRegistry with freeze semantics
-- 3-layer canonical hash lineage (structure + semantic + effective)
+- Agent outputs, runtime handoffs, trace topology, and revision artifacts must
+  be persisted and verified together.
+- The A/B framework must run both modes on the same input and retain evidence.
+- At least one real repository case and a Live Provider run remain required.
 
-M6 is now closed. The next milestone is M7 (Evaluation, Demo, Resume & Interview).
+M6 must remain in progress until those acceptance gates are met. M7 has not begun.
