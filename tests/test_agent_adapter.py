@@ -4,7 +4,15 @@ import json
 
 from specflow.agents.adapter import AgentRunner
 from specflow.agents.models import AgentIdentity, AgentRole
-from specflow.schema import build_schema_registry
+from specflow.schema.agent_payloads import DesignPayload
+from specflow.schema.registry import SchemaRegistry
+
+
+def _schema_registry() -> SchemaRegistry:
+    registry = SchemaRegistry()
+    registry.register("agent/test/v1/output", DesignPayload)
+    registry.freeze()
+    return registry
 
 
 def _make_identity(role: AgentRole = AgentRole.DESIGN) -> AgentIdentity:
@@ -41,7 +49,7 @@ class TestAgentRunner:
     def test_runner_passes_agent_id(self):
         ident = _make_identity()
         runner = AgentRunner(
-            ident, FakeLLMClient(), model="test", schema_registry=build_schema_registry()
+            ident, FakeLLMClient(), model="test", schema_registry=_schema_registry()
         )
         result = runner.execute({"requirement": "Add feature X"})
         assert result["agent_id"] == "test-agent-v1"
@@ -51,9 +59,7 @@ class TestAgentRunner:
     def test_runner_includes_role_in_user_message(self):
         ident = _make_identity(AgentRole.RISK_REVIEW)
         client = FakeLLMClient()
-        runner = AgentRunner(
-            ident, client, model="test", schema_registry=build_schema_registry()
-        )
+        runner = AgentRunner(ident, client, model="test", schema_registry=_schema_registry())
         runner.execute({"requirement": "Test"})
         user_msg = client.last_request.messages[-1].content.lower()
         assert "risk_review" in user_msg
@@ -61,9 +67,7 @@ class TestAgentRunner:
     def test_runner_includes_requirement(self):
         ident = _make_identity()
         client = FakeLLMClient()
-        runner = AgentRunner(
-            ident, client, model="test", schema_registry=build_schema_registry()
-        )
+        runner = AgentRunner(ident, client, model="test", schema_registry=_schema_registry())
         runner.execute({"requirement": "Build a search API"})
         msgs = client.last_request.messages
         user_msg = msgs[-1].content  # last message is always the user message
@@ -72,13 +76,13 @@ class TestAgentRunner:
     def test_runner_includes_prior_outputs(self):
         ident = _make_identity()
         client = FakeLLMClient()
-        runner = AgentRunner(
-            ident, client, model="test", schema_registry=build_schema_registry()
+        runner = AgentRunner(ident, client, model="test", schema_registry=_schema_registry())
+        runner.execute(
+            {
+                "requirement": "Test",
+                "prior_outputs": {"repo-analyst-agent-v1": {"output": {"files": ["a.py"]}}},
+            }
         )
-        runner.execute({
-            "requirement": "Test",
-            "prior_outputs": {"repo-analyst-agent-v1": {"output": {"files": ["a.py"]}}},
-        })
         user_msg = client.last_request.messages[-1].content
         assert "repo-analyst-agent-v1" in user_msg
 
@@ -90,7 +94,7 @@ class TestAgentRunner:
                 raise RuntimeError("API down")
 
         runner = AgentRunner(
-            ident, FailingClient(), model="test", schema_registry=build_schema_registry()
+            ident, FailingClient(), model="test", schema_registry=_schema_registry()
         )
         result = runner.execute({"requirement": "Test"})
         assert result["success"] is False
@@ -103,9 +107,7 @@ class TestAgentRunner:
     def test_runner_uses_json_response_format(self):
         ident = _make_identity()
         client = FakeLLMClient()
-        runner = AgentRunner(
-            ident, client, model="test", schema_registry=build_schema_registry()
-        )
+        runner = AgentRunner(ident, client, model="test", schema_registry=_schema_registry())
         runner.execute({"requirement": "Test"})
         assert client.last_request.response_format == "json"
 
@@ -127,7 +129,7 @@ class TestAgentRunner:
             _make_identity(),
             SecurityFailingClient(),
             model="test",
-            schema_registry=build_schema_registry(),
+            schema_registry=_schema_registry(),
             max_retries=2,
         ).execute({})
         assert calls == 1

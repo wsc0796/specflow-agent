@@ -55,6 +55,44 @@ class TestMultiAgentRunner:
         assert len(agent_traces) == 6
         assert {trace["parent_span_id"] for trace in agent_traces} == {coordinator["span_id"]}
 
+        metrics = json.loads((run_dir / "metrics.json").read_text(encoding="utf-8"))
+        assert metrics["schema_validated_count"] == 6
+        assert metrics["schema_unvalidated_count"] == 0
+        assert metrics["fallback_count"] == 0
+        assert metrics["review_decision"] == "PASS"
+
+    def test_mock_artifacts_use_schema_validated_sanitized_outputs(self, tmp_path: Path) -> None:
+        repo = tmp_path / "test-repo"
+        repo.mkdir()
+        (repo / "orders.py").write_text("# order timeout cancellation state")
+        output = tmp_path / "output"
+
+        assert (
+            run_multi_agent(
+                repo=repo,
+                requirement="Cancel timed out orders without duplicate transitions",
+                output=output,
+                mock=True,
+            )
+            == 0
+        )
+
+        run_dir = next(output.glob("run-multi-*"))
+        outputs = json.loads((run_dir / "agent-outputs.json").read_text(encoding="utf-8"))
+        metrics = json.loads((run_dir / "metrics.json").read_text(encoding="utf-8"))
+        serialized_artifacts = "\n".join(
+            artifact.read_text(encoding="utf-8")
+            for artifact in run_dir.iterdir()
+            if artifact.is_file()
+        )
+
+        assert len(outputs) == 6
+        assert all(result["schema_validated"] is True for result in outputs.values())
+        assert metrics["selected_file_count"] > 0
+        assert metrics["referenced_file_count"] > 0
+        assert str(repo.resolve()) not in serialized_artifacts
+        assert "api_key=secret" not in serialized_artifacts
+
     def test_reject_runs_one_revision_then_completes_when_limit_is_exhausted(
         self, tmp_path: Path
     ) -> None:

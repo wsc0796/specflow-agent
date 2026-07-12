@@ -9,7 +9,8 @@ from typing import Any
 from specflow.agents.models import AgentIdentity
 from specflow.llm.client import LLMClient
 from specflow.llm.models import LLMMessage, LLMRequest
-from specflow.policy.errors import ErrorCode, is_retryable as _is_retryable_error
+from specflow.policy.errors import ErrorCode
+from specflow.policy.errors import is_retryable as _is_retryable_error
 from specflow.schema.registry import SchemaRegistry
 
 
@@ -90,7 +91,7 @@ class AgentRunner:
                 retryable = _is_retryable_error(error_code)
                 if not retryable or attempt >= self._max_retries:
                     return _failed_result(self._identity, error_code.value)
-                backoff = min(0.5 * (2 ** attempt), 5.0)  # 0.5s, 1s, 2s, 4s, 5s cap
+                backoff = min(0.5 * (2**attempt), 5.0)  # 0.5s, 1s, 2s, 4s, 5s cap
                 time.sleep(backoff)
 
         try:

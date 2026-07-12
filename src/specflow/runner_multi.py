@@ -85,8 +85,7 @@ def run_multi_agent(
         )
         evidence_text = evidence.serialized_context()
         tool_call_records = [
-            r.as_dict() if hasattr(r, "as_dict") else {}
-            for r in evidence.tool_call_records
+            r.as_dict() if hasattr(r, "as_dict") else {} for r in evidence.tool_call_records
         ]
         discovered_files = evidence.discovered_file_count
         selected_file_count = len(evidence.selected_files)
@@ -106,6 +105,7 @@ def run_multi_agent(
             llm_client = _create_real_llm_client(provider, model)
         except Exception:
             import sys
+
             print("Provider configuration error", file=sys.stderr)
             return 2
 
@@ -135,8 +135,7 @@ def run_multi_agent(
                 llm_client=llm_client,
                 schema_registry=schema_registry,
                 system_prompt=(
-                    f"You are the **{identity.role.value}** agent. "
-                    f"{identity.description}"
+                    f"You are the **{identity.role.value}** agent. {identity.description}"
                 ),
                 model=model,
                 temperature=0.0,
@@ -160,28 +159,60 @@ def run_multi_agent(
         coordinator.engine.transition(MultiAgentWorkflowState.PLANNING, "plan compiled")
         coordinator.engine.transition(MultiAgentWorkflowState.ANALYZING, "repository analysis")
         _run_and_accumulate(
-            stages, scheduler, plan.stages[0], 0, executors, base_context, prior_outputs, registry, schema_registry
+            stages,
+            scheduler,
+            plan.stages[0],
+            0,
+            executors,
+            base_context,
+            prior_outputs,
+            registry,
+            schema_registry,
         )
         coordinator.engine.transition(MultiAgentWorkflowState.EXECUTING_SPECIALISTS, "specialists")
         runtime_handoffs.extend(
             _validate_stage_inputs(plan.tasks, plan.stages[1], registry, prior_outputs, requirement)
         )
         _run_and_accumulate(
-            stages, scheduler, plan.stages[1], 1, executors, base_context, prior_outputs, registry, schema_registry
+            stages,
+            scheduler,
+            plan.stages[1],
+            1,
+            executors,
+            base_context,
+            prior_outputs,
+            registry,
+            schema_registry,
         )
         coordinator.engine.transition(MultiAgentWorkflowState.SYNTHESIZING, "synthesis")
         runtime_handoffs.extend(
             _validate_stage_inputs(plan.tasks, plan.stages[2], registry, prior_outputs, requirement)
         )
         _run_and_accumulate(
-            stages, scheduler, plan.stages[2], 2, executors, base_context, prior_outputs, registry, schema_registry
+            stages,
+            scheduler,
+            plan.stages[2],
+            2,
+            executors,
+            base_context,
+            prior_outputs,
+            registry,
+            schema_registry,
         )
         coordinator.engine.transition(MultiAgentWorkflowState.REVIEWING, "review")
         runtime_handoffs.extend(
             _validate_stage_inputs(plan.tasks, plan.stages[3], registry, prior_outputs, requirement)
         )
         _run_and_accumulate(
-            stages, scheduler, plan.stages[3], 3, executors, base_context, prior_outputs, registry, schema_registry
+            stages,
+            scheduler,
+            plan.stages[3],
+            3,
+            executors,
+            base_context,
+            prior_outputs,
+            registry,
+            schema_registry,
         )
 
         decision = _review_decision(prior_outputs, plan.stages[3][0])
@@ -208,17 +239,35 @@ def run_multi_agent(
                     4,
                     executors,
                     {**base_context, "revision_task": revision_task.__dict__},
-                    prior_outputs, registry, schema_registry,
+                    prior_outputs,
+                    registry,
+                    schema_registry,
                 )
                 coordinator.engine.transition(
                     MultiAgentWorkflowState.SYNTHESIZING, "revision complete"
                 )
                 _run_and_accumulate(
-                    stages, scheduler, plan.stages[2], 5, executors, base_context, prior_outputs, registry, schema_registry
+                    stages,
+                    scheduler,
+                    plan.stages[2],
+                    5,
+                    executors,
+                    base_context,
+                    prior_outputs,
+                    registry,
+                    schema_registry,
                 )
                 coordinator.engine.transition(MultiAgentWorkflowState.REVIEWING, "re-review")
                 _run_and_accumulate(
-                    stages, scheduler, plan.stages[3], 6, executors, base_context, prior_outputs, registry, schema_registry
+                    stages,
+                    scheduler,
+                    plan.stages[3],
+                    6,
+                    executors,
+                    base_context,
+                    prior_outputs,
+                    registry,
+                    schema_registry,
                 )
                 decision = _review_decision(prior_outputs, plan.stages[3][0])
                 revision_exhausted = decision == "REJECT" and controller.exhausted
@@ -295,7 +344,8 @@ def run_multi_agent(
     (run_dir / "sources.json").write_text(
         json.dumps(
             {"evidence": evidence_text, "tool_calls": tool_call_records},
-            ensure_ascii=False, indent=2,
+            ensure_ascii=False,
+            indent=2,
         ),
         encoding="utf-8",
     )
@@ -378,9 +428,7 @@ def _validate_stage_results(
 
 
 _ABSOLUTE_PATH_RE = re.compile(r"(?<!\w)(?:[A-Za-z]:[\\/]|/)[^\s\"']+")
-_SECRET_RE = re.compile(
-    r"(?i)\b(api[_-]?key|token|secret|password)\s*[:=]\s*[^\s,;]+"
-)
+_SECRET_RE = re.compile(r"(?i)\b(api[_-]?key|token|secret|password)\s*[:=]\s*[^\s,;]+")
 
 
 def _sanitize_artifact_value(value: object) -> object:
@@ -552,6 +600,7 @@ def _persist_failed_run(
         # State transition recording is best-effort — do not mask the
         # original runtime failure.
         import logging
+
         logger = logging.getLogger(__name__)
         logger.debug("Failed to record workflow failure state", exc_info=True)
 
