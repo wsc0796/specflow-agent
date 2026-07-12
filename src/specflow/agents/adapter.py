@@ -50,12 +50,14 @@ class AgentRunner:
         requirement = context.get("requirement", "")
         prior_outputs = context.get("prior_outputs", {})
         task_description = context.get("task_description", self._identity.description)
+        evidence = context.get("repository_evidence", "")
 
         user_message = _build_user_message(
             role=self._identity.role.value,
             task_description=task_description,
             requirement=requirement,
             prior_outputs=prior_outputs,
+            evidence=evidence,
         )
 
         try:
@@ -100,6 +102,7 @@ def _build_user_message(
     task_description: str,
     requirement: str,
     prior_outputs: dict[str, Any],
+    evidence: str = "",
 ) -> str:
     """Build a structured user message for one agent execution."""
     parts: list[str] = [
@@ -110,6 +113,8 @@ def _build_user_message(
     ]
     if requirement:
         parts.extend(["", "## Requirement", requirement])
+    if evidence.strip():
+        parts.extend(["", "## Repository Evidence", evidence])
     if prior_outputs:
         parts.append("")
         parts.append("## Context from Previous Agents")

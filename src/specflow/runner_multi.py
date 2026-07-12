@@ -21,9 +21,13 @@ from specflow.agents.test_strategy import TestStrategyAgent
 from specflow.coordinator.coordinator import Coordinator
 from specflow.coordinator.scheduler import MultiAgentScheduler, StageExecutionResult
 from specflow.coordinator.state_machine import MultiAgentWorkflowState
+from specflow.evidence import EvidenceCollector
+from specflow.evidence.models import EvidenceCollectionConfig
 from specflow.handoff.models import AgentHandoff
 from specflow.handoff.validator import HandoffValidator
 from specflow.llm import LLMClient, OpenAICompatibleConfig, OpenAICompatibleLLMClient
+from specflow.tools import ToolExecutor, ToolRegistry
+from specflow.tools.repository_tools import RepositoryToolSet
 from specflow.trace.models import AgentTraceSpan
 
 AgentExecutor = Callable[[dict[str, Any]], dict[str, Any]]
@@ -51,6 +55,33 @@ def run_multi_agent(
     run_id = f"run-multi-{sha256(f'{repo.resolve()}|{requirement}'.encode()).hexdigest()[:12]}"
     if (output / run_id).exists():
         return 3
+
+    # Collect repository evidence (same pipeline as legacy runner)
+    evidence_text = ""
+    tool_call_records: list[dict[str, Any]] = []
+    discovered_files = 0
+    try:
+        tool_registry = ToolRegistry()
+        RepositoryToolSet(repo).register_into(tool_registry)
+        tool_executor = ToolExecutor(tool_registry)
+        collector = EvidenceCollector(
+            tool_executor, repo, config=EvidenceCollectionConfig(max_selected_files=10)
+        )
+        evidence = collector.collect(
+            run_id=run_id,
+            requirement=requirement,
+            project_summary=_repo_summary(repo),
+            technology_stack=(),
+        )
+        evidence_text = evidence.serialized_context()
+        tool_call_records = [
+            r.as_dict() if hasattr(r, "as_dict") else {}
+            for r in evidence.tool_call_records
+        ]
+        discovered_files = evidence.discovered_file_count
+    except Exception:
+        # Evidence collection is best-effort — proceed without it
+        evidence_text = f"Repository: {repo.name}\nPath: {repo.resolve()}"
 
     registry = _build_registry()
 
@@ -96,6 +127,7 @@ def run_multi_agent(
         "run_id": run_id,
         "repository_root": str(repo.resolve()),
         "requirement": requirement,
+        "repository_evidence": evidence_text,
     }
     scheduler = MultiAgentScheduler()
     prior_outputs: dict[str, dict[str, Any]] = {}
@@ -216,7 +248,10 @@ def run_multi_agent(
             "agent_outputs": "agent-outputs.json",
             "handoffs": "handoffs.json",
             "traces": "traces.json",
+            "sources": "sources.json",
         },
+        "discovered_files": discovered_files,
+        "tool_call_count": len(tool_call_records),
     }
     (run_dir / "manifest.json").write_text(
         json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8"
@@ -230,6 +265,13 @@ def run_multi_agent(
     )
     (run_dir / "traces.json").write_text(
         json.dumps(traces, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+    (run_dir / "sources.json").write_text(
+        json.dumps(
+            {"evidence": evidence_text, "tool_calls": tool_call_records},
+            ensure_ascii=False, indent=2,
+        ),
+        encoding="utf-8",
     )
     return 0
 
@@ -389,6 +431,13 @@ def _make_mock_llm_client() -> object:
             return MockResponse()
 
     return MockClient()
+
+
+def _repo_summary(repo: Path) -> str:
+    pyproject = repo / "pyproject.toml"
+    if pyproject.exists():
+        return f"Python project with pyproject.toml at {repo.name}"
+    return f"Project at {repo.name}"
 
 
 def _create_real_llm_client(provider: str, model: str) -> LLMClient:
