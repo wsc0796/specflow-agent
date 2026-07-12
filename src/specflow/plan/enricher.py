@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import uuid
 from datetime import datetime, timezone
 from typing import Any
 
@@ -98,7 +99,7 @@ class SemanticPlanEnricher:
                 model=self._model,
                 prompt_id=f"enrichment/{role}/v1",
                 prompt_version="1.0.0",
-                trace_id="",
+                trace_id=str(uuid.uuid4()),
                 generated_at=now,
             ),
         )

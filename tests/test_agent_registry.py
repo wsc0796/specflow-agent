@@ -119,7 +119,7 @@ class TestGetByRole:
         assert len(agents) == 2
         assert {a.agent_id for a in agents} == {"design-1", "design-2"}
 
-    def test_no_match_returns_empty_tuple(
+    def test_matching_role_returns_agents(
         self, populated_registry: AgentRegistry
     ) -> None:
         agents = populated_registry.get_by_role(AgentRole.REPOSITORY_ANALYST)

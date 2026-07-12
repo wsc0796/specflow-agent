@@ -8,7 +8,7 @@ from specflow.agents.protocol import Agent
 
 
 class AgentRegistry:
-    """Thread-safe registry of Agent instances.
+    """Registry of Agent instances.
 
     Agents are keyed by ``agent_id``.  Registration, lookup, and
     role-based queries are O(1) amortised.
