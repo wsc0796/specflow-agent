@@ -38,12 +38,34 @@ evidence aliases, and real evidence-backed metrics.
 
 | Check | Result |
 | --- | --- |
-| `uv run pytest -v` | 645 passed, 2 skipped |
+| `uv run pytest -v` | 637 passed, 2 skipped |
 | `uv run ruff check .` | passed |
 | `uv run ruff format --check .` | passed |
 | `git diff --check` | passed |
 | Legacy mock CLI | passed using the documented command syntax |
 | Multi-agent mock CLI | passed against `sky-takeout-python`; target repo unchanged |
+
+## Local acceptance evidence
+
+Legacy mock used the documented CLI syntax:
+
+```powershell
+uv run specflow run --repo . --requirement "Add a search endpoint" --output ./artifacts/m8-legacy-final --mock
+```
+
+Multi-agent mock used the documented CLI syntax and the required read-only
+target:
+
+```powershell
+uv run specflow run --mode multi-agent --repo "C:\Users\50469\github-projects\sky-takeout-python" --requirement "为订单增加超时自动取消功能，需要考虑订单状态竞争、重复任务、事务一致性、幂等、测试策略和失败恢复。" --output ./artifacts/m8-multi-agent-final --mock
+```
+
+The target repository was clean before and after the run. Its artifact contains
+6 agent outputs, 7 handoffs with recomputed valid hashes, and 8 trace spans.
+All 6 outputs are schema-validated, Review is explicit `PASS`,
+`selected_file_count=10`, `referenced_file_count=6`, and fallback/degraded
+counts are both 0. Artifact inspection found no secret pattern or absolute
+filesystem path.
 
 ## Known boundaries
 
