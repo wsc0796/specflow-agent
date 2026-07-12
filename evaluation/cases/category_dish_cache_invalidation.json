@@ -1,7 +1,7 @@
 {
   "case_id": "category_dish_cache_invalidation",
   "title": "分类变更后的菜品缓存失效",
-  "requirement": "当菜品分类被创建、修改或删除时，保证按分类筛选的菜品缓存不会返回过期结果。",
+  "requirement": "当 CategoryService 创建、修改或删除分类时，保证 DishService 按 category_id 筛选的菜品缓存不会返回过期结果。",
   "repository_type": "python-fastapi-sqlalchemy",
   "expected_domains": ["category", "dish", "api", "service", "cache"],
   "expected_file_patterns": ["app/api/routes/category.py", "app/services/category_service.py", "app/services/dish_service.py"],

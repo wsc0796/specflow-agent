@@ -1,7 +1,7 @@
 {
   "case_id": "dish_cache_consistency",
   "title": "菜品状态变更后的缓存一致性",
-  "requirement": "为菜品查询引入缓存，并确保创建、更新、删除和启停售卖状态后相关缓存失效。",
+  "requirement": "为 DishService 的菜品查询引入缓存，并确保 create、update、delete 和 update_status 后相关缓存失效。",
   "repository_type": "python-fastapi-sqlalchemy",
   "expected_domains": ["dish", "api", "service", "cache"],
   "expected_file_patterns": ["app/api/routes/dish.py", "app/services/dish_service.py", "app/models/dish.py"],
