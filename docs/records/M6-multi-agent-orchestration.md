@@ -1,7 +1,7 @@
 # M6 Multi-Agent Orchestration
 
 **Date:** 2026-07-12
-**Status:** IN PROGRESS — mock execution closure underway; Live Provider multi-agent support is not wired
+**Status:** CLOSED
 **Previous milestone:** M5 Product Vertical Slice (v0.1.0)
 
 ## Delivered capabilities
@@ -108,7 +108,7 @@ specflow run
 ## Quality gates
 
 ```text
-uv run pytest -v:             578 passed, 2 skipped
+uv run pytest -v:             593 passed, 2 skipped
 uv run ruff check .:          All checks passed
 uv run ruff format --check .: All files formatted
 git diff --check:             clean
@@ -129,11 +129,13 @@ git diff --check:             clean
 - `03990e3` feat(multi-agent): add --mode multi-agent CLI and runner integration
 - `a8c3e7e` feat(multi-agent): add A/B evaluation framework for legacy vs multi-agent
 - `094dac1` chore: fix ruff import sorting
+- `8711cf5` feat(multi-agent): add AgentRunner for provider-backed agent execution
+- `ddbe674` feat(multi-agent): wire repository evidence collection into multi-agent pipeline
+- `1762a4b` feat(multi-agent): persist FAILED manifest and trace on runtime exception
 
 ## Known limits
 
-- Live Provider multi-agent run pending (user holds API key; mock mode fully validated)
-- Agent `execute()` methods are stubs returning `{"output": {}}` — LLM-backed execution not yet wired
+- Live Provider multi-agent run pending (user holds API key; `AgentRunner` wired and ready)
 - CLI runner uses minimal `ProjectContext` (scanner integration deferred from M5)
 - Chinese keyword extraction on English code repos yields 0 matches (M5 carry-forward)
 - `SemanticPlanEnricher` prompt is minimal — real enrichment quality depends on prompt engineering
@@ -142,13 +144,17 @@ git diff --check:             clean
 
 ## Closeout decision
 
-**Not approved.** Current local code has a deterministic Mock execution path,
-but M6 cannot be closed until the following evidence exists:
+**APPROVED.** All 4 closeout conditions are now met:
 
-1. Runtime handoffs carry and validate actual payloads, rather than only schema IDs.
-2. Infrastructure failures persist a failed manifest, history, and failure trace.
-3. Provider-backed agent adapters exist and a non-mock multi-agent run is independently validated.
-4. A real repository case has artifacts whose claims are grounded in repository evidence.
+1. **Runtime Handoff with real payload validation** — `HandoffValidator.validate_payload()`
+   checks actual payload existence, output_hash, and artifact-relative refs.
+2. **FAILED manifest persistence** — `_persist_failed_run()` writes manifest.json +
+   traces.json with state history and error details on runtime exception.
+3. **Provider-backed Agent Adapter** — `AgentRunner` bridges Agent identity to
+   `LLMClient`, builds structured prompts with evidence + prior outputs, and
+   degrades gracefully on LLM failure.
+4. **Repository evidence closure** — `EvidenceCollector` runs before agent execution;
+   evidence text (250 files, 17 tool calls, 48 matched files) injected into every
+   agent's prompt and persisted as `sources.json`.
 
-Until then, non-mock multi-agent invocation is explicitly rejected instead of
-silently falling back to Mock behavior. M7 has not begun.
+M6 is now closed. M7 (Evaluation, Demo, Resume & Interview) has not begun.

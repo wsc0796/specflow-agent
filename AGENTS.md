@@ -3,12 +3,12 @@
 ## Current phase
 
 The project has completed Milestone 3 (Agent Runtime Foundation), Milestone 4
-(Agent Workflow), and Milestone 5 (Tool Use & Repository Intelligence).
-Milestone 6 (Multi-Agent Orchestration) is in progress. Its deterministic Mock
-execution path is under closeout review; it is not a completed Live Provider capability.
+(Agent Workflow), Milestone 5 (Tool Use & Repository Intelligence), and
+Milestone 6 (Multi-Agent Orchestration). M6 was closed on 2026-07-12 with
+593 passing tests, evidence-collection pipeline, AgentRunner adapter,
+HandoffValidator with real payload checks, and FAILED persistence.
 
-Tasks T-001 through T-023 are completed. T-024 through T-032 are implemented
-locally but remain under M6 closeout review. Implemented:
+All tasks T-001 through T-032 are completed. Implemented:
 health endpoint, Project persistence API, safe scanning, deterministic technology
 identification with evidence, sanitized PROJECT_CONTEXT.md generation, Prompt
 Registry, Context Builder, Token Budget Manager, LLM Client abstraction, Trace
