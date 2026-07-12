@@ -461,7 +461,11 @@ def _persist_failed_run(
                 MultiAgentWorkflowState.FAILED, f"runtime failure: {error}"
             )
     except Exception:
-        pass
+        # State transition recording is best-effort — do not mask the
+        # original runtime failure.
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.debug("Failed to record workflow failure state", exc_info=True)
 
     try:
         run_dir = output / run_id
@@ -483,7 +487,10 @@ def _persist_failed_run(
             json.dumps(traces, ensure_ascii=False, indent=2), encoding="utf-8"
         )
     except Exception:
-        pass  # best-effort; don't hide the original error
+        # Artifact persistence is best-effort — don't hide the original error.
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.debug("Failed to persist failed-run artifacts", exc_info=True)
 
 
 def _repo_summary(repo: Path) -> str:
