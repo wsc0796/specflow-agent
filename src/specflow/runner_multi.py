@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
+from specflow.agents.adapter import AgentRunner
 from specflow.agents.design import DesignAgent
 from specflow.agents.registry import AgentRegistry
 from specflow.agents.repository_analyst import RepositoryAnalystAgent
@@ -22,6 +23,7 @@ from specflow.coordinator.scheduler import MultiAgentScheduler, StageExecutionRe
 from specflow.coordinator.state_machine import MultiAgentWorkflowState
 from specflow.handoff.models import AgentHandoff
 from specflow.handoff.validator import HandoffValidator
+from specflow.llm import LLMClient, OpenAICompatibleConfig, OpenAICompatibleLLMClient
 from specflow.trace.models import AgentTraceSpan
 
 AgentExecutor = Callable[[dict[str, Any]], dict[str, Any]]
@@ -46,27 +48,49 @@ def run_multi_agent(
     if not repo.is_dir() or not requirement.strip():
         return 2
 
-    # The six MVP agents are deterministic adapters today. Do not pretend a
-    # provider was invoked until provider-backed adapters exist.
-    if not mock and provider != "mock":
-        return 2
-
     run_id = f"run-multi-{sha256(f'{repo.resolve()}|{requirement}'.encode()).hexdigest()[:12]}"
     if (output / run_id).exists():
         return 3
 
     registry = _build_registry()
+
+    # Create LLM client: real provider or mock
+    llm_client: object
+    if mock or provider == "mock":
+        llm_client = _make_mock_llm_client()
+    else:
+        try:
+            llm_client = _create_real_llm_client(provider, model)
+        except Exception:
+            return 2
+
     coordinator = Coordinator(
         agent_registry=registry,
-        llm_client=_make_llm_client(mock),
+        llm_client=llm_client,
         model=model,
         provider=provider,
     )
     plan = coordinator.plan(run_id)
-    executors: dict[str, AgentExecutor] = {
-        identity.agent_id: registry.get(identity.agent_id).execute
-        for identity in registry.list_agents()
-    }
+
+    # Build executors: AgentRunner for real, raw agent.execute for mock
+    executors: dict[str, AgentExecutor] = {}
+    for identity in registry.list_agents():
+        agent = registry.get(identity.agent_id)
+        if mock or provider == "mock":
+            executors[identity.agent_id] = agent.execute
+        else:
+            runner = AgentRunner(
+                identity=identity,
+                llm_client=llm_client,
+                system_prompt=(
+                    f"You are the **{identity.role.value}** agent. "
+                    f"{identity.description}"
+                ),
+                model=model,
+                temperature=0.0,
+                max_tokens=2048,
+            )
+            executors[identity.agent_id] = runner.execute
     executors.update(_executor_overrides or {})
     base_context: dict[str, Any] = {
         "run_id": run_id,
@@ -76,6 +100,7 @@ def run_multi_agent(
     scheduler = MultiAgentScheduler()
     prior_outputs: dict[str, dict[str, Any]] = {}
     stages: list[StageExecutionResult] = []
+    runtime_handoffs: list[AgentHandoff] = []
     revision_exhausted = False
 
     try:
@@ -85,14 +110,23 @@ def run_multi_agent(
             stages, scheduler, plan.stages[0], 0, executors, base_context, prior_outputs
         )
         coordinator.engine.transition(MultiAgentWorkflowState.EXECUTING_SPECIALISTS, "specialists")
+        runtime_handoffs.extend(
+            _validate_stage_inputs(plan.tasks, plan.stages[1], registry, prior_outputs, requirement)
+        )
         _run_and_accumulate(
             stages, scheduler, plan.stages[1], 1, executors, base_context, prior_outputs
         )
         coordinator.engine.transition(MultiAgentWorkflowState.SYNTHESIZING, "synthesis")
+        runtime_handoffs.extend(
+            _validate_stage_inputs(plan.tasks, plan.stages[2], registry, prior_outputs, requirement)
+        )
         _run_and_accumulate(
             stages, scheduler, plan.stages[2], 2, executors, base_context, prior_outputs
         )
         coordinator.engine.transition(MultiAgentWorkflowState.REVIEWING, "review")
+        runtime_handoffs.extend(
+            _validate_stage_inputs(plan.tasks, plan.stages[3], registry, prior_outputs, requirement)
+        )
         _run_and_accumulate(
             stages, scheduler, plan.stages[3], 3, executors, base_context, prior_outputs
         )
@@ -159,15 +193,7 @@ def run_multi_agent(
         for stage in stages
         for agent_id, result in stage.agent_results.items()
     }
-    initial_output_refs = {
-        agent_id: _output_ref(stage.stage_index, agent_id)
-        for stage in stages
-        if stage.stage_index < 4
-        for agent_id in stage.agent_results
-    }
-    handoffs = _build_handoffs(
-        plan.tasks, registry, agent_outputs, initial_output_refs, requirement
-    )
+    handoffs = runtime_handoffs
     traces = _build_trace_tree(stages, registry, run_id, model, coordinator.engine.state.value)
     manifest = {
         "run_id": run_id,
@@ -253,32 +279,38 @@ def _revision_target(outputs: Mapping[str, dict[str, Any]], review_id: str) -> s
     return target if isinstance(target, str) and target.strip() else "design-agent-v1"
 
 
-def _build_handoffs(
+def _validate_stage_inputs(
     tasks,
+    agent_ids: tuple[str, ...],
     registry: AgentRegistry,
-    outputs: Mapping[str, dict[str, Any]],
-    output_refs: Mapping[str, str],
+    prior_outputs: Mapping[str, dict[str, Any]],
     requirement: str,
 ) -> list[AgentHandoff]:
     handoffs: list[AgentHandoff] = []
     validator = HandoffValidator()
-    for task in tasks:
+    task_by_id = {task.agent_id: task for task in tasks}
+    for agent_id in agent_ids:
+        task = task_by_id[agent_id]
         receiver = registry.get(task.agent_id)
         for sender_id in sorted(task.depends_on):
             sender = registry.get(sender_id)
+            sender_stage = task_by_id[sender_id].stage
+            payload_ref = _output_ref(sender_stage, sender_id)
+            payload = prior_outputs.get(sender_id)
+            if payload is None:
+                raise ValueError(f"Missing runtime output for handoff sender {sender_id}")
             handoff = AgentHandoff(
                 handoff_id=f"handoff-{uuid4().hex}",
                 from_agent_id=sender_id,
                 to_agent_id=task.agent_id,
                 source_output_schema_id=sender.identity.output_schema_id,
                 target_input_schema_id=receiver.identity.input_schema_id,
-                payload_ref=f"agent-outputs.json#{output_refs[sender_id]}",
+                payload_ref=f"agent-outputs.json#{payload_ref}",
                 input_hash=sha256(requirement.encode()).hexdigest(),
-                output_hash=sha256(
-                    json.dumps(outputs[output_refs[sender_id]], sort_keys=True).encode()
-                ).hexdigest(),
+                output_hash=sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest(),
             )
             validator.validate(handoff, sender.identity, receiver.identity)
+            validator.validate_payload(handoff, sender.identity, {payload_ref: payload})
             handoffs.append(handoff)
     return handoffs
 
@@ -343,8 +375,8 @@ def _build_trace_tree(
     return traces
 
 
-def _make_llm_client(mock: bool) -> object:
-    """Create a deterministic client for semantic enrichment only."""
+def _make_mock_llm_client() -> object:
+    """Create a deterministic client for mock execution."""
 
     class MockClient:
         def complete(self, request) -> object:
@@ -357,3 +389,9 @@ def _make_llm_client(mock: bool) -> object:
             return MockResponse()
 
     return MockClient()
+
+
+def _create_real_llm_client(provider: str, model: str) -> LLMClient:
+    """Create a real OpenAI-compatible LLM client from env vars."""
+    config = OpenAICompatibleConfig.from_env()
+    return OpenAICompatibleLLMClient(config)

@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import json
+from hashlib import sha256
+
 import pytest
 
 from specflow.agents.models import AgentIdentity, AgentRole
@@ -101,3 +104,25 @@ class TestHandoffValidator:
         )
         with pytest.raises(HandoffValidationError, match="target_input_schema_id"):
             HandoffValidator().validate(handoff, sender, receiver)
+
+    def test_payload_must_exist_match_sender_and_hash(self) -> None:
+        sender = _make_identity(
+            "sender", AgentRole.REPOSITORY_ANALYST, output_schema_id="sender/output"
+        )
+        payload = {"agent_id": "sender", "role": "repository_analyst", "output": {"x": 1}}
+        output_hash = sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest()
+        handoff = AgentHandoff(
+            **{
+                **_make_handoff(source_output_schema_id="sender/output").__dict__,
+                "payload_ref": "agent-outputs.json#stage-0/sender",
+                "output_hash": output_hash,
+            }
+        )
+        HandoffValidator().validate_payload(handoff, sender, {"stage-0/sender": payload})
+
+        with pytest.raises(HandoffValidationError, match="output_hash"):
+            HandoffValidator().validate_payload(
+                AgentHandoff(**{**handoff.__dict__, "output_hash": "wrong"}),
+                sender,
+                {"stage-0/sender": payload},
+            )

@@ -1,3 +1,4 @@
+from specflow.agents.adapter import AgentRunner
 from specflow.agents.models import (
     AgentConstraints,
     AgentDependency,
@@ -15,5 +16,6 @@ __all__ = [
     "AgentIdentity",
     "AgentRegistry",
     "AgentRole",
+    "AgentRunner",
     "RevisionPolicy",
 ]
