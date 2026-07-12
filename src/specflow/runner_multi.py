@@ -6,7 +6,7 @@ import json
 import re
 import time
 from collections.abc import Callable, Mapping
-from dataclasses import replace
+from dataclasses import asdict, replace
 from datetime import UTC, datetime
 from hashlib import sha256
 from pathlib import Path
@@ -96,7 +96,7 @@ def run_multi_agent(
         )
         evidence_text = evidence.serialized_context()
         tool_call_records = [
-            r.as_dict() if hasattr(r, "as_dict") else {} for r in evidence.tool_call_records
+            r.as_dict() if hasattr(r, "as_dict") else asdict(r) for r in evidence.tool_call_records
         ]
         discovered_files = evidence.discovered_file_count
         selected_file_count = len(evidence.selected_files)
@@ -353,8 +353,7 @@ def run_multi_agent(
         f"{sha256(repo.resolve().as_uri().encode()).hexdigest()}"
         f"|{sha256(requirement.encode()).hexdigest()}"
         f"|{plan.structure_hash}"
-        f"|{provider}|{model}"
-        .encode()
+        f"|{provider}|{model}".encode()
     ).hexdigest()
 
     manifest = {
@@ -387,8 +386,12 @@ def run_multi_agent(
     }
     # Write stage checkpoints
     checkpoints = [
-        {"stage": s.stage_index, "agents": sorted(s.agent_results),
-         "started": s.started_at, "completed": s.completed_at}
+        {
+            "stage": s.stage_index,
+            "agents": sorted(s.agent_results),
+            "started": s.started_at,
+            "completed": s.completed_at,
+        }
         for s in stages
     ]
     (run_dir / "checkpoints.json").write_text(

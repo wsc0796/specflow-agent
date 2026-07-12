@@ -105,7 +105,7 @@ def run(
         return 3
 
     project_context = ProjectContext(
-        project_name=repo.name,
+        project_name=repo.resolve().name,
         root_path=str(repo.resolve()),
         language="python",
         frameworks=[],

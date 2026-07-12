@@ -121,6 +121,19 @@ _CODE_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
 
 _CHINESE_WORD_RE = re.compile(r"[一-鿿]{2,6}")
 
+# Small, deterministic domain aliases keep Chinese product requirements
+# searchable in repositories whose identifiers are English.  This is an
+# evidence-search aid, not translation or semantic inference.
+_CHINESE_CODE_ALIASES = {
+    "订单": "order",
+    "超时": "timeout",
+    "取消": "cancel",
+    "状态": "status",
+    "事务": "transaction",
+    "幂等": "idempot",
+    "测试": "test",
+}
+
 
 def extract_keywords(
     requirement: str,
@@ -141,6 +154,10 @@ def extract_keywords(
         token = match.group()
         if token not in _STOP_WORDS:
             scored[token] = scored.get(token, 0) + 1.5
+
+    for chinese, code_term in _CHINESE_CODE_ALIASES.items():
+        if chinese in requirement:
+            scored[code_term] = scored.get(code_term, 0) + 2.0
 
     words = re.findall(r"[a-zA-Z][a-zA-Z0-9]{2,}", requirement)
     for word in words:

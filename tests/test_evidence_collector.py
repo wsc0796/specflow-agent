@@ -37,6 +37,12 @@ def test_keyword_extraction_from_mixed_language() -> None:
     assert any("celery" in k.lower() for k in keywords)
 
 
+def test_keyword_extraction_adds_deterministic_chinese_code_aliases() -> None:
+    keywords = extract_keywords("为订单增加超时自动取消功能，并保证幂等和测试策略")
+
+    assert {"order", "timeout", "cancel", "idempot", "test"}.issubset(keywords)
+
+
 def test_keyword_extraction_returns_bounded_result() -> None:
     keywords = extract_keywords(
         "add user login logout register profile settings dashboard notification history",

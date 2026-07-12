@@ -108,7 +108,9 @@ class DeterministicPlanner:
         )
 
         _required = {
-            repo_id, synthesis_id, review_id,
+            repo_id,
+            synthesis_id,
+            review_id,
         }
 
         constraints = tuple(

@@ -1,10 +1,10 @@
-# M8 Pre-Flight Report
+# M8 Pre-Flight Report (Historical Baseline)
 
 **Date:** 2026-07-12
 **Branch:** feat/m8-production-hardening
 **Base commit:** ab25b1f (M7 closeout)
 
-## Baseline
+## Historical baseline
 
 | Check | Result |
 |-------|--------|
@@ -15,7 +15,11 @@
 | Multi-Agent Pipeline | Intact |
 | Live Provider | Case 2 validated (Redis cache, 2.75x speedup) |
 
-## Current architecture
+This document describes the state before M8 remediation. It is not a statement
+of the current implementation. For the resolved findings and current validation
+evidence, see `M8-review-fix-report.md`.
+
+## Historical architecture
 
 - `src/specflow/agents/` — Agent protocol, registry, 6 implementations, AgentRunner adapter
 - `src/specflow/plan/` — Planner, Compiler, Enricher, Validator, Hash utils
