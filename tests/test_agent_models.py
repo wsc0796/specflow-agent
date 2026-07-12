@@ -105,6 +105,24 @@ class TestAgentConstraints:
                 denied_paths=(),
             )
 
+    def test_empty_allowed_path_raises(self):
+        with pytest.raises(AgentModelValidationError):
+            AgentConstraints(
+                agent_id="design-agent-v1",
+                max_execution_seconds=60,
+                max_token_budget=4096,
+                allowed_paths=("",),
+            )
+
+    def test_empty_denied_path_raises(self):
+        with pytest.raises(AgentModelValidationError):
+            AgentConstraints(
+                agent_id="design-agent-v1",
+                max_execution_seconds=60,
+                max_token_budget=4096,
+                denied_paths=("/safe", ""),
+            )
+
 
 class TestRevisionPolicy:
     def test_defaults(self):

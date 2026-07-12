@@ -80,6 +80,12 @@ class AgentConstraints:
             raise AgentModelValidationError("max_token_budget must be positive")
         if self.max_revision_rounds < 0:
             raise AgentModelValidationError("max_revision_rounds must be non-negative")
+        for name in ("allowed_paths", "denied_paths"):
+            paths = getattr(self, name)
+            if any(not p.strip() for p in paths):
+                raise AgentModelValidationError(
+                    f"{name} must not contain empty path strings"
+                )
 
 
 @dataclass(frozen=True)
