@@ -96,7 +96,7 @@ class MultiAgentWorkflowEngine:
     @property
     def revision_exhausted(self) -> bool:
         """``True`` when revision rounds have exceeded the configured maximum."""
-        return self._revision_count > self._max_rounds
+        return self._revision_count >= self._max_rounds
 
     # ── State transitions ───────────────────────────────────────────
 

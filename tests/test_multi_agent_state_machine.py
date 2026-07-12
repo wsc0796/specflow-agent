@@ -114,10 +114,10 @@ class TestMultiAgentWorkflowEngine:
         engine.transition(MultiAgentWorkflowState.SYNTHESIZING, "s")
         engine.transition(MultiAgentWorkflowState.REVIEWING, "r")
 
-        # Round 2 — at limit (2), so > 2 is False
+        # Round 2 reaches the inclusive revision limit.
         engine.transition(MultiAgentWorkflowState.REVISING, "r2")
         assert engine.revision_count == 2
-        assert engine.revision_exhausted is False  # 2 > 2 is False
+        assert engine.revision_exhausted is True
 
         engine.transition(MultiAgentWorkflowState.SYNTHESIZING, "s")
         engine.transition(MultiAgentWorkflowState.REVIEWING, "r")
