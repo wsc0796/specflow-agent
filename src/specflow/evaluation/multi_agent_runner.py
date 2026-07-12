@@ -1,12 +1,8 @@
-"""Deterministic A/B score aggregation for the M6 evaluation surface."""
-
-from __future__ import annotations
-
 from dataclasses import dataclass
 
 from specflow.evaluation.rubric import RubricDimension
 
-AB_DIMENSIONS = (
+AB_DIMENSIONS = [
     RubricDimension("requirement_coverage", "需求覆盖率", max_score=2),
     RubricDimension("file_reference_rate", "真实文件引用率", max_score=2),
     RubricDimension("risk_coverage", "风险覆盖率", max_score=2),
@@ -17,10 +13,10 @@ AB_DIMENSIONS = (
     RubricDimension("end_to_end_latency", "端到端耗时", max_score=2),
     RubricDimension("fallback_rate", "Fallback 率", max_score=2),
     RubricDimension("revision_count", "Revision 次数", max_score=2),
-)
+]
 
 
-@dataclass(frozen=True)
+@dataclass
 class ABComparisonResult:
     case_id: str
     legacy_scores: dict[str, int]
@@ -35,32 +31,20 @@ class ABComparisonResult:
     @property
     def summary(self) -> str:
         return (
-            f"Legacy: {self.legacy_total}/20 | Multi-Agent: {self.multi_agent_total}/20 | "
+            f"Legacy: {self.legacy_total}/20 | "
+            f"Multi-Agent: {self.multi_agent_total}/20 | "
             f"Delta: {self.improvement:+d}"
         )
 
 
-def compare_legacy_vs_multi_agent(
-    legacy_results: dict[str, object], multi_results: dict[str, object]
-) -> ABComparisonResult:
-    """Compare supplied evaluation scores; it never invents a quality score."""
-    legacy_scores = _scores(legacy_results)
-    multi_scores = _scores(multi_results)
+def compare_legacy_vs_multi_agent(legacy_results: dict, multi_results: dict) -> ABComparisonResult:
+    """Compare legacy and multi-agent evaluation results."""
+    legacy_scores = {d["key"]: d["score"] for d in legacy_results.get("dimensions", [])}
+    multi_scores = {d["key"]: d["score"] for d in multi_results.get("dimensions", [])}
     return ABComparisonResult(
-        case_id=str(multi_results.get("case_id", "unknown")),
+        case_id=multi_results.get("case_id", "unknown"),
         legacy_scores=legacy_scores,
         multi_agent_scores=multi_scores,
         legacy_total=sum(legacy_scores.values()),
         multi_agent_total=sum(multi_scores.values()),
     )
-
-
-def _scores(result: dict[str, object]) -> dict[str, int]:
-    dimensions = result.get("dimensions", [])
-    if not isinstance(dimensions, list):
-        return {}
-    return {
-        str(item["key"]): int(item["score"])
-        for item in dimensions
-        if isinstance(item, dict) and "key" in item and "score" in item
-    }
