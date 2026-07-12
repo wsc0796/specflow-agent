@@ -16,8 +16,7 @@ class TestMultiAgentRunner:
             repo=repo, requirement="Add feature X", output=output, mock=True
         )
         assert exit_code == 0
-        manifest_files = list(output.glob("*-manifest.json"))
-        assert len(manifest_files) == 1
+        assert len(list(output.glob("run-multi-*"))) == 1
 
     def test_manifest_contains_three_hashes(self, tmp_path: Path) -> None:
         repo = tmp_path / "test-repo"
@@ -25,7 +24,9 @@ class TestMultiAgentRunner:
         (repo / "README.md").write_text("# Test")
         output = tmp_path / "output"
         run_multi_agent(repo=repo, requirement="Test", output=output, mock=True)
-        manifest = json.loads((list(output.glob("*-manifest.json"))[0]).read_text(encoding="utf-8"))
+        manifest = json.loads(
+            (next(output.glob("run-multi-*")) / "manifest.json").read_text(encoding="utf-8")
+        )
         assert len(manifest["structure_hash"]) == 64
         assert len(manifest["semantic_brief_hash"]) == 64
         assert len(manifest["effective_plan_hash"]) == 64
@@ -39,10 +40,10 @@ class TestMultiAgentRunner:
 
         assert run_multi_agent(repo=repo, requirement="Test", output=output, mock=True) == 0
 
-        prefix = next(output.glob("*-manifest.json")).name.removesuffix("-manifest.json")
-        outputs = json.loads((output / f"{prefix}-agent-outputs.json").read_text())
-        handoffs = json.loads((output / f"{prefix}-handoffs.json").read_text())
-        traces = json.loads((output / f"{prefix}-traces.json").read_text())
+        run_dir = next(output.glob("run-multi-*"))
+        outputs = json.loads((run_dir / "agent-outputs.json").read_text())
+        handoffs = json.loads((run_dir / "handoffs.json").read_text())
+        traces = json.loads((run_dir / "traces.json").read_text())
         assert len(outputs) == 6
         assert len(handoffs) == 7
         assert len(traces) == 6

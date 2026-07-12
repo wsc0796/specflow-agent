@@ -77,8 +77,11 @@ def run_multi_agent(
     except Exception:
         return 3
 
-    # 4. Write manifest
-    output.mkdir(parents=True, exist_ok=True)
+    # 4. Write one self-contained, reviewable run directory.
+    run_dir = output / run_id
+    if run_dir.exists():
+        return 3
+    run_dir.mkdir(parents=True, exist_ok=False)
     agent_outputs = {
         agent_id: result for stage in stages for agent_id, result in stage.agent_results.items()
     }
@@ -136,18 +139,23 @@ def run_multi_agent(
             {"stage": result.stage_index, "agents": sorted(result.agent_results)}
             for result in stages
         ],
+        "artifacts": {
+            "agent_outputs": "agent-outputs.json",
+            "handoffs": "handoffs.json",
+            "traces": "traces.json",
+        },
     }
-    (output / f"{run_id}-manifest.json").write_text(
+    (run_dir / "manifest.json").write_text(
         json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8"
     )
-    (output / f"{run_id}-agent-outputs.json").write_text(
+    (run_dir / "agent-outputs.json").write_text(
         json.dumps(agent_outputs, ensure_ascii=False, indent=2, sort_keys=True), encoding="utf-8"
     )
-    (output / f"{run_id}-handoffs.json").write_text(
+    (run_dir / "handoffs.json").write_text(
         json.dumps([handoff.__dict__ for handoff in handoffs], ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
-    (output / f"{run_id}-traces.json").write_text(
+    (run_dir / "traces.json").write_text(
         json.dumps([span.as_dict() for span in spans], ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
