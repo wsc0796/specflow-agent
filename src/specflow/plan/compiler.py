@@ -21,7 +21,13 @@ class PlanCompiler:
     def compile(self, spec: StructuralDelegationSpec) -> CompiledStructuralPlan:
         agent_ids = {a.agent_id for a in spec.agents}
         dep_map: dict[str, set[str]] = {}
+        seen_dep_ids: set[str] = set()
         for d in spec.dependencies:
+            if d.agent_id in seen_dep_ids:
+                raise PlanCompilationError(
+                    f"Duplicate dependency entry for agent_id={d.agent_id!r}"
+                )
+            seen_dep_ids.add(d.agent_id)
             if d.agent_id not in agent_ids:
                 raise PlanCompilationError(
                     f"Dependency references unknown agent_id={d.agent_id!r}"
