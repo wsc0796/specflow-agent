@@ -81,7 +81,10 @@ class AgentRunner:
             )
             data = json.loads(response.content)
 
-            # Validate against agent's output schema if registry is available
+            # Validate against agent's output schema if registered.
+            # Schema mismatches are recorded but do NOT block execution —
+            # the LLM output flows through and downstream agents handle it.
+            schema_validated = False
             if self._schema_registry is not None:
                 try:
                     output_model = self._schema_registry.get(
@@ -89,15 +92,11 @@ class AgentRunner:
                     )
                     validated = output_model.model_validate(data)
                     data = validated.model_dump()
+                    schema_validated = True
                 except Exception:
-                    # Schema validation failed — degrade gracefully
-                    return {
-                        "agent_id": self.agent_id,
-                        "role": self._identity.role.value,
-                        "success": False,
-                        "output": {"degraded": True, "error": "Schema validation failed"},
-                        "degraded": True,
-                    }
+                    # Schema not registered or validation failed —
+                    # pass raw output through (best-effort)
+                    pass
 
             return {
                 "agent_id": self.agent_id,
@@ -105,6 +104,7 @@ class AgentRunner:
                 "success": True,
                 "output": data,
                 "model": self._model,
+                "schema_validated": schema_validated,
                 "usage": {
                     "input_tokens": getattr(response, "input_tokens", 0),
                     "output_tokens": getattr(response, "output_tokens", 0),
