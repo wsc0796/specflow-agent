@@ -6,12 +6,10 @@ import os
 
 from fastapi import HTTPException, status
 
-DEV_MODE = os.environ.get("SPECFLOW_DEV_MODE", "0") == "1"
-
 
 def require_auth() -> str:
     """Require valid Bearer token in production, skip in dev mode."""
-    if DEV_MODE:
+    if os.environ.get("SPECFLOW_DEV_MODE", "0") == "1":
         return "dev-mode"
 
     expected = os.environ.get("SPECFLOW_API_TOKEN", "")

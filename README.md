@@ -30,7 +30,7 @@ uv run specflow run --mode multi-agent --provider openai-compatible --model deep
 
 ## Current milestone
 
-**M8 independent-review remediation — CLOSED.** 636 tests passed, 2 skipped.
+**M8 independent-review remediation — CLOSED.** 645 tests passed, 2 skipped.
 The remediation adds fail-closed schema enforcement, bounded execution policy,
 safe error artifacts, deterministic evidence aliases for Chinese requirements,
 and revision audit edges. See `docs/reports/M8-review-fix-report.md`.

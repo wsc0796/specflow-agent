@@ -38,7 +38,7 @@ evidence aliases, and real evidence-backed metrics.
 
 | Check | Result |
 | --- | --- |
-| `uv run pytest -v` | 636 passed, 2 skipped |
+| `uv run pytest -v` | 645 passed, 2 skipped |
 | `uv run ruff check .` | passed |
 | `uv run ruff format --check .` | passed |
 | `git diff --check` | passed |
