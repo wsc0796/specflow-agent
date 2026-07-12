@@ -1,16 +1,22 @@
-from specflow.agents.repository_analyst import RepositoryAnalystAgent
 from specflow.agents.design import DesignAgent
-from specflow.agents.test_strategy import TestStrategyAgent
+from specflow.agents.models import AgentRole
+from specflow.agents.repository_analyst import RepositoryAnalystAgent
+from specflow.agents.review import ReviewAgent
 from specflow.agents.risk_review import RiskReviewAgent
 from specflow.agents.synthesis import SynthesisAgent
-from specflow.agents.review import ReviewAgent
-from specflow.agents.models import AgentRole
+from specflow.agents.test_strategy import TestStrategyAgent
 
 
 class TestAgentIdentities:
     def test_all_agents_have_unique_ids(self):
-        agents = [RepositoryAnalystAgent(), DesignAgent(), TestStrategyAgent(),
-                  RiskReviewAgent(), SynthesisAgent(), ReviewAgent()]
+        agents = [
+            RepositoryAnalystAgent(),
+            DesignAgent(),
+            TestStrategyAgent(),
+            RiskReviewAgent(),
+            SynthesisAgent(),
+            ReviewAgent(),
+        ]
         ids = [a.agent_id for a in agents]
         assert len(ids) == len(set(ids))
 
@@ -23,8 +29,14 @@ class TestAgentIdentities:
         assert ReviewAgent().role == AgentRole.REVIEW
 
     def test_all_agents_satisfy_protocol(self):
-        for agent in [RepositoryAnalystAgent(), DesignAgent(), TestStrategyAgent(),
-                      RiskReviewAgent(), SynthesisAgent(), ReviewAgent()]:
+        for agent in [
+            RepositoryAnalystAgent(),
+            DesignAgent(),
+            TestStrategyAgent(),
+            RiskReviewAgent(),
+            SynthesisAgent(),
+            ReviewAgent(),
+        ]:
             ident = agent.identity
             assert ident.agent_id == agent.agent_id
             assert ident.role == agent.role

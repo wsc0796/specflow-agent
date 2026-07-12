@@ -25,9 +25,7 @@ class TestMultiAgentRunner:
         (repo / "README.md").write_text("# Test")
         output = tmp_path / "output"
         run_multi_agent(repo=repo, requirement="Test", output=output, mock=True)
-        manifest = json.loads(
-            (list(output.glob("*-manifest.json"))[0]).read_text(encoding="utf-8")
-        )
+        manifest = json.loads((list(output.glob("*-manifest.json"))[0]).read_text(encoding="utf-8"))
         assert len(manifest["structure_hash"]) == 64
         assert len(manifest["semantic_brief_hash"]) == 64
         assert len(manifest["effective_plan_hash"]) == 64

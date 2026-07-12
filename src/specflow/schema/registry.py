@@ -20,9 +20,7 @@ class SchemaRegistry:
         if self._frozen:
             raise RegistryFrozenError("Cannot register after freeze()")
         if not isinstance(model, type) or not issubclass(model, BaseModel):
-            raise ValueError(
-                f"Schema model must be a BaseModel subclass, got {type(model)}"
-            )
+            raise ValueError(f"Schema model must be a BaseModel subclass, got {type(model)}")
         if not schema_id.strip():
             raise ValueError("schema_id must not be empty")
         existing = self._models.get(schema_id)

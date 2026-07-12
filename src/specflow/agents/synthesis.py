@@ -13,10 +13,7 @@ class SynthesisAgent:
             agent_id="synthesis-agent-v1",
             role=AgentRole.SYNTHESIS,
             version="1.0.0",
-            description=(
-                "Merges outputs from multiple specialist agents,"
-                " resolves conflicts"
-            ),
+            description=("Merges outputs from multiple specialist agents, resolves conflicts"),
             prompt_id="prompts/synthesis/v1",
             prompt_version="1.0.0",
             input_schema_id="agent/synthesis/v1/input",

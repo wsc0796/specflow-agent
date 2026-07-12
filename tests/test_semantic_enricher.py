@@ -15,7 +15,7 @@ from specflow.agents.models import (
     RevisionPolicy,
 )
 from specflow.llm.exceptions import LLMResponseError
-from specflow.llm.models import LLMMessage, LLMRequest, LLMResponse, LLMUsage
+from specflow.llm.models import LLMRequest, LLMResponse, LLMUsage
 from specflow.plan.enricher import SemanticPlanEnricher
 from specflow.plan.models import (
     EnrichmentProvenance,
@@ -75,10 +75,7 @@ def _make_spec(agent_count: int = 2) -> StructuralDelegationSpec:
         )
         for i in range(agent_count)
     ]
-    deps = tuple(
-        AgentDependency(agent_id=a.agent_id, depends_on=frozenset())
-        for a in agents
-    )
+    deps = tuple(AgentDependency(agent_id=a.agent_id, depends_on=frozenset()) for a in agents)
     constraints = tuple(
         AgentConstraints(
             agent_id=a.agent_id,

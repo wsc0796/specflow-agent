@@ -27,10 +27,7 @@ def compute_structure_hash(input_: StructuralHashInput) -> str:
     payload = {
         "agents": sorted(input_.agents, key=lambda a: a["agent_id"]),
         "dependencies": sorted(
-            [
-                {**d, "depends_on": sorted(d["depends_on"])}
-                for d in input_.dependencies
-            ],
+            [{**d, "depends_on": sorted(d["depends_on"])} for d in input_.dependencies],
             key=lambda d: d["agent_id"],
         ),
         "stages": [sorted(stage) for stage in input_.stages],

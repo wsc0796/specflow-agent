@@ -57,9 +57,7 @@ class AgentDependency:
         if not self.agent_id.strip():
             raise AgentModelValidationError("agent_id must not be empty")
         if self.agent_id in self.depends_on:
-            raise AgentModelValidationError(
-                f"Agent cannot depend on itself: {self.agent_id}"
-            )
+            raise AgentModelValidationError(f"Agent cannot depend on itself: {self.agent_id}")
 
 
 @dataclass(frozen=True)
@@ -83,20 +81,20 @@ class AgentConstraints:
         for name in ("allowed_paths", "denied_paths"):
             paths = getattr(self, name)
             if any(not p.strip() for p in paths):
-                raise AgentModelValidationError(
-                    f"{name} must not contain empty path strings"
-                )
+                raise AgentModelValidationError(f"{name} must not contain empty path strings")
 
 
 @dataclass(frozen=True)
 class RevisionPolicy:
     max_total_rounds: int = 1
     revisable_roles: frozenset[AgentRole] = field(
-        default_factory=lambda: frozenset({
-            AgentRole.DESIGN,
-            AgentRole.TEST_STRATEGY,
-            AgentRole.RISK_REVIEW,
-        })
+        default_factory=lambda: frozenset(
+            {
+                AgentRole.DESIGN,
+                AgentRole.TEST_STRATEGY,
+                AgentRole.RISK_REVIEW,
+            }
+        )
     )
     final_authority_role: AgentRole = AgentRole.REVIEW
 
@@ -104,9 +102,7 @@ class RevisionPolicy:
         if self.max_total_rounds < 0:
             raise AgentModelValidationError("max_total_rounds must be non-negative")
         if not isinstance(self.final_authority_role, AgentRole):
-            raise AgentModelValidationError(
-                "final_authority_role must be an AgentRole"
-            )
+            raise AgentModelValidationError("final_authority_role must be an AgentRole")
 
     def is_revisable(self, role: AgentRole) -> bool:
         return role in self.revisable_roles

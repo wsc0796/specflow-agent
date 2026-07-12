@@ -13,10 +13,7 @@ class ReviewAgent:
             agent_id="review-agent-v1",
             role=AgentRole.REVIEW,
             version="1.0.0",
-            description=(
-                "Performs final review and issues PASS/REJECT"
-                " with structured findings"
-            ),
+            description=("Performs final review and issues PASS/REJECT with structured findings"),
             prompt_id="prompts/review/v1",
             prompt_version="1.0.0",
             input_schema_id="agent/review/v1/input",

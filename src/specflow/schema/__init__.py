@@ -1,8 +1,8 @@
 from specflow.schema.exceptions import (
     RegistryFrozenError,
     SchemaConflictError,
-    SchemaNotFoundError,
     SchemaError,
+    SchemaNotFoundError,
 )
 from specflow.schema.registry import SchemaRegistry
 

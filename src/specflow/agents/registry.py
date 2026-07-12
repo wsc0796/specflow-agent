@@ -28,9 +28,7 @@ class AgentRegistry:
         ``agent_id`` is already registered.
         """
         if agent.agent_id in self._agents:
-            raise DuplicateAgentError(
-                f"Agent already registered: {agent.agent_id!r}"
-            )
+            raise DuplicateAgentError(f"Agent already registered: {agent.agent_id!r}")
         self._agents[agent.agent_id] = agent
 
     # ------------------------------------------------------------------
@@ -49,9 +47,7 @@ class AgentRegistry:
 
     def get_by_role(self, role: AgentRole) -> tuple[Agent, ...]:
         """Return all agents matching *role*."""
-        return tuple(
-            agent for agent in self._agents.values() if agent.role == role
-        )
+        return tuple(agent for agent in self._agents.values() if agent.role == role)
 
     # ------------------------------------------------------------------
     # Introspection

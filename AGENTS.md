@@ -20,8 +20,9 @@ bounded evidence collection pipeline, `specflow run` CLI with 10 structured
 artifacts, and a deterministic real-repository evaluation layer with safe Live
 Artifact import validation and 10-dimension human rubric.
 
-The next milestone is M6. The next permitted task is T-024.
-M6 must not begin before an explicit task spec is approved.
+M6 code exists locally but is under readiness review and is not task-complete.
+The next permitted action is to freeze T-024 task specifications and resolve
+the M6 readiness audit before treating any M6 implementation as completed.
 Future task IDs are not permission to implement future features.
 
 ## Mandatory workflow

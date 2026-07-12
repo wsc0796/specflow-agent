@@ -13,10 +13,7 @@ class DesignAgent:
             agent_id="design-agent-v1",
             role=AgentRole.DESIGN,
             version="1.0.0",
-            description=(
-                "Generates architecture, interface, data, and"
-                " implementation plans"
-            ),
+            description=("Generates architecture, interface, data, and implementation plans"),
             prompt_id="prompts/design/v1",
             prompt_version="1.0.0",
             input_schema_id="agent/design/v1/input",

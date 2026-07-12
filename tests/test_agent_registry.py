@@ -8,7 +8,6 @@ import pytest
 
 from specflow.agents.exceptions import AgentNotFoundError, DuplicateAgentError
 from specflow.agents.models import AgentIdentity, AgentRole
-from specflow.agents.protocol import Agent
 from specflow.agents.registry import AgentRegistry
 
 
@@ -100,9 +99,7 @@ class TestGet:
         with pytest.raises(AgentNotFoundError):
             populated_registry.get("nonexistent")
 
-    def test_get_from_empty_registry_raises(
-        self, empty_registry: AgentRegistry
-    ) -> None:
+    def test_get_from_empty_registry_raises(self, empty_registry: AgentRegistry) -> None:
         with pytest.raises(AgentNotFoundError):
             empty_registry.get("any-agent")
 
@@ -119,15 +116,11 @@ class TestGetByRole:
         assert len(agents) == 2
         assert {a.agent_id for a in agents} == {"design-1", "design-2"}
 
-    def test_matching_role_returns_agents(
-        self, populated_registry: AgentRegistry
-    ) -> None:
+    def test_matching_role_returns_agents(self, populated_registry: AgentRegistry) -> None:
         agents = populated_registry.get_by_role(AgentRole.REPOSITORY_ANALYST)
         assert len(agents) == 1
 
-    def test_unregistered_role_returns_empty(
-        self, empty_registry: AgentRegistry
-    ) -> None:
+    def test_unregistered_role_returns_empty(self, empty_registry: AgentRegistry) -> None:
         agents = empty_registry.get_by_role(AgentRole.DESIGN)
         assert agents == ()
 

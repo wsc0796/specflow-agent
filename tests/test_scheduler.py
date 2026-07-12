@@ -17,7 +17,11 @@ def _make_executor(agent_id: str, fail: bool = False) -> Any:
         if fail:
             msg = f"Intentional failure in {agent_id}"
             raise RuntimeError(msg)
-        return {"agent_id": agent_id, "result": f"{agent_id}_output", "prior": context.get("prior_outputs", {})}
+        return {
+            "agent_id": agent_id,
+            "result": f"{agent_id}_output",
+            "prior": context.get("prior_outputs", {}),
+        }
 
     return executor
 

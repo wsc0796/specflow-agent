@@ -18,7 +18,6 @@ from specflow.plan.exceptions import PlanValidationError
 from specflow.plan.models import CompiledStructuralPlan
 from specflow.plan.validator import PlanValidator
 
-
 # ------------------------------------------------------------------
 # Helpers
 # ------------------------------------------------------------------
@@ -100,9 +99,7 @@ class TestPlanValidator:
     def test_extra_agent_in_stages_raises(self) -> None:
         """Agent in execution stages but not in plan.agents."""
         plan = _valid_plan(
-            agents=(
-                _make_identity("a1", AgentRole.REPOSITORY_ANALYST),
-            ),
+            agents=(_make_identity("a1", AgentRole.REPOSITORY_ANALYST),),
             execution_stages=(("a1",), ("a2",)),  # a2 not in plan.agents
         )
         with pytest.raises(PlanValidationError, match="not declared in plan"):
@@ -116,9 +113,7 @@ class TestPlanValidator:
             dependencies=(),
             constraints=(_make_constraints("a1"),),
         )
-        with pytest.raises(
-            PlanValidationError, match="appears in multiple execution stages"
-        ):
+        with pytest.raises(PlanValidationError, match="appears in multiple execution stages"):
             PlanValidator().validate(plan)
 
     def test_intra_stage_dependency_raises(self) -> None:
@@ -128,14 +123,10 @@ class TestPlanValidator:
                 _make_identity("a1", AgentRole.REPOSITORY_ANALYST),
                 _make_identity("a2", AgentRole.DESIGN),
             ),
-            dependencies=(
-                AgentDependency(agent_id="a2", depends_on=frozenset({"a1"})),
-            ),
+            dependencies=(AgentDependency(agent_id="a2", depends_on=frozenset({"a1"})),),
             execution_stages=(("a1", "a2"),),  # same stage, but a2 depends on a1
         )
-        with pytest.raises(
-            PlanValidationError, match="Intra-stage dependency"
-        ):
+        with pytest.raises(PlanValidationError, match="Intra-stage dependency"):
             PlanValidator().validate(plan)
 
     def test_with_schema_registry_all_exist(self) -> None:
@@ -193,9 +184,7 @@ class TestPlanValidator:
             dependencies=(),
             constraints=(_make_constraints("a1"),),
         )
-        with pytest.raises(
-            PlanValidationError, match="unknown input_schema_id"
-        ):
+        with pytest.raises(PlanValidationError, match="unknown input_schema_id"):
             PlanValidator().validate(plan, schema_registry=registry)
 
     def test_with_schema_registry_missing_output_raises(self) -> None:
@@ -223,7 +212,5 @@ class TestPlanValidator:
             dependencies=(),
             constraints=(_make_constraints("a1"),),
         )
-        with pytest.raises(
-            PlanValidationError, match="unknown output_schema_id"
-        ):
+        with pytest.raises(PlanValidationError, match="unknown output_schema_id"):
             PlanValidator().validate(plan, schema_registry=registry)

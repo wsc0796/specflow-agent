@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from specflow.llm.models import LLMMessage, LLMRequest
@@ -46,9 +46,7 @@ class SemanticPlanEnricher:
     # Public API
     # ------------------------------------------------------------------
 
-    def enrich(
-        self, spec: StructuralDelegationSpec
-    ) -> tuple[SemanticTaskBrief, ...]:
+    def enrich(self, spec: StructuralDelegationSpec) -> tuple[SemanticTaskBrief, ...]:
         """Enrich *spec* with one brief per agent.
 
         A failed enrichment for an individual agent results in a degraded
@@ -62,8 +60,7 @@ class SemanticPlanEnricher:
                 brief = SemanticTaskBrief.degraded_default(
                     agent_id=agent.agent_id,
                     task_description=(
-                        f"Execute {agent.role.value} analysis "
-                        f"for the given requirement."
+                        f"Execute {agent.role.value} analysis for the given requirement."
                     ),
                 )
             briefs.append(brief)
@@ -85,7 +82,7 @@ class SemanticPlanEnricher:
         )
         response = self._llm.complete(request)
         data = json.loads(response.content)
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
 
         return SemanticTaskBrief(
             agent_id=agent_id,

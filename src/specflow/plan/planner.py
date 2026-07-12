@@ -122,9 +122,7 @@ class DeterministicPlanner:
         all_deps = list(dependencies)
         dep_agent_ids = {d.agent_id for d in all_deps}
         if repo_id not in dep_agent_ids:
-            all_deps.append(
-                AgentDependency(agent_id=repo_id, depends_on=frozenset())
-            )
+            all_deps.append(AgentDependency(agent_id=repo_id, depends_on=frozenset()))
 
         return StructuralDelegationSpec(
             plan_id=plan_id,

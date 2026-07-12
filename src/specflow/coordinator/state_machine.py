@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import StrEnum
 
 from specflow.coordinator.exceptions import StateTransitionError
@@ -128,5 +128,5 @@ class MultiAgentWorkflowEngine:
             self._revision_count += 1
 
         self._state = to_state
-        timestamp = datetime.now(timezone.utc).isoformat()
+        timestamp = datetime.now(UTC).isoformat()
         self._history.append((from_state.value, to_state.value, reason, timestamp))

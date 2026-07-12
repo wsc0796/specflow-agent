@@ -29,9 +29,7 @@ class PlanCompiler:
                 )
             seen_dep_ids.add(d.agent_id)
             if d.agent_id not in agent_ids:
-                raise PlanCompilationError(
-                    f"Dependency references unknown agent_id={d.agent_id!r}"
-                )
+                raise PlanCompilationError(f"Dependency references unknown agent_id={d.agent_id!r}")
             for dep_id in d.depends_on:
                 if dep_id not in agent_ids:
                     raise PlanCompilationError(
@@ -83,9 +81,7 @@ class PlanCompiler:
             stages.append(sorted(current_stage))
 
         if visited_count != len(agent_ids):
-            raise PlanCompilationError(
-                "Cycle detected in agent dependency graph"
-            )
+            raise PlanCompilationError("Cycle detected in agent dependency graph")
 
         execution_stages = tuple(tuple(stage) for stage in stages)
 

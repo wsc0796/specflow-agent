@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import pytest
@@ -19,7 +19,6 @@ from specflow.plan.models import (
     EnrichmentStatus,
     SemanticTaskBrief,
 )
-
 
 # ------------------------------------------------------------------
 # Helpers
@@ -54,7 +53,7 @@ def _enriched_brief(agent_id: str, **overrides: Any) -> SemanticTaskBrief:
             prompt_id="enrichment/test/v1",
             prompt_version="1.0.0",
             trace_id=f"trace-{agent_id}",
-            generated_at=datetime.now(timezone.utc).isoformat(),
+            generated_at=datetime.now(UTC).isoformat(),
         ),
     )
     defaults.update(overrides)
@@ -161,7 +160,7 @@ def _build_effective_plan(
         stages=stages,
         tasks=tasks,
         revision_policy=RevisionPolicy(),
-        generated_at=datetime.now(timezone.utc).isoformat(),
+        generated_at=datetime.now(UTC).isoformat(),
     )
 
 
@@ -198,14 +197,10 @@ class TestEffectiveDelegationPlan:
                 stage_map[agent_id] = idx
 
         # Map agent_id -> depends_on frozenset
-        dep_map: dict[str, frozenset[str]] = {
-            d.agent_id: d.depends_on for d in spec.dependencies
-        }
+        dep_map: dict[str, frozenset[str]] = {d.agent_id: d.depends_on for d in spec.dependencies}
 
         # Map agent_id -> constraints
-        constraints_map: dict[str, AgentConstraints] = {
-            c.agent_id: c for c in spec.constraints
-        }
+        constraints_map: dict[str, AgentConstraints] = {c.agent_id: c for c in spec.constraints}
 
         tasks = tuple(
             AgentTask(
@@ -244,7 +239,7 @@ class TestEffectiveDelegationPlan:
             stages=compiled.execution_stages,
             tasks=tasks,
             revision_policy=spec.revision_policy,
-            generated_at=datetime.now(timezone.utc).isoformat(),
+            generated_at=datetime.now(UTC).isoformat(),
         )
 
         # Verify 6 tasks
@@ -310,7 +305,7 @@ class TestEffectiveDelegationPlan:
             stages=stages,
             tasks=tasks,
             revision_policy=RevisionPolicy(),
-            generated_at=datetime.now(timezone.utc).isoformat(),
+            generated_at=datetime.now(UTC).isoformat(),
         )
         assert plan.enriched is False
         assert plan.degraded_agents == ("degraded-agent",)

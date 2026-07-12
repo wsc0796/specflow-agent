@@ -13,10 +13,7 @@ class RepositoryAnalystAgent:
             agent_id="repository-analyst-agent-v1",
             role=AgentRole.REPOSITORY_ANALYST,
             version="1.0.0",
-            description=(
-                "Analyzes repository structure and maps requirements"
-                " to code evidence"
-            ),
+            description=("Analyzes repository structure and maps requirements to code evidence"),
             prompt_id="prompts/repository-analyst/v1",
             prompt_version="1.0.0",
             input_schema_id="agent/repository-analyst/v1/input",

@@ -90,8 +90,10 @@ class TestCompiledStructuralPlan:
             AgentDependency(agent_id=test_id, depends_on=frozenset({design_id})),
         ]
         bad_spec = StructuralDelegationSpec(
-            plan_id=spec.plan_id, agents=spec.agents,
-            dependencies=tuple(deps), constraints=spec.constraints,
+            plan_id=spec.plan_id,
+            agents=spec.agents,
+            dependencies=tuple(deps),
+            constraints=spec.constraints,
             revision_policy=spec.revision_policy,
         )
         with pytest.raises(PlanCompilationError):
@@ -103,8 +105,10 @@ class TestCompiledStructuralPlan:
             AgentDependency(agent_id="nonexistent-agent", depends_on=frozenset()),
         ]
         bad_spec = StructuralDelegationSpec(
-            plan_id=spec.plan_id, agents=spec.agents,
-            dependencies=tuple(deps), constraints=spec.constraints,
+            plan_id=spec.plan_id,
+            agents=spec.agents,
+            dependencies=tuple(deps),
+            constraints=spec.constraints,
             revision_policy=spec.revision_policy,
         )
         with pytest.raises(PlanCompilationError):
@@ -117,8 +121,10 @@ class TestCompiledStructuralPlan:
             AgentDependency(agent_id=design_id, depends_on=frozenset({"ghost-agent"})),
         ]
         bad_spec = StructuralDelegationSpec(
-            plan_id=spec.plan_id, agents=spec.agents,
-            dependencies=tuple(deps), constraints=spec.constraints,
+            plan_id=spec.plan_id,
+            agents=spec.agents,
+            dependencies=tuple(deps),
+            constraints=spec.constraints,
             revision_policy=spec.revision_policy,
         )
         with pytest.raises(PlanCompilationError):

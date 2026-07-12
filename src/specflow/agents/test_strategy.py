@@ -13,9 +13,7 @@ class TestStrategyAgent:
             agent_id="test-strategy-agent-v1",
             role=AgentRole.TEST_STRATEGY,
             version="1.0.0",
-            description=(
-                "Independently generates comprehensive test strategies"
-            ),
+            description=("Independently generates comprehensive test strategies"),
             prompt_id="prompts/test-strategy/v1",
             prompt_version="1.0.0",
             input_schema_id="agent/test-strategy/v1/input",

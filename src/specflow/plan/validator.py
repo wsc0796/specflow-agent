@@ -77,8 +77,7 @@ class PlanValidator:
             )
         if missing_in_plan:
             raise PlanValidationError(
-                f"Agents in stages not declared in plan.agents: "
-                f"{sorted(missing_in_plan)}"
+                f"Agents in stages not declared in plan.agents: {sorted(missing_in_plan)}"
             )
 
     @staticmethod

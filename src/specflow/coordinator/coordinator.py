@@ -7,11 +7,13 @@ execution by the :class:`MultiAgentScheduler`.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from specflow.agents.models import AgentConstraints
 from specflow.agents.registry import AgentRegistry
+from specflow.coordinator.revision import RevisionController
+from specflow.coordinator.state_machine import MultiAgentWorkflowEngine
 from specflow.plan.compiler import PlanCompiler
 from specflow.plan.enricher import SemanticPlanEnricher
 from specflow.plan.hash_utils import (
@@ -21,9 +23,6 @@ from specflow.plan.hash_utils import (
 from specflow.plan.models import AgentTask, EffectiveDelegationPlan
 from specflow.plan.planner import DeterministicPlanner
 from specflow.plan.validator import PlanValidator
-
-from specflow.coordinator.revision import RevisionController
-from specflow.coordinator.state_machine import MultiAgentWorkflowEngine, MultiAgentWorkflowState
 
 
 class Coordinator:
@@ -128,9 +127,7 @@ class Coordinator:
             d.agent_id: d.depends_on for d in compiled.dependencies
         }
 
-        constraints_map: dict[str, AgentConstraints] = {
-            c.agent_id: c for c in compiled.constraints
-        }
+        constraints_map: dict[str, AgentConstraints] = {c.agent_id: c for c in compiled.constraints}
 
         tasks = tuple(
             AgentTask(
@@ -161,5 +158,5 @@ class Coordinator:
             stages=compiled.execution_stages,
             tasks=tasks,
             revision_policy=compiled.revision_policy,
-            generated_at=datetime.now(timezone.utc).isoformat(),
+            generated_at=datetime.now(UTC).isoformat(),
         )

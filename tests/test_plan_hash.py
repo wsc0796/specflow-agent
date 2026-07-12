@@ -1,4 +1,3 @@
-
 from specflow.plan.hash_utils import (
     StructuralHashInput,
     compute_effective_plan_hash,
@@ -98,28 +97,34 @@ class TestSemanticBriefHash:
     def test_different_description_different_hash(self):
         assert compute_semantic_brief_hash(
             [{"agent_id": "a1", "task_description": "do X"}]
-        ) != compute_semantic_brief_hash(
-            [{"agent_id": "a1", "task_description": "do Y"}]
-        )
+        ) != compute_semantic_brief_hash([{"agent_id": "a1", "task_description": "do Y"}])
 
     def test_agent_id_order_independent(self):
-        a = compute_semantic_brief_hash([
-            {"agent_id": "a1", "task_description": "X"},
-            {"agent_id": "a2", "task_description": "Y"},
-        ])
-        b = compute_semantic_brief_hash([
-            {"agent_id": "a2", "task_description": "Y"},
-            {"agent_id": "a1", "task_description": "X"},
-        ])
+        a = compute_semantic_brief_hash(
+            [
+                {"agent_id": "a1", "task_description": "X"},
+                {"agent_id": "a2", "task_description": "Y"},
+            ]
+        )
+        b = compute_semantic_brief_hash(
+            [
+                {"agent_id": "a2", "task_description": "Y"},
+                {"agent_id": "a1", "task_description": "X"},
+            ]
+        )
         assert a == b
 
     def test_excludes_extra_fields(self):
-        a = compute_semantic_brief_hash([
-            {"agent_id": "a1", "task_description": "X", "provenance": "old"},
-        ])
-        b = compute_semantic_brief_hash([
-            {"agent_id": "a1", "task_description": "X", "provenance": "new"},
-        ])
+        a = compute_semantic_brief_hash(
+            [
+                {"agent_id": "a1", "task_description": "X", "provenance": "old"},
+            ]
+        )
+        b = compute_semantic_brief_hash(
+            [
+                {"agent_id": "a1", "task_description": "X", "provenance": "new"},
+            ]
+        )
         assert a == b
 
 

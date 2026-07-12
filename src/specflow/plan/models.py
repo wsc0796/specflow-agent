@@ -77,8 +77,12 @@ class EnrichmentProvenance:
 
     def __post_init__(self) -> None:
         for field_name in (
-            "provider", "model", "prompt_id", "prompt_version",
-            "trace_id", "generated_at",
+            "provider",
+            "model",
+            "prompt_id",
+            "prompt_version",
+            "trace_id",
+            "generated_at",
         ):
             if not getattr(self, field_name).strip():
                 raise PlanValidationError(f"{field_name} must not be empty")

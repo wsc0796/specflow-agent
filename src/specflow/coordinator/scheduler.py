@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from typing import Any, Callable
+from datetime import UTC, datetime
+from typing import Any
 
 from specflow.coordinator.exceptions import ScheduleExecutionError
 
@@ -90,15 +91,13 @@ class MultiAgentScheduler:
         prior_outputs: dict[str, dict[str, Any]] = {}
 
         for stage_idx, stage_agent_ids in enumerate(stages):
-            started_at = datetime.now(timezone.utc).isoformat()
+            started_at = datetime.now(UTC).isoformat()
             agent_results: dict[str, dict[str, Any]] = {}
 
             # Validate all agents in this stage have executors
             for agent_id in stage_agent_ids:
                 if agent_id not in agent_executors:
-                    raise ScheduleExecutionError(
-                        f"No executor registered for agent {agent_id!r}"
-                    )
+                    raise ScheduleExecutionError(f"No executor registered for agent {agent_id!r}")
 
             # Execute agents in this stage concurrently
             with ThreadPoolExecutor(max_workers=self._max_workers) as executor:
@@ -120,7 +119,7 @@ class MultiAgentScheduler:
                             f"Agent {agent_id!r} execution failed: {exc}"
                         ) from exc
 
-            completed_at = datetime.now(timezone.utc).isoformat()
+            completed_at = datetime.now(UTC).isoformat()
 
             # Accumulate outputs so downstream stages can access them
             prior_outputs.update(agent_results)
