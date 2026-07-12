@@ -51,9 +51,11 @@ class TestExecutionPolicy:
     def test_policy_hash_stable(self):
         p1 = DEFAULT_POLICY
         p2 = ExecutionPolicy(
-            max_wall_time_seconds=300, tokens=TokenPolicy(max_run_total_tokens=62000),
+            max_wall_time_seconds=300,
+            tokens=TokenPolicy(max_run_total_tokens=62000),
             repository=RepositoryPolicy(max_selected_files=80),
-            retry=RetryPolicy(), artifacts=ArtifactPolicy(),
+            retry=RetryPolicy(),
+            artifacts=ArtifactPolicy(),
         )
         assert p1.policy_hash() == p2.policy_hash()
 
@@ -118,17 +120,17 @@ class TestRuntimeGuard:
             g.consume_llm_call()
 
     def test_tokens_within_budget(self):
-        g = RuntimeGuard(ExecutionPolicy(
-            tokens=TokenPolicy(max_run_total_tokens=1000, reserved_retry_tokens=0)
-        ))
+        g = RuntimeGuard(
+            ExecutionPolicy(tokens=TokenPolicy(max_run_total_tokens=1000, reserved_retry_tokens=0))
+        )
         g.consume_tokens(400, 400)
         assert g.total_input_tokens == 400
         assert g.total_output_tokens == 400
 
     def test_tokens_exceeded(self):
-        g = RuntimeGuard(ExecutionPolicy(
-            tokens=TokenPolicy(max_run_total_tokens=500, reserved_retry_tokens=0)
-        ))
+        g = RuntimeGuard(
+            ExecutionPolicy(tokens=TokenPolicy(max_run_total_tokens=500, reserved_retry_tokens=0))
+        )
         with pytest.raises(SpecFlowError, match="budget exceeded"):
             g.consume_tokens(300, 300)
 
@@ -160,9 +162,7 @@ class TestRuntimeGuard:
         g.check_artifact_size(100)
 
     def test_artifact_size_exceeded(self):
-        g = RuntimeGuard(
-            ExecutionPolicy(artifacts=ArtifactPolicy(max_artifact_bytes=100))
-        )
+        g = RuntimeGuard(ExecutionPolicy(artifacts=ArtifactPolicy(max_artifact_bytes=100)))
         with pytest.raises(SpecFlowError, match="exceeds limit"):
             g.check_artifact_size(200)
 

@@ -51,8 +51,7 @@ class RuntimeGuard:
             raise SpecFlowError(
                 code="TOKEN_BUDGET_EXCEEDED",
                 safe_message=(
-                    f"Run token budget exceeded"
-                    f" ({self._policy.tokens.max_run_total_tokens})"
+                    f"Run token budget exceeded ({self._policy.tokens.max_run_total_tokens})"
                 ),
                 retryable=False,
             )
@@ -82,9 +81,7 @@ class RuntimeGuard:
         if elapsed > self._policy.max_wall_time_seconds:
             raise SpecFlowError(
                 code="TIME_BUDGET_EXCEEDED",
-                safe_message=(
-                    f"Wall-time budget exceeded ({self._policy.max_wall_time_seconds}s)"
-                ),
+                safe_message=(f"Wall-time budget exceeded ({self._policy.max_wall_time_seconds}s)"),
                 retryable=False,
                 details={"elapsed_seconds": elapsed},
             )

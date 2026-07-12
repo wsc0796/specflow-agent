@@ -10,6 +10,7 @@ from specflow.plan.hash_utils import canonical_json_bytes
 
 # ── Run Status ───────────────────────────────────────────────────
 
+
 class RunStatus:
     CREATED = "created"
     RUNNING = "running"
@@ -23,6 +24,7 @@ class RunStatus:
 
 
 # ── Sub-policies ─────────────────────────────────────────────────
+
 
 @dataclass(frozen=True)
 class RepositoryPolicy:
@@ -53,8 +55,11 @@ class TokenPolicy:
 
     def __post_init__(self) -> None:
         for name in (
-            "max_run_input_tokens", "max_run_output_tokens", "max_run_total_tokens",
-            "max_agent_input_tokens", "max_agent_output_tokens",
+            "max_run_input_tokens",
+            "max_run_output_tokens",
+            "max_run_total_tokens",
+            "max_agent_input_tokens",
+            "max_agent_output_tokens",
         ):
             _check_positive(self, name)
         _check_non_negative(self, "reserved_retry_tokens")
@@ -87,6 +92,7 @@ class ArtifactPolicy:
 
 
 # ── Composite ExecutionPolicy ────────────────────────────────────
+
 
 @dataclass(frozen=True)
 class ExecutionPolicy:
@@ -154,7 +160,8 @@ class ExecutionPolicy:
 
 # ── SpecFlowError ────────────────────────────────────────────────
 
-@dataclass(frozen=True)
+
+@dataclass
 class SpecFlowError(Exception):
     """Safe, auditable error that never leaks raw exception data to artifacts."""
 
@@ -177,6 +184,7 @@ class SpecFlowError(Exception):
 
 # ── RunOutcome ───────────────────────────────────────────────────
 
+
 @dataclass(frozen=True)
 class RunOutcome:
     status: str
@@ -196,6 +204,7 @@ class RunOutcome:
 
 
 # ── Helpers ──────────────────────────────────────────────────────
+
 
 def _check_positive(obj: object, field_name: str) -> None:
     value = getattr(obj, field_name)

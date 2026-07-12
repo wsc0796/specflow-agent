@@ -24,8 +24,10 @@ class PolicyValidator:
             ("tokens.max_agent_output_tokens", self._hard_limit.tokens.max_agent_output_tokens),
             ("repository.max_scanned_files", self._hard_limit.repository.max_scanned_files),
             ("repository.max_selected_files", self._hard_limit.repository.max_selected_files),
-            ("repository.max_total_evidence_chars",
-             self._hard_limit.repository.max_total_evidence_chars),
+            (
+                "repository.max_total_evidence_chars",
+                self._hard_limit.repository.max_total_evidence_chars,
+            ),
             ("artifacts.max_artifact_bytes", self._hard_limit.artifacts.max_artifact_bytes),
         ]
         for field_path, max_allowed in limits:

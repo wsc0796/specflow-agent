@@ -129,8 +129,8 @@ def run(
     trace_dir.mkdir(parents=True, exist_ok=True)
     trace_recorder = TraceRecorder(JsonTraceStorage(trace_dir))
     token_policy = BudgetPolicy(
-        max_tokens=policy.max_agent_input_tokens + policy.max_agent_output_tokens,
-        reserved_response_tokens=policy.max_agent_output_tokens,
+        max_tokens=(policy.tokens.max_agent_input_tokens + policy.tokens.max_agent_output_tokens),
+        reserved_response_tokens=policy.tokens.max_agent_output_tokens,
     )
     fallback = FallbackManager(RetryStrategy(max_retries=1))
 
