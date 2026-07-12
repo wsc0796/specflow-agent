@@ -11,9 +11,12 @@
 1. Implement one task at a time with a task spec, tests, completion report, and
    focused Git commit.
 2. The MVP is frozen. Do not add LangGraph, Redis, vector databases, MCP, Java,
-   multi-agent orchestration, or automated bulk code modification.
-3. T-001 through T-005 are deterministic and must not call an LLM.
-4. The quality gate requires tests, Ruff, documentation synchronization, and
+   or automated bulk code modification.
+3. Multi-agent orchestration is implemented in M6 via Coordinator + fixed topology.
+   Do not add peer-to-peer agent chat, dynamic agent discovery, or general-purpose
+   DAG scheduling beyond the fixed topology.
+4. T-001 through T-005 are deterministic and must not call an LLM.
+5. The quality gate requires tests, Ruff, documentation synchronization, and
    explicit acceptance evidence.
 
 ## Historical baseline task note

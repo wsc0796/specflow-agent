@@ -3,11 +3,12 @@
 ## Current phase
 
 The project has completed Milestone 3 (Agent Runtime Foundation), Milestone 4
-(Agent Workflow), and Milestone 5 (Tool Use & Repository Intelligence).
-M5 was closed on 2026-07-12 with a validated Live Provider run
-(see `docs/records/M5-product-vertical-slice.md`).
+(Agent Workflow), Milestone 5 (Tool Use & Repository Intelligence), and
+Milestone 6 (Multi-Agent Orchestration).
+M6 was closed on 2026-07-12 with 578 passing tests and an end-to-end mock
+provider validation run (see `docs/records/M6-multi-agent-orchestration.md`).
 
-All tasks T-001 through T-023 (including T-022.1) are completed. Implemented:
+All tasks T-001 through T-032 are completed. Implemented:
 health endpoint, Project persistence API, safe scanning, deterministic technology
 identification with evidence, sanitized PROJECT_CONTEXT.md generation, Prompt
 Registry, Context Builder, Token Budget Manager, LLM Client abstraction, Trace
@@ -17,12 +18,19 @@ Analyze/Generate/Review Workers with structured outputs and honest degraded
 fallbacks, Tool Framework, Registry, and Executor contracts,
 repository-root-bound read-only tools, OpenAI-compatible Provider,
 bounded evidence collection pipeline, `specflow run` CLI with 10 structured
-artifacts, and a deterministic real-repository evaluation layer with safe Live
-Artifact import validation and 10-dimension human rubric.
+artifacts, deterministic real-repository evaluation layer with safe Live
+Artifact import validation and 10-dimension human rubric,
+**SchemaRegistry with freeze semantics, 6-agent fixed topology with parallel
+execution, Coordinator with Planner→Compiler→Validator→Enricher pipeline,
+deterministic structural plan + LLM semantic enrichment (M6-ADR-001),
+structured AgentHandoff with schema validation, bounded Revision (max 1 round),
+AgentTraceSpan with stage timing, and A/B evaluation framework (10 dimensions).**
 
-M6 code exists locally but is under readiness review and is not task-complete.
-The next permitted action is to freeze T-024 task specifications and resolve
-the M6 readiness audit before treating any M6 implementation as completed.
+The legacy `--mode legacy` pipeline (Analyze→Generate→Review) is preserved
+unchanged as the T-029 A/B baseline. Multi-agent mode is accessed via
+`--mode multi-agent`.
+
+The next milestone is M7 (Evaluation, Demo, Resume & Interview).
 Future task IDs are not permission to implement future features.
 
 ## Mandatory workflow
