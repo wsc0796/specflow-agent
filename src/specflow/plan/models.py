@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from enum import Enum
 
 from specflow.agents.models import AgentConstraints, AgentDependency, AgentIdentity, RevisionPolicy
 from specflow.plan.exceptions import PlanCompilationError, PlanValidationError
@@ -44,3 +45,71 @@ class CompiledStructuralPlan:
             raise PlanValidationError("structure_hash must not be empty")
         if not self.execution_stages:
             raise PlanValidationError("execution_stages must not be empty")
+
+
+class EnrichmentStatus(Enum):
+    """Whether a semantic brief was fully enriched or fell back to degraded defaults."""
+
+    ENRICHED = "enriched"
+    DEGRADED = "degraded"
+
+
+@dataclass(frozen=True)
+class EnrichmentProvenance:
+    """Provenance metadata for an LLM-produced enrichment.
+
+    Tracks the provider, model, prompt version, and request trace so that
+    every enrichment can be audited and reproduced.
+    """
+
+    provider: str
+    model: str
+    prompt_id: str
+    prompt_version: str
+    trace_id: str
+    generated_at: str
+
+
+@dataclass(frozen=True)
+class SemanticTaskBrief:
+    """Semantic description of what a single agent should do.
+
+    Produced by the :class:`SemanticPlanEnricher` during the enrichment
+    phase.  Carries either a full ``ENRICHED`` payload (with provenance)
+    or a ``DEGRADED`` fallback when the LLM call fails.
+    """
+
+    agent_id: str
+    task_description: str
+    analysis_focus: tuple[str, ...]
+    evaluation_hints: tuple[str, ...]
+    repository_scope_hint: str
+    enrichment_status: EnrichmentStatus
+    provenance: EnrichmentProvenance | None
+
+    def __post_init__(self) -> None:
+        if not self.agent_id.strip():
+            raise ValueError("agent_id must not be empty")
+        if not isinstance(self.enrichment_status, EnrichmentStatus):
+            raise ValueError("enrichment_status must be an EnrichmentStatus")
+
+    @classmethod
+    def degraded_default(
+        cls,
+        *,
+        agent_id: str,
+        task_description: str,
+        analysis_focus: tuple[str, ...] = (),
+        evaluation_hints: tuple[str, ...] = (),
+        repository_scope_hint: str = "",
+    ) -> SemanticTaskBrief:
+        """Create a degraded brief — used when the LLM enrichment call fails."""
+        return cls(
+            agent_id=agent_id,
+            task_description=task_description,
+            analysis_focus=analysis_focus,
+            evaluation_hints=evaluation_hints,
+            repository_scope_hint=repository_scope_hint,
+            enrichment_status=EnrichmentStatus.DEGRADED,
+            provenance=None,
+        )
