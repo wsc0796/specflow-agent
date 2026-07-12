@@ -8,7 +8,8 @@ T-012 Workflow State Machine, T-013 Agent
 Executor, T-014 Worker Framework, T-015 Analyze Worker, T-016 Generate Worker,
 T-017 Review Worker, T-018 Tool Framework, T-019 Read-only Repository Tools,
 T-020 OpenAI-compatible LLM Provider, T-021 Repository-aware Agent
-Integration, and T-022 CLI and Artifact Delivery are completed. Implemented:
+Integration, T-022 CLI and Artifact Delivery, and T-023 Phase A real-repository
+Mock evaluation preparation are completed. Implemented:
 health endpoint, Project persistence API, safe scanning, deterministic technology
 identification with evidence, sanitized PROJECT_CONTEXT.md generation, Prompt
 Registry, Context Builder, Token Budget Manager, LLM Client abstraction, Trace
@@ -22,8 +23,10 @@ bounded, sanitized output, plus one configurable Provider that maps a single
 OpenAI-compatible HTTP completion into the existing LLM contracts, and a bounded
 deterministic evidence collection pipeline that uses the Tool Framework to feed
 real repository evidence into the Analyze/Generate/Review Worker chain, plus a
-`specflow run` CLI with structured JSON + Markdown artifact delivery.
-The next permitted task is T-023 Real Repository Cases and Evaluation.
+`specflow run` CLI with structured JSON + Markdown artifact delivery, plus a
+deterministic real-repository evaluation layer and safe Live Artifact import
+validation. The next permitted work is T-023 Live Artifact validation only.
+M5 must not be closed until a user supplies a non-mock Live artifact.
 Future task IDs are not permission to implement future features.
 
 ## Mandatory workflow

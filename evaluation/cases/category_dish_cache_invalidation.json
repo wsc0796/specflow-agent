@@ -1,0 +1,12 @@
+{
+  "case_id": "category_dish_cache_invalidation",
+  "title": "分类变更后的菜品缓存失效",
+  "requirement": "当菜品分类被创建、修改或删除时，保证按分类筛选的菜品缓存不会返回过期结果。",
+  "repository_type": "python-fastapi-sqlalchemy",
+  "expected_domains": ["category", "dish", "api", "service", "cache"],
+  "expected_file_patterns": ["app/api/routes/category.py", "app/services/category_service.py", "app/services/dish_service.py"],
+  "expected_risks": ["cross-domain invalidation omission", "delete with referenced dishes", "stale category filter results"],
+  "expected_acceptance_topics": ["category mutation invalidation", "dish query cache invalidation", "foreign-key behavior", "regression tests"],
+  "forbidden_claims": ["category writes currently invalidate a cache", "Redis is already configured"],
+  "human_review_notes": "Category and Dish services are separate current modules. The case measures whether a proposal recognizes the cross-domain cache-invalidation boundary."
+}

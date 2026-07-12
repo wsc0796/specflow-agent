@@ -1,0 +1,12 @@
+{
+  "case_id": "login_failure_rate_limit",
+  "title": "员工登录失败保护",
+  "requirement": "为员工登录增加失败次数限制和短期账户保护，避免暴力破解，同时保留现有 JWT 登录成功路径。",
+  "repository_type": "python-fastapi-sqlalchemy",
+  "expected_domains": ["employee", "authentication", "api", "service", "security"],
+  "expected_file_patterns": ["app/api/routes/employee.py", "app/services/employee_service.py", "app/schemas/employee.py", "app/utils/jwt.py"],
+  "expected_risks": ["username enumeration", "concurrent failed attempts", "lockout reset", "JWT success regression"],
+  "expected_acceptance_topics": ["threshold policy", "time window", "successful-login reset", "generic error response", "boundary tests"],
+  "forbidden_claims": ["login rate limiting already exists", "passwords are stored in plaintext"],
+  "human_review_notes": "Current login verifies bcrypt credentials and returns a JWT, but has no rate-limit or lockout state. The change must be proposed as new behavior."
+}

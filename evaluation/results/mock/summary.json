@@ -1,0 +1,25 @@
+{
+  "live_validation_status": "blocked",
+  "mode": "mock_contract",
+  "notes": [
+    "blocked_live_validation: user must run the provider in an independent shell."
+  ],
+  "runs": [
+    {
+      "case_id": "category_dish_cache_invalidation",
+      "finding_codes": [],
+      "status": "passed"
+    },
+    {
+      "case_id": "dish_cache_consistency",
+      "finding_codes": [],
+      "status": "passed"
+    },
+    {
+      "case_id": "login_failure_rate_limit",
+      "finding_codes": [],
+      "status": "passed"
+    }
+  ],
+  "status": "passed"
+}

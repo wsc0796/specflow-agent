@@ -44,6 +44,12 @@ the Tool Framework and feed it into the Analyze/Generate/Review Worker chain, an
 run the full `specflow run` CLI with structured JSON + Markdown artifact
 delivery. It still does not include shell access, file writes, Git actions, or Tool loops.
 
+T-023 phase A adds three repository-grounded evaluation cases for the local
+`sky-takeout-python` project, deterministic Mock contract evaluation, and a
+read-only Live Artifact importer. The committed Mock summary verifies pipeline
+contracts only; Live Provider validation is blocked pending a user-run artifact,
+so M5 remains open.
+
 ## T-001 foundation boundary
 
 T-001 included only the FastAPI application package, `GET /health`, pytest, Ruff,

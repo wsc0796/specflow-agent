@@ -1,0 +1,12 @@
+{
+  "case_id": "dish_cache_consistency",
+  "title": "菜品状态变更后的缓存一致性",
+  "requirement": "为菜品查询引入缓存，并确保创建、更新、删除和启停售卖状态后相关缓存失效。",
+  "repository_type": "python-fastapi-sqlalchemy",
+  "expected_domains": ["dish", "api", "service", "cache"],
+  "expected_file_patterns": ["app/api/routes/dish.py", "app/services/dish_service.py", "app/models/dish.py"],
+  "expected_risks": ["stale cache after status update", "cache invalidation after mutation", "category-filter cache key collision"],
+  "expected_acceptance_topics": ["read-through cache", "mutation invalidation", "status update invalidation", "cache-key isolation", "regression tests"],
+  "forbidden_claims": ["Redis is already configured", "existing cache invalidation covers dish mutations"],
+  "human_review_notes": "Dish CRUD and status mutation exist; Redis is explicitly deferred in the target README, so cache infrastructure must be proposed rather than claimed as present."
+}

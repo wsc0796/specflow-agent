@@ -11,3 +11,4 @@ htmlcov/
 *.sqlite3
 data/
 artifacts/
+evaluation/results/mock/artifacts/
