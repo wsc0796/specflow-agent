@@ -32,23 +32,24 @@ consume `AnalysisOutput` to produce a bounded `GenerationOutput`. It still does
 review `GenerationOutput` and distinguish business `REJECT` from execution
 failure. It still does not implement automatic code generation or M5 behavior.
 
-M5 is in progress. T-018 Tool Framework & Registry, T-019 Safe Read-only
+M5 is complete. T-018 Tool Framework & Registry, T-019 Safe Read-only
 Repository Tools, T-020 OpenAI-compatible LLM Provider, T-021 Repository
-Evidence Pipeline, and T-022 CLI & Artifact Delivery are complete. The system can
-now define Tool metadata, represent explicit Tool calls and results, register
-tools deterministically, execute one registered Tool through a structured
-executor, list allowed repository files, search text code, and read bounded text
-files inside one validated repository root, call one explicitly configured
-OpenAI-compatible completion endpoint, collect real repository evidence through
-the Tool Framework and feed it into the Analyze/Generate/Review Worker chain, and
-run the full `specflow run` CLI with structured JSON + Markdown artifact
-delivery. It still does not include shell access, file writes, Git actions, or Tool loops.
+Evidence Pipeline, T-022 CLI & Artifact Delivery, and T-023 Real Repository
+Cases & Evaluation are complete. The system can now define Tool metadata,
+represent explicit Tool calls and results, register tools deterministically,
+execute one registered Tool through a structured executor, list allowed
+repository files, search text code, read bounded text files inside one
+validated repository root, call one explicitly configured OpenAI-compatible
+completion endpoint, collect real repository evidence through the Tool Framework
+and feed it into the Analyze/Generate/Review Worker chain, run the full
+`specflow run` CLI with structured JSON + Markdown artifact delivery, evaluate
+pipeline contracts deterministically against repository-grounded cases, and
+safely import and validate user-supplied Live Provider artifacts. One real,
+non-mock Live Provider run has been validated (DeepSeek V4 Flash on
+sky-takeout-python). See `docs/records/M5-product-vertical-slice.md`.
 
-T-023 phase A adds three repository-grounded evaluation cases for the local
-`sky-takeout-python` project, deterministic Mock contract evaluation, and a
-read-only Live Artifact importer. The committed Mock summary verifies pipeline
-contracts only; Live Provider validation is blocked pending a user-run artifact,
-so M5 remains open.
+It still does not include shell access, file writes, Git actions, Tool loops,
+or scanner-to-runner integration (deferred to M6).
 
 ## T-001 foundation boundary
 

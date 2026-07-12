@@ -3,30 +3,25 @@
 ## Current phase
 
 The project has completed Milestone 3 (Agent Runtime Foundation), Milestone 4
-(Agent Workflow), and started Milestone 5 (Tool Use & Repository Intelligence).
-T-012 Workflow State Machine, T-013 Agent
-Executor, T-014 Worker Framework, T-015 Analyze Worker, T-016 Generate Worker,
-T-017 Review Worker, T-018 Tool Framework, T-019 Read-only Repository Tools,
-T-020 OpenAI-compatible LLM Provider, T-021 Repository-aware Agent
-Integration, T-022 CLI and Artifact Delivery, and T-023 Phase A real-repository
-Mock evaluation preparation are completed. Implemented:
+(Agent Workflow), and Milestone 5 (Tool Use & Repository Intelligence).
+M5 was closed on 2026-07-12 with a validated Live Provider run
+(see `docs/records/M5-product-vertical-slice.md`).
+
+All tasks T-001 through T-023 (including T-022.1) are completed. Implemented:
 health endpoint, Project persistence API, safe scanning, deterministic technology
 identification with evidence, sanitized PROJECT_CONTEXT.md generation, Prompt
 Registry, Context Builder, Token Budget Manager, LLM Client abstraction, Trace
-System, Fallback System, deterministic workflow state transitions, and
-deterministic Agent Executor step advancement, Worker Framework contracts, the
-first real requirement-analysis Worker, a generation Worker that consumes
-AnalysisOutput, a review Worker that distinguishes business REJECT from
-execution failure, explicit Tool models, Registry, and Executor contracts, plus
-repository-root-bound `list_files`, `search_code`, and `read_file` tools with
-bounded, sanitized output, plus one configurable Provider that maps a single
-OpenAI-compatible HTTP completion into the existing LLM contracts, and a bounded
-deterministic evidence collection pipeline that uses the Tool Framework to feed
-real repository evidence into the Analyze/Generate/Review Worker chain, plus a
-`specflow run` CLI with structured JSON + Markdown artifact delivery, plus a
-deterministic real-repository evaluation layer and safe Live Artifact import
-validation. The next permitted work is T-023 Live Artifact validation only.
-M5 must not be closed until a user supplies a non-mock Live artifact.
+System, Fallback System, deterministic workflow state transitions,
+deterministic Agent Executor step advancement, Worker Framework contracts,
+Analyze/Generate/Review Workers with structured outputs and honest degraded
+fallbacks, Tool Framework, Registry, and Executor contracts,
+repository-root-bound read-only tools, OpenAI-compatible Provider,
+bounded evidence collection pipeline, `specflow run` CLI with 10 structured
+artifacts, and a deterministic real-repository evaluation layer with safe Live
+Artifact import validation and 10-dimension human rubric.
+
+The next milestone is M6. The next permitted task is T-024.
+M6 must not begin before an explicit task spec is approved.
 Future task IDs are not permission to implement future features.
 
 ## Mandatory workflow
