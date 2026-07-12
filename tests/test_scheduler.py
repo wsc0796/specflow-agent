@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from threading import Barrier, Event, Lock, Thread
 from typing import Any
 
 import pytest
@@ -46,6 +47,7 @@ class TestStageExecutionResult:
         assert result.stage_index == 1
         assert result.agent_results["a1"]["data"] == 42
         assert result.started_at == "2025-01-01T00:00:00"
+        assert result.agent_timings == {}
 
 
 class TestMultiAgentScheduler:
@@ -182,6 +184,41 @@ class TestMultiAgentScheduler:
         assert stage_result.agent_results["a1"]["result"] == "a1_output"
         assert stage_result.agent_results["a2"]["result"] == "a2_output"
         assert stage_result.agent_results["a3"]["result"] == "a3_output"
+
+    def test_all_parallel_agents_are_submitted_before_any_completes(self) -> None:
+        """A barrier makes the parallel submission proof deterministic without sleeps."""
+        scheduler = MultiAgentScheduler(max_parallel_workers=3)
+        started = Barrier(4)
+        allow_completion = Event()
+        completed: list[str] = []
+        completed_lock = Lock()
+
+        def controlled(agent_id: str):
+            def execute(_: dict[str, Any]) -> dict[str, Any]:
+                started.wait(timeout=2)
+                allow_completion.wait(timeout=2)
+                with completed_lock:
+                    completed.append(agent_id)
+                return {"agent_id": agent_id}
+
+            return execute
+
+        executors = {agent_id: controlled(agent_id) for agent_id in ("a1", "a2", "a3")}
+
+        def release() -> None:
+            started.wait(timeout=2)
+            allow_completion.set()
+
+        releaser = Thread(target=release)
+        releaser.start()
+        result = scheduler.execute((("a1", "a2", "a3"),), executors, {})[0]
+        releaser.join(timeout=2)
+
+        assert set(completed) == {"a1", "a2", "a3"}
+        assert set(result.agent_timings) == {"a1", "a2", "a3"}
+        assert max(t.submitted_at for t in result.agent_timings.values()) <= min(
+            t.completed_at for t in result.agent_timings.values()
+        )
 
     # ── Empty stages ────────────────────────────────────────────────
 

@@ -15,6 +15,14 @@ AgentExecutor = Callable[[dict[str, Any]], dict[str, Any]]
 
 
 @dataclass
+class AgentExecutionTiming:
+    """Submission and completion timestamps for one agent in a stage."""
+
+    submitted_at: str
+    completed_at: str = ""
+
+
+@dataclass
 class StageExecutionResult:
     """Outcome of executing a single stage.
 
@@ -34,6 +42,7 @@ class StageExecutionResult:
     agent_results: dict[str, dict[str, Any]] = field(default_factory=dict)
     started_at: str = ""
     completed_at: str = ""
+    agent_timings: dict[str, AgentExecutionTiming] = field(default_factory=dict)
 
 
 class MultiAgentScheduler:
@@ -88,11 +97,15 @@ class MultiAgentScheduler:
             callable raises an exception.
         """
         results: list[StageExecutionResult] = []
-        prior_outputs: dict[str, dict[str, Any]] = {}
+        supplied_prior_outputs = context.get("prior_outputs", {})
+        if not isinstance(supplied_prior_outputs, dict):
+            raise ScheduleExecutionError("context.prior_outputs must be a mapping")
+        prior_outputs: dict[str, dict[str, Any]] = dict(supplied_prior_outputs)
 
         for stage_idx, stage_agent_ids in enumerate(stages):
             started_at = datetime.now(UTC).isoformat()
             agent_results: dict[str, dict[str, Any]] = {}
+            agent_timings: dict[str, AgentExecutionTiming] = {}
 
             # Validate all agents in this stage have executors
             for agent_id in stage_agent_ids:
@@ -109,11 +122,15 @@ class MultiAgentScheduler:
                     }
                     future = executor.submit(agent_executors[agent_id], agent_ctx)
                     future_map[future] = agent_id
+                    agent_timings[agent_id] = AgentExecutionTiming(
+                        submitted_at=datetime.now(UTC).isoformat()
+                    )
 
                 for future in as_completed(future_map):
                     agent_id = future_map[future]
                     try:
                         agent_results[agent_id] = future.result()
+                        agent_timings[agent_id].completed_at = datetime.now(UTC).isoformat()
                     except Exception as exc:
                         raise ScheduleExecutionError(
                             f"Agent {agent_id!r} execution failed: {exc}"
@@ -130,6 +147,7 @@ class MultiAgentScheduler:
                     agent_results=agent_results,
                     started_at=started_at,
                     completed_at=completed_at,
+                    agent_timings=agent_timings,
                 )
             )
 
