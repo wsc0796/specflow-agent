@@ -59,6 +59,20 @@ def test_full_failure_uses_rule_baseline() -> None:
     assert result.retry_count == 1
 
 
+def test_security_and_auth_failures_are_not_retried() -> None:
+    for message in ("401 unauthorized", "403 forbidden", "path traversal blocked"):
+        calls = 0
+
+        def operation() -> str:
+            nonlocal calls
+            calls += 1
+            raise RuntimeError(message)
+
+        result = FallbackManager(RetryStrategy(max_retries=2)).execute(operation)
+        assert result.status == "degraded"
+        assert calls == 1
+
+
 def test_invalid_json_uses_rule_baseline() -> None:
     result = FallbackManager().execute(lambda: "not json", expect_json=True)
 

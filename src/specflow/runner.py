@@ -21,6 +21,7 @@ from specflow.llm import (
     OpenAICompatibleConfig,
     OpenAICompatibleLLMClient,
 )
+from specflow.policy import DEFAULT_POLICY, ExecutionBudget, ExecutionPolicy, PolicyValidator
 from specflow.token_budget import BudgetPolicy, TokenBudgetManager
 from specflow.tools import ToolExecutor, ToolRegistry
 from specflow.tools.repository_tools import RepositoryToolSet
@@ -40,9 +41,12 @@ def run(
     model: str = "",
     mock: bool = False,
     max_files: int = 5,
+    policy: ExecutionPolicy = DEFAULT_POLICY,
 ) -> int:
     """Run the complete specification generation pipeline. Returns exit code."""
     started_at = _now_iso()
+    PolicyValidator().validate(policy)
+    execution_budget = ExecutionBudget(policy)
     run_id = _generate_run_id(repo, requirement)
     if not requirement.strip() or max_files <= 0:
         _write_error_artifact(
@@ -62,25 +66,31 @@ def run(
     else:
         try:
             real_client = _create_llm_client(provider, model, use_mock)
-        except LLMConfigurationError as exc:
-            _write_error_artifact(
-                output, run_id, started_at, f"Provider configuration error: {exc}"
-            )
+        except LLMConfigurationError:
+            _write_error_artifact(output, run_id, started_at, "PROVIDER_CONFIGURATION_FAILED")
             return 2
         analyze_client = generate_client = review_client = real_client
 
+    analyze_client = _PolicyBoundLLMClient(analyze_client, execution_budget)
+    generate_client = _PolicyBoundLLMClient(generate_client, execution_budget)
+    review_client = _PolicyBoundLLMClient(review_client, execution_budget)
+
     if not repo.exists() or not repo.is_dir():
-        _write_error_artifact(output, run_id, started_at, f"Repository not found: {repo}")
+        _write_error_artifact(output, run_id, started_at, "REPOSITORY_NOT_FOUND")
         return 2
 
     registry = ToolRegistry()
     try:
         RepositoryToolSet(repo).register_into(registry)
-    except Exception as exc:
-        _write_error_artifact(output, run_id, started_at, str(exc))
+    except Exception:
+        _write_error_artifact(output, run_id, started_at, "REPOSITORY_TOOL_SETUP_FAILED")
         return 2
 
-    evidence_config = EvidenceCollectionConfig(max_selected_files=max_files)
+    evidence_config = EvidenceCollectionConfig(
+        max_selected_files=min(max_files, policy.max_selected_files),
+        max_total_evidence_chars=policy.max_evidence_chars,
+        max_tool_calls=policy.max_tool_calls,
+    )
     tool_executor = ToolExecutor(registry)
     collector = EvidenceCollector(tool_executor, repo, config=evidence_config)
     try:
@@ -90,12 +100,12 @@ def run(
             project_summary=_repo_summary(repo),
             technology_stack=(),
         )
-    except Exception as exc:
-        _write_error_artifact(output, run_id, started_at, str(exc))
+    except Exception:
+        _write_error_artifact(output, run_id, started_at, "EVIDENCE_COLLECTION_FAILED")
         return 3
 
     project_context = ProjectContext(
-        project_name=repo.name,
+        project_name=repo.resolve().name,
         root_path=str(repo.resolve()),
         language="python",
         frameworks=[],
@@ -118,7 +128,10 @@ def run(
     trace_dir = output / ".traces"
     trace_dir.mkdir(parents=True, exist_ok=True)
     trace_recorder = TraceRecorder(JsonTraceStorage(trace_dir))
-    policy = BudgetPolicy(max_tokens=8192, reserved_response_tokens=2048)
+    token_policy = BudgetPolicy(
+        max_tokens=policy.max_agent_input_tokens + policy.max_agent_output_tokens,
+        reserved_response_tokens=policy.max_agent_output_tokens,
+    )
     fallback = FallbackManager(RetryStrategy(max_retries=1))
 
     evidence_text = evidence.serialized_context()
@@ -128,7 +141,7 @@ def run(
         llm_client=analyze_client,
         trace_recorder=trace_recorder,
         fallback_manager=fallback,
-        budget_manager=TokenBudgetManager(policy),
+        budget_manager=TokenBudgetManager(token_policy),
         model=effective_model,
     )
     generate_worker = GenerateWorker(
@@ -136,7 +149,7 @@ def run(
         llm_client=generate_client,
         trace_recorder=trace_recorder,
         fallback_manager=fallback,
-        budget_manager=TokenBudgetManager(policy),
+        budget_manager=TokenBudgetManager(token_policy),
         model=effective_model,
     )
     review_worker = ReviewWorker(
@@ -144,7 +157,7 @@ def run(
         llm_client=review_client,
         trace_recorder=trace_recorder,
         fallback_manager=fallback,
-        budget_manager=TokenBudgetManager(policy),
+        budget_manager=TokenBudgetManager(token_policy),
         model=effective_model,
     )
 
@@ -179,8 +192,8 @@ def run(
 
     try:
         results = executor.execute_until_complete()
-    except Exception as exc:
-        _write_error_artifact(output, run_id, started_at, str(exc))
+    except Exception:
+        _write_error_artifact(output, run_id, started_at, "WORKFLOW_EXECUTION_FAILED")
         return 3
 
     if not results or results[-1].current_state.value == "failed":
@@ -241,8 +254,8 @@ def run(
             ),
             trace_json=_load_run_traces(trace_dir, run_id),
         )
-    except Exception as exc:
-        _write_error_artifact(output, run_id, started_at, str(exc))
+    except Exception:
+        _write_error_artifact(output, run_id, started_at, "ARTIFACT_WRITE_FAILED")
         return 3
 
     if degraded or requires_review or requires_human_review:
@@ -256,6 +269,18 @@ def _create_llm_client(provider: str, model: str, use_mock: bool) -> LLMClient:
         raise LLMConfigurationError("_create_llm_client should not be called in mock mode")
     config = OpenAICompatibleConfig.from_env()
     return OpenAICompatibleLLMClient(config)
+
+
+class _PolicyBoundLLMClient:
+    """Apply one run budget to every legacy-worker provider call and retry."""
+
+    def __init__(self, delegate: LLMClient, budget: ExecutionBudget) -> None:
+        self._delegate = delegate
+        self._budget = budget
+
+    def complete(self, request):
+        self._budget.reserve_llm_call()
+        return self._delegate.complete(request)
 
 
 def _create_mock_clients(

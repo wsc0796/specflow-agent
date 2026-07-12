@@ -2,14 +2,17 @@
 
 ## Current phase
 
-The project has completed all milestones through M7:
+The project has completed all milestones through M7. M8 independent-review
+remediation is complete and has passed local mock acceptance:
 - M3: Agent Runtime Foundation
 - M4: Agent Workflow
 - M5: Tool Use & Repository Intelligence
 - M6: Multi-Agent Orchestration (Live Provider validated)
 - M7: Evaluation, Demo & Resume (portfolio-ready)
 
-607 passing tests. M8 (Production Hardening) is the next milestone.
+637 passing tests, 2 skipped. M8 production hardening remains limited to the
+implemented policy, schema, fallback, evidence, and artifact boundaries; it
+does not claim the deferred API-service or deployment work listed in M7.
 
 All tasks T-001 through T-032 are completed. Implemented:
 health endpoint, Project persistence API, safe scanning, deterministic technology
@@ -33,7 +36,7 @@ The legacy `--mode legacy` pipeline (Analyze→Generate→Review) is preserved
 unchanged as the T-029 A/B baseline. Multi-agent mode is accessed via
 `--mode multi-agent`.
 
-The next milestone is M7 (Evaluation, Demo, Resume & Interview).
+The next milestone is the separately scoped M8 follow-up work, if authorized.
 Future task IDs are not permission to implement future features.
 
 ## Mandatory workflow

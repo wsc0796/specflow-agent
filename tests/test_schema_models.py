@@ -93,9 +93,7 @@ class TestAgentOutputValidation:
         assert output.decision == "PASS"
 
     def test_valid_synthesis_output_passes(self) -> None:
-        output = SynthesisOutput(
-            agent_id="syn-1", role="synthesis", output={"proposal": {}}
-        )
+        output = SynthesisOutput(agent_id="syn-1", role="synthesis", output={"proposal": {}})
         assert output.role == "synthesis"
 
     def test_missing_agent_id_fails(self) -> None:
@@ -108,9 +106,7 @@ class TestAgentOutputValidation:
 
     def test_output_with_non_dict_output_fails(self) -> None:
         with pytest.raises(PydanticValidationError):
-            RepositoryAnalystOutput(
-                agent_id="r1", role="repository_analyst", output="not_a_dict"
-            )
+            RepositoryAnalystOutput(agent_id="r1", role="repository_analyst", output="not_a_dict")
 
     def test_all_output_models_accept_valid_minimal_payload(self) -> None:
         """Every output model must accept a minimal-envelope payload."""
@@ -161,9 +157,7 @@ class TestSchemaRegistryWiring:
         spec = planner.generate()
         # Replace one agent with a copy that has an unknown input_schema_id.
         tampered = replace(spec.agents[0], input_schema_id="nonexistent/schema/v99")
-        tampered_agents = tuple(
-            tampered if i == 0 else a for i, a in enumerate(spec.agents)
-        )
+        tampered_agents = tuple(tampered if i == 0 else a for i, a in enumerate(spec.agents))
         tampered_spec = replace(spec, agents=tampered_agents)
         compiler = PlanCompiler()
         compiled = compiler.compile(tampered_spec)

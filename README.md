@@ -10,6 +10,8 @@ repositories. Built from scratch without LangGraph or agent frameworks.
 - **Bounded Revision loop** — max 1 round, business rejection ≠ infrastructure failure
 - **Repository evidence pipeline** — read-only tools → evidence → agent prompts → traceable references
 - **Structured Agent Handoff** — schema-validated, canonical-JSON-hashed payloads between agents
+- **Fail-closed production boundaries** — required-agent failure stops the run; input and output contracts are validated
+- **Execution policy** — bounded LLM calls, revisions, wall time, evidence/tool limits, and classified retry behavior
 - **Agent-level trace topology** — stage timing, parent/child spans, submission/completion timestamps
 - **Dual pipeline** — legacy linear (Analyze→Generate→Review) preserved as A/B baseline
 - **Live Provider validated** — DeepSeek v4-flash on sky-takeout-python: 6/6 agents, 7 handoffs, PASS
@@ -28,8 +30,13 @@ uv run specflow run --mode multi-agent --provider openai-compatible --model deep
 
 ## Current milestone
 
-**M6 (Multi-Agent Orchestration) — CLOSED.** 607 tests, Live Provider validated.
-See `docs/records/M6-multi-agent-orchestration.md`.
+**M8 independent-review remediation — CLOSED.** 637 tests passed, 2 skipped.
+The remediation adds fail-closed schema enforcement, bounded execution policy,
+safe error artifacts, deterministic evidence aliases for Chinese requirements,
+and revision audit edges. See `docs/reports/M8-review-fix-report.md`.
+
+M6 remains the latest live-provider validation milestone. M8 validation in this
+repository is local mock acceptance; it does not add a new live-provider claim.
 
 M1–M5 milestones (project scanning, technology detection, prompt/context/token
 infrastructure, LLM client, trace/fallback, workflow state machine, worker

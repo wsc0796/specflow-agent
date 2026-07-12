@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import json
+import re
 import time
 from collections.abc import Callable, Mapping
-from dataclasses import replace
+from dataclasses import asdict, replace
 from datetime import UTC, datetime
 from hashlib import sha256
 from pathlib import Path
@@ -30,6 +31,7 @@ from specflow.handoff.models import AgentHandoff
 from specflow.handoff.validator import HandoffValidator
 from specflow.llm import LLMClient, OpenAICompatibleConfig, OpenAICompatibleLLMClient
 from specflow.plan.hash_utils import canonical_json_bytes
+from specflow.policy import DEFAULT_POLICY, ExecutionBudget, ExecutionPolicy, PolicyValidator
 from specflow.tools import ToolExecutor, ToolRegistry
 from specflow.tools.repository_tools import RepositoryToolSet
 from specflow.trace.models import AgentTraceSpan
@@ -45,6 +47,7 @@ def run_multi_agent(
     mock: bool = False,
     provider: str = "mock",
     model: str = "mock-model",
+    policy: ExecutionPolicy = DEFAULT_POLICY,
     _executor_overrides: Mapping[str, AgentExecutor] | None = None,
 ) -> int:
     """Execute the fixed plan and persist auditable multi-agent artifacts.
@@ -55,6 +58,9 @@ def run_multi_agent(
     """
     started_at = datetime.now(UTC).isoformat()
     t0 = time.monotonic()
+
+    PolicyValidator().validate(policy)
+    budget = ExecutionBudget(policy)
 
     if not repo.is_dir() or not requirement.strip():
         return 2
@@ -67,12 +73,20 @@ def run_multi_agent(
     evidence_text = ""
     tool_call_records: list[dict[str, Any]] = []
     discovered_files = 0
+    selected_file_count = 0
+    referenced_file_count = 0
     try:
         tool_registry = ToolRegistry()
         RepositoryToolSet(repo).register_into(tool_registry)
         tool_executor = ToolExecutor(tool_registry)
         collector = EvidenceCollector(
-            tool_executor, repo, config=EvidenceCollectionConfig(max_selected_files=10)
+            tool_executor,
+            repo,
+            config=EvidenceCollectionConfig(
+                max_selected_files=min(10, policy.max_selected_files),
+                max_total_evidence_chars=policy.max_evidence_chars,
+                max_tool_calls=policy.max_tool_calls,
+            ),
         )
         evidence = collector.collect(
             run_id=run_id,
@@ -82,13 +96,15 @@ def run_multi_agent(
         )
         evidence_text = evidence.serialized_context()
         tool_call_records = [
-            r.as_dict() if hasattr(r, "as_dict") else {}
-            for r in evidence.tool_call_records
+            r.as_dict() if hasattr(r, "as_dict") else asdict(r) for r in evidence.tool_call_records
         ]
         discovered_files = evidence.discovered_file_count
+        selected_file_count = len(evidence.selected_files)
+        referenced_file_count = len({excerpt.relative_path for excerpt in evidence.excerpts})
     except Exception:
-        # Evidence collection is best-effort — proceed without it
-        evidence_text = f"Repository: {repo.name}\nPath: {repo.resolve()}"
+        # Evidence is a required, untrusted input boundary.  Continuing would
+        # let agents produce an ungrounded plan with no audit evidence.
+        return 3
 
     registry = _build_registry()
 
@@ -99,9 +115,10 @@ def run_multi_agent(
     else:
         try:
             llm_client = _create_real_llm_client(provider, model)
-        except Exception as exc:
+        except Exception:
             import sys
-            print(f"Provider configuration error: {exc}", file=sys.stderr)
+
+            print("Provider configuration error", file=sys.stderr)
             return 2
 
     # Build schema registry before Coordinator so PlanValidator can check schema IDs.
@@ -130,8 +147,7 @@ def run_multi_agent(
                 llm_client=llm_client,
                 schema_registry=schema_registry,
                 system_prompt=(
-                    f"You are the **{identity.role.value}** agent. "
-                    f"{identity.description}"
+                    f"You are the **{identity.role.value}** agent. {identity.description}"
                 ),
                 model=model,
                 temperature=0.0,
@@ -141,7 +157,6 @@ def run_multi_agent(
     executors.update(_executor_overrides or {})
     base_context: dict[str, Any] = {
         "run_id": run_id,
-        "repository_root": str(repo.resolve()),
         "requirement": requirement,
         "repository_evidence": evidence_text,
     }
@@ -155,32 +170,69 @@ def run_multi_agent(
         coordinator.engine.transition(MultiAgentWorkflowState.PLANNING, "plan compiled")
         coordinator.engine.transition(MultiAgentWorkflowState.ANALYZING, "repository analysis")
         _run_and_accumulate(
-            stages, scheduler, plan.stages[0], 0, executors, base_context, prior_outputs
+            stages,
+            scheduler,
+            plan.stages[0],
+            0,
+            executors,
+            base_context,
+            prior_outputs,
+            registry,
+            schema_registry,
+            budget,
         )
         coordinator.engine.transition(MultiAgentWorkflowState.EXECUTING_SPECIALISTS, "specialists")
         runtime_handoffs.extend(
             _validate_stage_inputs(plan.tasks, plan.stages[1], registry, prior_outputs, requirement)
         )
         _run_and_accumulate(
-            stages, scheduler, plan.stages[1], 1, executors, base_context, prior_outputs
+            stages,
+            scheduler,
+            plan.stages[1],
+            1,
+            executors,
+            base_context,
+            prior_outputs,
+            registry,
+            schema_registry,
+            budget,
         )
         coordinator.engine.transition(MultiAgentWorkflowState.SYNTHESIZING, "synthesis")
         runtime_handoffs.extend(
             _validate_stage_inputs(plan.tasks, plan.stages[2], registry, prior_outputs, requirement)
         )
         _run_and_accumulate(
-            stages, scheduler, plan.stages[2], 2, executors, base_context, prior_outputs
+            stages,
+            scheduler,
+            plan.stages[2],
+            2,
+            executors,
+            base_context,
+            prior_outputs,
+            registry,
+            schema_registry,
+            budget,
         )
         coordinator.engine.transition(MultiAgentWorkflowState.REVIEWING, "review")
         runtime_handoffs.extend(
             _validate_stage_inputs(plan.tasks, plan.stages[3], registry, prior_outputs, requirement)
         )
         _run_and_accumulate(
-            stages, scheduler, plan.stages[3], 3, executors, base_context, prior_outputs
+            stages,
+            scheduler,
+            plan.stages[3],
+            3,
+            executors,
+            base_context,
+            prior_outputs,
+            registry,
+            schema_registry,
+            budget,
         )
 
         decision = _review_decision(prior_outputs, plan.stages[3][0])
         if decision == "REJECT":
+            budget.reserve_revision()
             controller = coordinator.revision_controller
             if controller is None:
                 raise RuntimeError("Coordinator did not initialize RevisionController")
@@ -196,6 +248,15 @@ def run_multi_agent(
                 revision_exhausted = True
             else:
                 coordinator.engine.transition(MultiAgentWorkflowState.REVISING, "review rejected")
+                runtime_handoffs.append(
+                    _revision_handoff(
+                        review_id=plan.stages[3][0],
+                        target_id=target_id,
+                        registry=registry,
+                        prior_outputs=prior_outputs,
+                        requirement=requirement,
+                    )
+                )
                 _run_and_accumulate(
                     stages,
                     scheduler,
@@ -204,16 +265,57 @@ def run_multi_agent(
                     executors,
                     {**base_context, "revision_task": revision_task.__dict__},
                     prior_outputs,
+                    registry,
+                    schema_registry,
+                    budget,
                 )
                 coordinator.engine.transition(
                     MultiAgentWorkflowState.SYNTHESIZING, "revision complete"
                 )
+                runtime_handoffs.extend(
+                    _validate_stage_inputs(
+                        plan.tasks,
+                        plan.stages[2],
+                        registry,
+                        prior_outputs,
+                        requirement,
+                        sender_stage_overrides={target_id: 4},
+                    )
+                )
                 _run_and_accumulate(
-                    stages, scheduler, plan.stages[2], 5, executors, base_context, prior_outputs
+                    stages,
+                    scheduler,
+                    plan.stages[2],
+                    5,
+                    executors,
+                    base_context,
+                    prior_outputs,
+                    registry,
+                    schema_registry,
+                    budget,
                 )
                 coordinator.engine.transition(MultiAgentWorkflowState.REVIEWING, "re-review")
+                runtime_handoffs.extend(
+                    _validate_stage_inputs(
+                        plan.tasks,
+                        plan.stages[3],
+                        registry,
+                        prior_outputs,
+                        requirement,
+                        sender_stage_overrides={"synthesis-agent-v1": 5},
+                    )
+                )
                 _run_and_accumulate(
-                    stages, scheduler, plan.stages[3], 6, executors, base_context, prior_outputs
+                    stages,
+                    scheduler,
+                    plan.stages[3],
+                    6,
+                    executors,
+                    base_context,
+                    prior_outputs,
+                    registry,
+                    schema_registry,
+                    budget,
                 )
                 decision = _review_decision(prior_outputs, plan.stages[3][0])
                 revision_exhausted = decision == "REJECT" and controller.exhausted
@@ -222,7 +324,7 @@ def run_multi_agent(
             MultiAgentWorkflowState.COMPLETED,
             "review passed" if decision == "PASS" else "revision limit reached",
         )
-    except Exception as exc:
+    except Exception:
         _persist_failed_run(
             output=output,
             run_id=run_id,
@@ -232,7 +334,7 @@ def run_multi_agent(
             stages=stages,
             plan=plan,
             discovered_files=discovered_files,
-            error=str(exc),
+            error="MULTI_AGENT_RUN_FAILED",
         )
         return 3
 
@@ -247,8 +349,16 @@ def run_multi_agent(
     }
     handoffs = runtime_handoffs
     traces = _build_trace_tree(stages, registry, run_id, model, coordinator.engine.state.value)
+    idempotency_key = sha256(
+        f"{sha256(repo.resolve().as_uri().encode()).hexdigest()}"
+        f"|{sha256(requirement.encode()).hexdigest()}"
+        f"|{plan.structure_hash}"
+        f"|{provider}|{model}".encode()
+    ).hexdigest()
+
     manifest = {
         "run_id": run_id,
+        "idempotency_key": idempotency_key,
         "plan_id": plan.plan_id,
         "structure_hash": plan.structure_hash,
         "semantic_brief_hash": plan.semantic_brief_hash,
@@ -274,6 +384,19 @@ def run_multi_agent(
         "discovered_files": discovered_files,
         "tool_call_count": len(tool_call_records),
     }
+    # Write stage checkpoints
+    checkpoints = [
+        {
+            "stage": s.stage_index,
+            "agents": sorted(s.agent_results),
+            "started": s.started_at,
+            "completed": s.completed_at,
+        }
+        for s in stages
+    ]
+    (run_dir / "checkpoints.json").write_text(
+        json.dumps(checkpoints, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
     (run_dir / "manifest.json").write_text(
         json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8"
     )
@@ -290,7 +413,8 @@ def run_multi_agent(
     (run_dir / "sources.json").write_text(
         json.dumps(
             {"evidence": evidence_text, "tool_calls": tool_call_records},
-            ensure_ascii=False, indent=2,
+            ensure_ascii=False,
+            indent=2,
         ),
         encoding="utf-8",
     )
@@ -304,6 +428,8 @@ def run_multi_agent(
         wall_ms=wall_ms,
         discovered_files=discovered_files,
         tool_call_count=len(tool_call_records),
+        selected_file_count=selected_file_count,
+        referenced_file_count=referenced_file_count,
         runtime_handoffs=runtime_handoffs,
         revision_exhausted=revision_exhausted,
         provider=provider,
@@ -337,13 +463,112 @@ def _run_and_accumulate(
     executors: Mapping[str, AgentExecutor],
     context: Mapping[str, Any],
     prior_outputs: dict[str, dict[str, Any]],
+    registry: AgentRegistry,
+    schema_registry: object,
+    budget: ExecutionBudget,
 ) -> None:
+    budget.check_wall_time()
+    validated_inputs = _validated_inputs(
+        agent_ids, registry, schema_registry, context, prior_outputs
+    )
+    guarded_executors = {
+        agent_id: _budgeted_executor(executors[agent_id], validated_inputs[agent_id], budget)
+        for agent_id in agent_ids
+    }
     result = scheduler.execute(
-        (agent_ids,), dict(executors), {**context, "prior_outputs": dict(prior_outputs)}
+        (agent_ids,), guarded_executors, {**context, "prior_outputs": dict(prior_outputs)}
     )[0]
     result = replace(result, stage_index=stage_index)
+    _validate_stage_results(result, registry, schema_registry)
     results.append(result)
     prior_outputs.update(result.agent_results)
+
+
+def _budgeted_executor(
+    executor: AgentExecutor, validated_input: dict[str, Any], budget: ExecutionBudget
+) -> AgentExecutor:
+    def run(context: dict[str, Any]) -> dict[str, Any]:
+        budget.reserve_llm_call()
+        return executor({**context, "validated_input": validated_input})
+
+    return run
+
+
+def _validated_inputs(
+    agent_ids: tuple[str, ...],
+    registry: AgentRegistry,
+    schema_registry: object,
+    context: Mapping[str, Any],
+    prior_outputs: Mapping[str, dict[str, Any]],
+) -> dict[str, dict[str, Any]]:
+    """Build and validate only the declared input contract for each receiver."""
+    output = {agent_id: result.get("output", {}) for agent_id, result in prior_outputs.items()}
+    requirement = str(context.get("requirement", ""))
+    evidence = str(context.get("repository_evidence", ""))
+    inputs: dict[str, dict[str, Any]] = {}
+    for agent_id in agent_ids:
+        role = registry.get(agent_id).role.value
+        if role == "repository_analyst":
+            payload = {"requirement": requirement, "repository_evidence": evidence}
+        elif role in {"design", "test_strategy", "risk_review"}:
+            payload = {
+                "requirement": requirement,
+                "repository_analysis": output.get("repository-analyst-agent-v1", {}),
+            }
+        elif role == "synthesis":
+            payload = {
+                "requirement": requirement,
+                "design_output": output.get("design-agent-v1", {}),
+                "test_strategy_output": output.get("test-strategy-agent-v1", {}),
+                "risk_review_output": output.get("risk-review-agent-v1", {}),
+            }
+        elif role == "review":
+            payload = {
+                "requirement": requirement,
+                "synthesis_output": output.get("synthesis-agent-v1", {}),
+            }
+        else:
+            raise ValueError("UNKNOWN_AGENT_ROLE")
+        model = schema_registry.get(registry.get(agent_id).identity.input_schema_id)
+        inputs[agent_id] = model.model_validate(payload).model_dump()
+    return inputs
+
+
+def _validate_stage_results(
+    stage: StageExecutionResult,
+    registry: AgentRegistry,
+    schema_registry: object,
+) -> None:
+    """Fail closed before outputs can become inter-agent handoffs."""
+    for agent_id, result in stage.agent_results.items():
+        if result.get("agent_id") != agent_id or not result.get("success", True):
+            raise ValueError("AGENT_EXECUTION_FAILED")
+        output = _sanitize_artifact_value(result.get("output"))
+        if not isinstance(output, dict):
+            raise ValueError("AGENT_OUTPUT_NOT_OBJECT")
+        identity = registry.get(agent_id).identity
+        try:
+            output_model = schema_registry.get(identity.output_schema_id)
+            result["output"] = output_model.model_validate(output).model_dump()
+        except Exception as exc:
+            raise ValueError("SCHEMA_VALIDATION_FAILED") from exc
+        result["schema_validated"] = True
+
+
+_ABSOLUTE_PATH_RE = re.compile(r"(?<!\w)(?:[A-Za-z]:[\\/]|/)[^\s\"']+")
+_SECRET_RE = re.compile(r"(?i)\b(api[_-]?key|token|secret|password)\s*[:=]\s*[^\s,;]+")
+
+
+def _sanitize_artifact_value(value: object) -> object:
+    """Remove secrets and absolute filesystem paths before persistence/handoff."""
+    if isinstance(value, str):
+        value = _SECRET_RE.sub(r"\1=<redacted>", value)
+        return _ABSOLUTE_PATH_RE.sub("<absolute-path-redacted>", value)
+    if isinstance(value, list):
+        return [_sanitize_artifact_value(item) for item in value]
+    if isinstance(value, dict):
+        return {str(key): _sanitize_artifact_value(item) for key, item in value.items()}
+    return value
 
 
 def _review_decision(outputs: Mapping[str, dict[str, Any]], review_id: str) -> str:
@@ -355,41 +580,10 @@ def _review_decision(outputs: Mapping[str, dict[str, Any]], review_id: str) -> s
     if not isinstance(output, dict):
         raise ValueError("Review agent output must be a dict")
 
-    # Try canonical key first, then fallback to searching all values
     value = output.get("decision")
-    if isinstance(value, str) and value.strip():
-        return _normalize_decision(value.strip())
-
-    for key in ("conclusion", "verdict", "recommendation", "result"):
-        value = output.get(key)
-        if isinstance(value, str) and value.strip():
-            return _normalize_decision(value.strip())
-
-    # Last resort: search any string value containing PASS/REJECT keywords
-    for v in output.values():
-        if isinstance(v, str) and v.strip():
-            try:
-                return _normalize_decision(v.strip())
-            except ValueError:
-                continue
-
-    raise ValueError(
-        "Review agent output must contain a recognizable PASS or REJECT decision. "
-        f"Got keys: {sorted(output.keys())}"
-    )
-
-
-def _normalize_decision(raw: str) -> str:
-    upper = raw.upper().strip()
-    if upper in {"PASS", "APPROVED", "通过", "批准", "ACCEPT", "APPROVE", "合格"}:
-        return "PASS"
-    if upper in {"REJECT", "REJECTED", "拒绝", "驳回", "不通过", "DECLINE", "DENY"}:
-        return "REJECT"
-    if "PASS" in upper:
-        return "PASS"
-    if "REJECT" in upper or "拒绝" in raw or "不通过" in raw:
-        return "REJECT"
-    raise ValueError(f"Cannot normalize decision: {raw!r}")
+    if value in {"PASS", "REJECT"}:
+        return value
+    raise ValueError("Review agent output must contain explicit PASS or REJECT decision")
 
 
 def _revision_target(outputs: Mapping[str, dict[str, Any]], review_id: str) -> str:
@@ -404,6 +598,7 @@ def _validate_stage_inputs(
     registry: AgentRegistry,
     prior_outputs: Mapping[str, dict[str, Any]],
     requirement: str,
+    sender_stage_overrides: Mapping[str, int] | None = None,
 ) -> list[AgentHandoff]:
     handoffs: list[AgentHandoff] = []
     validator = HandoffValidator()
@@ -413,7 +608,9 @@ def _validate_stage_inputs(
         receiver = registry.get(task.agent_id)
         for sender_id in sorted(task.depends_on):
             sender = registry.get(sender_id)
-            sender_stage = task_by_id[sender_id].stage
+            sender_stage = (sender_stage_overrides or {}).get(
+                sender_id, task_by_id[sender_id].stage
+            )
             payload_ref = _output_ref(sender_stage, sender_id)
             payload = prior_outputs.get(sender_id)
             if payload is None:
@@ -432,6 +629,34 @@ def _validate_stage_inputs(
             validator.validate_payload(handoff, sender.identity, {payload_ref: payload})
             handoffs.append(handoff)
     return handoffs
+
+
+def _revision_handoff(
+    *,
+    review_id: str,
+    target_id: str,
+    registry: AgentRegistry,
+    prior_outputs: Mapping[str, dict[str, Any]],
+    requirement: str,
+) -> AgentHandoff:
+    """Record the explicit Review → revision-target audit edge."""
+    review = prior_outputs[review_id]
+    sender = registry.get(review_id).identity
+    receiver = registry.get(target_id).identity
+    handoff = AgentHandoff(
+        handoff_id=f"handoff-revision-{uuid4().hex}",
+        from_agent_id=review_id,
+        to_agent_id=target_id,
+        source_output_schema_id=sender.output_schema_id,
+        target_input_schema_id=receiver.input_schema_id,
+        payload_ref="agent-outputs.json#stage-3/review-agent-v1",
+        input_hash=sha256(requirement.encode()).hexdigest(),
+        output_hash=sha256(canonical_json_bytes(review)).hexdigest(),
+    )
+    validator = HandoffValidator()
+    validator.validate(handoff, sender, receiver)
+    validator.validate_payload(handoff, sender, {"stage-3/review-agent-v1": review})
+    return handoff
 
 
 def _output_ref(stage_index: int, agent_id: str) -> str:
@@ -475,6 +700,13 @@ def _build_trace_tree(
     for stage in stages:
         for agent_id in sorted(stage.agent_results):
             timing = stage.agent_timings[agent_id]
+            result = stage.agent_results[agent_id]
+            if not result.get("success", False):
+                trace_status = "failed"
+            elif result.get("degraded", False):
+                trace_status = "degraded"
+            else:
+                trace_status = "success"
             span = AgentTraceSpan(
                 span_id=f"agent-{uuid4().hex}",
                 agent_id=agent_id,
@@ -487,7 +719,7 @@ def _build_trace_tree(
                 agent_completed_at=timing.completed_at,
                 stage_completed_at=stage.completed_at,
                 model=model or "mock-model",
-                status="success",
+                status=trace_status,
                 revision_round=1 if stage.stage_index >= 4 else 0,
             )
             traces.append(span.as_dict())
@@ -534,6 +766,7 @@ def _persist_failed_run(
         # State transition recording is best-effort — do not mask the
         # original runtime failure.
         import logging
+
         logger = logging.getLogger(__name__)
         logger.debug("Failed to record workflow failure state", exc_info=True)
 
@@ -582,6 +815,8 @@ def _build_multi_agent_metrics(
     wall_ms: int,
     discovered_files: int,
     tool_call_count: int,
+    selected_file_count: int,
+    referenced_file_count: int,
     runtime_handoffs: list[AgentHandoff],
     revision_exhausted: bool,
     provider: str,
@@ -653,8 +888,13 @@ def _build_multi_agent_metrics(
         status = "degraded"
 
     review_agent_id = plan.stages[-1][0] if hasattr(plan, "stages") else ""
-    decision = _try_review_decision(
-        {s.stage_index: s.agent_results for s in stages}, review_agent_id
+    decision = _review_decision(
+        next(
+            stage.agent_results
+            for stage in reversed(stages)
+            if review_agent_id in stage.agent_results
+        ),
+        review_agent_id,
     )
 
     return RunMetrics(
@@ -674,8 +914,8 @@ def _build_multi_agent_metrics(
         schema_validated_count=schema_ok,
         schema_unvalidated_count=schema_fail,
         discovered_file_count=discovered_files,
-        selected_file_count=0,
-        referenced_file_count=0,
+        selected_file_count=selected_file_count,
+        referenced_file_count=referenced_file_count,
         tool_call_count=tool_call_count,
         revision_count=coordinator.engine.revision_count,
         revision_exhausted=revision_exhausted,
@@ -704,21 +944,6 @@ def _agent_wall_ms(stage: StageExecutionResult, agent_id: str) -> int:
         return int((end - start).total_seconds() * 1000)
     except (ValueError, TypeError):
         return 0
-
-
-def _try_review_decision(
-    stage_results: dict[int, dict[str, dict[str, Any]]], review_agent_id: str
-) -> str:
-    """Try to extract review decision without raising."""
-    try:
-        for stage_idx, results in stage_results.items():
-            if review_agent_id in results:
-                return _review_decision(
-                    {review_agent_id: results[review_agent_id]}, review_agent_id
-                )
-    except Exception:
-        pass
-    return "UNKNOWN"
 
 
 def _repo_summary(repo: Path) -> str:

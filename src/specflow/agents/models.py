@@ -66,8 +66,11 @@ class AgentConstraints:
     max_execution_seconds: int
     max_token_budget: int
     max_revision_rounds: int = 1
+    max_retries: int = 0
     allowed_paths: tuple[str, ...] = ()
     denied_paths: tuple[str, ...] = ()
+    criticality: str = "optional"  # "required" | "optional"
+    fallback_allowed: bool = True
 
     def __post_init__(self) -> None:
         if not self.agent_id.strip():
@@ -78,6 +81,10 @@ class AgentConstraints:
             raise AgentModelValidationError("max_token_budget must be positive")
         if self.max_revision_rounds < 0:
             raise AgentModelValidationError("max_revision_rounds must be non-negative")
+        if self.max_retries < 0:
+            raise AgentModelValidationError("max_retries must be non-negative")
+        if self.criticality not in {"required", "optional"}:
+            raise AgentModelValidationError("criticality must be 'required' or 'optional'")
         for name in ("allowed_paths", "denied_paths"):
             paths = getattr(self, name)
             if any(not p.strip() for p in paths):
