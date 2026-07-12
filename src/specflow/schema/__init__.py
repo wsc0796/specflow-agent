@@ -4,6 +4,7 @@ from specflow.schema.exceptions import (
     SchemaError,
     SchemaNotFoundError,
 )
+from specflow.schema.factory import build_schema_registry
 from specflow.schema.registry import SchemaRegistry
 
 __all__ = [
@@ -12,4 +13,5 @@ __all__ = [
     "SchemaError",
     "SchemaNotFoundError",
     "SchemaRegistry",
+    "build_schema_registry",
 ]

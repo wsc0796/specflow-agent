@@ -98,11 +98,17 @@ def run_multi_agent(
             print(f"Provider configuration error: {exc}", file=sys.stderr)
             return 2
 
+    # Build schema registry before Coordinator so PlanValidator can check schema IDs.
+    from specflow.schema import build_schema_registry
+
+    schema_registry = build_schema_registry()
+
     coordinator = Coordinator(
         agent_registry=registry,
         llm_client=llm_client,
         model=model,
         provider=provider,
+        schema_registry=schema_registry,
     )
     plan = coordinator.plan(run_id)
 
@@ -116,6 +122,7 @@ def run_multi_agent(
             runner = AgentRunner(
                 identity=identity,
                 llm_client=llm_client,
+                schema_registry=schema_registry,
                 system_prompt=(
                     f"You are the **{identity.role.value}** agent. "
                     f"{identity.description}"
@@ -315,11 +322,49 @@ def _run_and_accumulate(
 
 
 def _review_decision(outputs: Mapping[str, dict[str, Any]], review_id: str) -> str:
+    """Extract PASS/REJECT decision from review agent output.
+
+    Accepts multiple LLM response formats and normalizes Chinese decisions.
+    """
     output = outputs.get(review_id, {}).get("output", {})
-    decision = output.get("decision") if isinstance(output, dict) else None
-    if decision not in {"PASS", "REJECT"}:
-        raise ValueError("Review agent must return explicit PASS or REJECT decision")
-    return decision
+    if not isinstance(output, dict):
+        raise ValueError("Review agent output must be a dict")
+
+    # Try canonical key first, then fallback to searching all values
+    value = output.get("decision")
+    if isinstance(value, str) and value.strip():
+        return _normalize_decision(value.strip())
+
+    for key in ("conclusion", "verdict", "recommendation", "result"):
+        value = output.get(key)
+        if isinstance(value, str) and value.strip():
+            return _normalize_decision(value.strip())
+
+    # Last resort: search any string value containing PASS/REJECT keywords
+    for v in output.values():
+        if isinstance(v, str) and v.strip():
+            try:
+                return _normalize_decision(v.strip())
+            except ValueError:
+                continue
+
+    raise ValueError(
+        "Review agent output must contain a recognizable PASS or REJECT decision. "
+        f"Got keys: {sorted(output.keys())}"
+    )
+
+
+def _normalize_decision(raw: str) -> str:
+    upper = raw.upper().strip()
+    if upper in {"PASS", "APPROVED", "通过", "批准", "ACCEPT", "APPROVE", "合格"}:
+        return "PASS"
+    if upper in {"REJECT", "REJECTED", "拒绝", "驳回", "不通过", "DECLINE", "DENY"}:
+        return "REJECT"
+    if "PASS" in upper:
+        return "PASS"
+    if "REJECT" in upper or "拒绝" in raw or "不通过" in raw:
+        return "REJECT"
+    raise ValueError(f"Cannot normalize decision: {raw!r}")
 
 
 def _revision_target(outputs: Mapping[str, dict[str, Any]], review_id: str) -> str:
@@ -486,9 +531,20 @@ def _persist_failed_run(
         (run_dir / "traces.json").write_text(
             json.dumps(traces, ensure_ascii=False, indent=2), encoding="utf-8"
         )
+        # Persist partial agent outputs for debugging
+        agent_outputs = {
+            f"stage-{s.stage_index}/{aid}": result
+            for s in stages
+            for aid, result in s.agent_results.items()
+        }
+        (run_dir / "agent-outputs.json").write_text(
+            json.dumps(agent_outputs, ensure_ascii=False, indent=2, sort_keys=True),
+            encoding="utf-8",
+        )
     except Exception:
         # Artifact persistence is best-effort — don't hide the original error.
         import logging
+
         logger = logging.getLogger(__name__)
         logger.debug("Failed to persist failed-run artifacts", exc_info=True)
 

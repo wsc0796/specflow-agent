@@ -48,11 +48,13 @@ class Coordinator:
         llm_client: Any = None,
         model: str = "unknown",
         provider: str = "unknown",
+        schema_registry: Any = None,
     ) -> None:
         self._registry = agent_registry
         self._llm_client = llm_client
         self._model = model
         self._provider = provider
+        self._schema_registry = schema_registry
         self._engine = MultiAgentWorkflowEngine()
         self._revision_controller: RevisionController | None = None
 
@@ -92,9 +94,9 @@ class Coordinator:
         compiler = PlanCompiler()
         compiled = compiler.compile(spec)
 
-        # Step 3: Structural validation
+        # Step 3: Structural validation (with schema registry when available)
         validator = PlanValidator()
-        validator.validate(compiled)
+        validator.validate(compiled, schema_registry=self._schema_registry)
 
         # Step 4: Semantic enrichment
         enricher = SemanticPlanEnricher(

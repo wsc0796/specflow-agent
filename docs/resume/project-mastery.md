@@ -102,18 +102,20 @@
    → 审查 GenerationOutput → PASS/REJECT
 
 8. Artifact Delivery
-   → 10 个结构化文件写入 artifacts-live/<run_id>/
+   → manifest.json + agent-outputs.json + handoffs.json
+   + traces.json + sources.json（5 个结构化文件）
 ```
 
 ### Multi-Agent Pipeline（M6）
 
 ```text
-1-4. 同 Legacy（Evidence Collection → Context Building）
+1-4. Evidence Collection → 仓库扫描 + 关键词匹配 + 证据收集
+     （与 Legacy 共享同一 EvidenceCollector，但不经过 Context Builder/Token Budget）
 
 5. Coordinator.plan()
    → DeterministicPlanner 生成固定拓扑
    → PlanCompiler 编译为执行阶段
-   → PlanValidator 校验结构完整性
+   → PlanValidator 校验结构完整性 + SchemaRegistry 校验 Schema ID
    → SemanticPlanEnricher 用 LLM 为每个 Agent 生成任务语义
 
 6. Stage 0（顺序执行）
@@ -192,7 +194,7 @@ Stage 3 ──       Review   ──→ PASS → 输出
 
 面试证据：
   - 593 个测试覆盖各种失败场景
-  - Live Provider 验证：真实 DeepSeek 调用，10 个 Artifact 生成成功
+  - Live Provider 验证：真实 DeepSeek 调用，完整 Agent Pipeline 跑通
 ```
 
 ### 2. 如何防止多 Agent 无限循环？
@@ -219,7 +221,7 @@ Stage 3 ──       Review   ──→ PASS → 输出
   - FallbackManager：自动重试（可配置次数），失败后降级到 rule_baseline
   - rule_baseline：不依赖 LLM，用静态规则生成最低可用结果
   - 所有降级路径在 Trace 中记录，Artifact 标记 DEGRADED + requires_review
-  - Provider 层：socket timeout + HTTP retry（不依赖 SDK）
+  - Provider 层：同步 HTTP 调用，socket timeout（不依赖 SDK，不执行自动 retry）
 
 代码位置：fallback.py, llm/ (OpenAICompatibleLLMClient), trace/
 ```
