@@ -1,0 +1,20 @@
+{
+  "context_hash": "f8e97af19ff5e2d4919b5d365622e1433cec036663568c372268116a3235753d",
+  "error_type": null,
+  "fallback_level": "none",
+  "input_tokens": 682,
+  "latency_ms": 0,
+  "metadata": {
+    "worker_name": "review-worker",
+    "worker_role": "review",
+    "worker_version": "1.0.0"
+  },
+  "model": "mock-model",
+  "output_tokens": 146,
+  "prompt_hash": "9fe4c87ad8e98049dbd2e0d5d7b7413f5d0391e12d131786ed887db2723de7f4",
+  "prompt_name": "review_generation",
+  "prompt_version": "1.0.0",
+  "retry_count": 0,
+  "run_id": "run-304e2aabbe04-review",
+  "status": "success"
+}

@@ -1,0 +1,32 @@
+{
+  "design-agent-v1": {
+    "agent_id": "design-agent-v1",
+    "output": {},
+    "role": "design"
+  },
+  "repository-analyst-agent-v1": {
+    "agent_id": "repository-analyst-agent-v1",
+    "output": {},
+    "role": "repository_analyst"
+  },
+  "review-agent-v1": {
+    "agent_id": "review-agent-v1",
+    "output": {},
+    "role": "review"
+  },
+  "risk-review-agent-v1": {
+    "agent_id": "risk-review-agent-v1",
+    "output": {},
+    "role": "risk_review"
+  },
+  "synthesis-agent-v1": {
+    "agent_id": "synthesis-agent-v1",
+    "output": {},
+    "role": "synthesis"
+  },
+  "test-strategy-agent-v1": {
+    "agent_id": "test-strategy-agent-v1",
+    "output": {},
+    "role": "test_strategy"
+  }
+}

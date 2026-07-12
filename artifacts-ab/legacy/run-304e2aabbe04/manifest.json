@@ -1,0 +1,21 @@
+{
+  "schema_version": "1.0.0",
+  "run_id": "run-304e2aabbe04",
+  "started_at": "2026-07-12T07:23:26.249037+00:00",
+  "completed_at": "2026-07-12T07:23:27.072315+00:00",
+  "status": "completed",
+  "provider_type": "mock",
+  "model": "mock-model",
+  "repository_root": "D:\\Documents\\暑假计划\\specflow-agent",
+  "requirement": "Add multi-agent orchestration",
+  "requirement_hash": "187f69001ee6fe0af9ce486647a54a541fdade89bab162abad55e223f9115080",
+  "evidence_hash": "f3aff81eba52d845c68938d15e235a06dd9d70467ea99e85e0374e18705e6267",
+  "analysis_hash": "d6700003c1f6ccc5a8e5919242ad62690bf76131c47d02be772bc098d8f9738e",
+  "generation_hash": "883d30bbc849bfbcacc0bc65469665fb6c41e844e5b2ae49be02a9010f41bbad",
+  "review_hash": "c77320c3666a7b8a63ff3e02cac8e3a15298e9a88a9bcbbbb90ce2f1fedea531",
+  "review_decision": "PASS",
+  "degraded": false,
+  "requires_review": false,
+  "tool_call_count": 10,
+  "warnings": []
+}

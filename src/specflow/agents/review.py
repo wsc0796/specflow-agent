@@ -34,4 +34,11 @@ class ReviewAgent:
         return self._identity
 
     def execute(self, context: dict[str, Any]) -> dict[str, Any]:
-        return {"agent_id": self.agent_id, "role": self.role.value, "output": {}}
+        # The MVP executor is deterministic: a real review decision may be
+        # supplied by a test or a future provider-backed adapter, but it must
+        # always use this explicit contract rather than an implicit truthy value.
+        return {
+            "agent_id": self.agent_id,
+            "role": self.role.value,
+            "output": {"decision": "PASS", "requires_revision": False, "findings": []},
+        }

@@ -1,0 +1,764 @@
+{
+  "run_id": "run-304e2aabbe04",
+  "requirement": "Add multi-agent orchestration",
+  "repository_root": "D:\\Documents\\暑假计划\\specflow-agent",
+  "project_summary": "Python project with pyproject.toml at specflow-agent",
+  "technology_stack": [],
+  "searched_terms": [
+    "agent",
+    "multi",
+    "multi-agent",
+    "orchestration"
+  ],
+  "discovered_file_count": 245,
+  "matched_files": [
+    "evaluation/cases/multi_agent_case.py",
+    "src/specflow/__init__.py",
+    "src/specflow/agents/__init__.py",
+    "src/specflow/agents/design.py",
+    "src/specflow/agents/exceptions.py",
+    "src/specflow/agents/models.py",
+    "src/specflow/agents/protocol.py",
+    "src/specflow/agents/registry.py",
+    "src/specflow/agents/synthesis.py",
+    "src/specflow/artifacts/renderers.py",
+    "src/specflow/cli.py",
+    "src/specflow/coordinator/__init__.py",
+    "src/specflow/coordinator/coordinator.py",
+    "src/specflow/coordinator/revision.py",
+    "src/specflow/coordinator/scheduler.py",
+    "src/specflow/coordinator/state_machine.py",
+    "src/specflow/evaluation/multi_agent_runner.py",
+    "src/specflow/plan/planner.py",
+    "src/specflow/plan/validator.py",
+    "src/specflow/runner.py",
+    "src/specflow/runner_multi.py",
+    "src/specflow/trace/models.py",
+    "tests/test_agent_registry.py",
+    "tests/test_cli_multi_agent.py",
+    "tests/test_context.py",
+    "tests/test_coordinator.py",
+    "tests/test_evaluation_multi_agent.py"
+  ],
+  "selected_files": [
+    "src/specflow/agents/models.py",
+    "src/specflow/trace/models.py",
+    "src/specflow/coordinator/state_machine.py",
+    "src/specflow/evaluation/multi_agent_runner.py",
+    "src/specflow/agents/registry.py"
+  ],
+  "excerpts": [
+    {
+      "relative_path": "src/specflow/agents/models.py",
+      "line_number": 6,
+      "excerpt": "from specflow.agents.exceptions import AgentModelValidationError",
+      "match_count": 2
+    },
+    {
+      "relative_path": "src/specflow/agents/models.py",
+      "line_number": 9,
+      "excerpt": "class AgentRole(StrEnum):",
+      "match_count": 1
+    },
+    {
+      "relative_path": "src/specflow/agents/models.py",
+      "line_number": 19,
+      "excerpt": "class AgentIdentity:",
+      "match_count": 1
+    },
+    {
+      "relative_path": "src/specflow/agents/models.py",
+      "line_number": 20,
+      "excerpt": "agent_id: str",
+      "match_count": 1
+    },
+    {
+      "relative_path": "src/specflow/agents/models.py",
+      "line_number": 21,
+      "excerpt": "role: AgentRole",
+      "match_count": 1
+    },
+    {
+      "relative_path": "src/specflow/agents/models.py",
+      "line_number": 31,
+      "excerpt": "if not self.agent_id.strip():",
+      "match_count": 1
+    },
+    {
+      "relative_path": "src/specflow/agents/models.py",
+      "line_number": 32,
+      "excerpt": "raise AgentModelValidationError(\"agent_id must not be empty\")",
+      "match_count": 2
+    },
+    {
+      "relative_path": "src/specflow/agents/models.py",
+      "line_number": 33,
+      "excerpt": "if not isinstance(self.role, AgentRole):",
+      "match_count": 1
+    },
+    {
+      "relative_path": "src/specflow/agents/models.py",
+      "line_number": 34,
+      "excerpt": "raise AgentModelValidationError(\"role must be an AgentRole\")",
+      "match_count": 2
+    },
+    {
+      "relative_path": "src/specflow/agents/models.py",
+      "line_number": 36,
+      "excerpt": "raise AgentModelValidationError(\"version must not be empty\")",
+      "match_count": 1
+    },
+    {
+      "relative_path": "src/specflow/agents/models.py",
+      "line_number": 38,
+      "excerpt": "raise AgentModelValidationError(\"description must not be empty\")",
+      "match_count": 1
+    },
+    {
+      "relative_path": "src/specflow/agents/models.py",
+      "line_number": 40,
+      "excerpt": "raise AgentModelValidationError(\"prompt_id must not be empty\")",
+      "match_count": 1
+    },
+    {
+      "relative_path": "src/specflow/agents/models.py",
+      "line_number": 42,
+      "excerpt": "raise AgentModelValidationError(\"prompt_version must not be empty\")",
+      "match_count": 1
+    },
+    {
+      "relative_path": "src/specflow/agents/models.py",
+      "line_number": 44,
+      "excerpt": "raise AgentModelValidationError(\"input_schema_id must not be empty\")",
+      "match_count": 1
+    },
+    {
+      "relative_path": "src/specflow/agents/models.py",
+      "line_number": 46,
+      "excerpt": "raise AgentModelValidationError(\"output_schema_id must not be empty\")",
+      "match_count": 1
+    },
+    {
+      "relative_path": "src/specflow/agents/models.py",
+      "line_number": 50,
+      "excerpt": "class AgentDependency:",
+      "match_count": 1
+    },
+    {
+      "relative_path": "src/specflow/agents/models.py",
+      "line_number": 53,
+      "excerpt": "agent_id: str",
+      "match_count": 1
+    },
+    {
+      "relative_path": "src/specflow/agents/models.py",
+      "line_number": 57,
+      "excerpt": "if not self.agent_id.strip():",
+      "match_count": 1
+    },
+    {
+      "relative_path": "src/specflow/agents/models.py",
+      "line_number": 58,
+      "excerpt": "raise AgentModelValidationError(\"agent_id must not be empty\")",
+      "match_count": 2
+    },
+    {
+      "relative_path": "src/specflow/agents/models.py",
+      "line_number": 59,
+      "excerpt": "if self.agent_id in self.depends_on:",
+      "match_count": 1
+    },
+    {
+      "relative_path": "src/specflow/agents/models.py",
+      "line_number": 60,
+      "excerpt": "raise AgentModelValidationError(f\"Agent cannot depend on itself: {self.agent_id}\")",
+      "match_count": 3
+    },
+    {
+      "relative_path": "src/specflow/agents/models.py",
+      "line_number": 64,
+      "excerpt": "class AgentConstraints:",
+      "match_count": 1
+    },
+    {
+      "relative_path": "src/specflow/agents/models.py",
+      "line_number": 65,
+      "excerpt": "agent_id: str",
+      "match_count": 1
+    },
+    {
+      "relative_path": "src/specflow/agents/models.py",
+      "line_number": 73,
+      "excerpt": "if not self.agent_id.strip():",
+      "match_count": 1
+    },
+    {
+      "relative_path": "src/specflow/agents/models.py",
+      "line_number": 74,
+      "excerpt": "raise AgentModelValidationError(\"agent_id must not be empty\")",
+      "match_count": 2
+    },
+    {
+      "relative_path": "src/specflow/agents/models.py",
+      "line_number": 76,
+      "excerpt": "raise AgentModelValidationError(\"max_execution_seconds must be positive\")",
+      "match_count": 1
+    },
+    {
+      "relative_path": "src/specflow/agents/models.py",
+      "line_number": 78,
+      "excerpt": "raise AgentModelValidationError(\"max_token_budget must be positive\")",
+      "match_count": 1
+    },
+    {
+      "relative_path": "src/specflow/agents/models.py",
+      "line_number": 80,
+      "excerpt": "raise AgentModelValidationError(\"max_revision_rounds must be non-negative\")",
+      "match_count": 1
+    },
+    {
+      "relative_path": "src/specflow/agents/models.py",
+      "line_number": 84,
+      "excerpt": "raise AgentModelValidationError(f\"{name} must not contain empty path strings\")",
+      "match_count": 1
+    },
+    {
+      "relative_path": "src/specflow/agents/models.py",
+      "line_number": 90,
+      "excerpt": "revisable_roles: frozenset[AgentRole] = field(",
+      "match_count": 1
+    },
+    {
+      "relative_path": "src/specflow/agents/models.py",
+      "line_number": 93,
+      "excerpt": "AgentRole.DESIGN,",
+      "match_count": 1
+    },
+    {
+      "relative_path": "src/specflow/agents/models.py",
+      "line_number": 94,
+      "excerpt": "AgentRole.TEST_STRATEGY,",
+      "match_count": 1
+    },
+    {
+      "relative_path": "src/specflow/agents/models.py",
+      "line_number": 95,
+      "excerpt": "AgentRole.RISK_REVIEW,",
+      "match_count": 1
+    },
+    {
+      "relative_path": "src/specflow/agents/models.py",
+      "line_number": 99,
+      "excerpt": "final_authority_role: AgentRole = AgentRole.REVIEW",
+      "match_count": 2
+    },
+    {
+      "relative_path": "src/specflow/agents/models.py",
+      "line_number": 103,
+      "excerpt": "raise AgentModelValidationError(\"max_total_rounds must be non-negative\")",
+      "match_count": 1
+    },
+    {
+      "relative_path": "src/specflow/agents/models.py",
+      "line_number": 104,
+      "excerpt": "if not isinstance(self.final_authority_role, AgentRole):",
+      "match_count": 1
+    },
+    {
+      "relative_path": "src/specflow/agents/models.py",
+      "line_number": 105,
+      "excerpt": "raise AgentModelValidationError(\"final_authority_role must be an AgentRole\")",
+      "match_count": 2
+    },
+    {
+      "relative_path": "src/specflow/agents/models.py",
+      "line_number": 107,
+      "excerpt": "def is_revisable(self, role: AgentRole) -> bool:",
+      "match_count": 1
+    },
+    {
+      "relative_path": "src/specflow/trace/models.py",
+      "line_number": 48,
+      "excerpt": "\"\"\"Timing and metadata for one agent invocation within a multi-agent trace.\"\"\"",
+      "match_count": 1
+    },
+    {
+      "relative_path": "src/specflow/trace/models.py",
+      "line_number": 48,
+      "excerpt": "\"\"\"Timing and metadata for one agent invocation within a multi-agent trace.\"\"\"",
+      "match_count": 1
+    },
+    {
+      "relative_path": "src/specflow/coordinator/state_machine.py",
+      "line_number": 1,
+      "excerpt": "\"\"\"Multi-agent workflow state machine — tracks lifecycle from creation through completion.\"\"\"",
+      "match_count": 1
+    },
+    {
+      "relative_path": "src/specflow/coordinator/state_machine.py",
+      "line_number": 11,
+      "excerpt": "class MultiAgentWorkflowState(StrEnum):",
+      "match_count": 1
+    },
+    {
+      "relative_path": "src/specflow/coordinator/state_machine.py",
+      "line_number": 12,
+      "excerpt": "\"\"\"All possible states of a multi-agent workflow.\"\"\"",
+      "match_count": 1
+    },
+    {
+      "relative_path": "src/specflow/coordinator/state_machine.py",
+      "line_number": 27,
+      "excerpt": "_LEGAL_TRANSITIONS: dict[MultiAgentWorkflowState, frozenset[MultiAgentWorkflowState]] = {",
+      "match_count": 2
+    },
+    {
+      "relative_path": "src/specflow/coordinator/state_machine.py",
+      "line_number": 28,
+      "excerpt": "MultiAgentWorkflowState.CREATED: frozenset({MultiAgentWorkflowState.PLANNING}),",
+      "match_count": 2
+    },
+    {
+      "relative_path": "src/specflow/coordinator/state_machine.py",
+      "line_number": 29,
+      "excerpt": "MultiAgentWorkflowState.PLANNING: frozenset(",
+      "match_count": 1
+    },
+    {
+      "relative_path": "src/specflow/coordinator/state_machine.py",
+      "line_number": 30,
+      "excerpt": "{MultiAgentWorkflowState.ANALYZING, MultiAgentWorkflowState.FAILED}",
+      "match_count": 2
+    },
+    {
+      "relative_path": "src/specflow/coordinator/state_machine.py",
+      "line_number": 32,
+      "excerpt": "MultiAgentWorkflowState.ANALYZING: frozenset(",
+      "match_count": 1
+    },
+    {
+      "relative_path": "src/specflow/coordinator/state_machine.py",
+      "line_number": 33,
+      "excerpt": "{MultiAgentWorkflowState.EXECUTING_SPECIALISTS, MultiAgentWorkflowState.FAILED}",
+      "match_count": 2
+    },
+    {
+      "relative_path": "src/specflow/coordinator/state_machine.py",
+      "line_number": 35,
+      "excerpt": "MultiAgentWorkflowState.EXECUTING_SPECIALISTS: frozenset(",
+      "match_count": 1
+    },
+    {
+      "relative_path": "src/specflow/coordinator/state_machine.py",
+      "line_number": 36,
+      "excerpt": "{MultiAgentWorkflowState.SYNTHESIZING, MultiAgentWorkflowState.FAILED}",
+      "match_count": 2
+    },
+    {
+      "relative_path": "src/specflow/coordinator/state_machine.py",
+      "line_number": 38,
+      "excerpt": "MultiAgentWorkflowState.SYNTHESIZING: frozenset(",
+      "match_count": 1
+    },
+    {
+      "relative_path": "src/specflow/coordinator/state_machine.py",
+      "line_number": 39,
+      "excerpt": "{MultiAgentWorkflowState.REVIEWING, MultiAgentWorkflowState.FAILED}",
+      "match_count": 2
+    },
+    {
+      "relative_path": "src/specflow/coordinator/state_machine.py",
+      "line_number": 41,
+      "excerpt": "MultiAgentWorkflowState.REVIEWING: frozenset(",
+      "match_count": 1
+    },
+    {
+      "relative_path": "src/specflow/coordinator/state_machine.py",
+      "line_number": 43,
+      "excerpt": "MultiAgentWorkflowState.COMPLETED,",
+      "match_count": 1
+    },
+    {
+      "relative_path": "src/specflow/coordinator/state_machine.py",
+      "line_number": 44,
+      "excerpt": "MultiAgentWorkflowState.REVISING,",
+      "match_count": 1
+    },
+    {
+      "relative_path": "src/specflow/coordinator/state_machine.py",
+      "line_number": 45,
+      "excerpt": "MultiAgentWorkflowState.FAILED,",
+      "match_count": 1
+    },
+    {
+      "relative_path": "src/specflow/coordinator/state_machine.py",
+      "line_number": 48,
+      "excerpt": "MultiAgentWorkflowState.REVISING: frozenset(",
+      "match_count": 1
+    },
+    {
+      "relative_path": "src/specflow/coordinator/state_machine.py",
+      "line_number": 49,
+      "excerpt": "{MultiAgentWorkflowState.SYNTHESIZING, MultiAgentWorkflowState.FAILED}",
+      "match_count": 2
+    },
+    {
+      "relative_path": "src/specflow/coordinator/state_machine.py",
+      "line_number": 51,
+      "excerpt": "MultiAgentWorkflowState.COMPLETED: frozenset(),",
+      "match_count": 1
+    },
+    {
+      "relative_path": "src/specflow/coordinator/state_machine.py",
+      "line_number": 52,
+      "excerpt": "MultiAgentWorkflowState.FAILED: frozenset(),",
+      "match_count": 1
+    },
+    {
+      "relative_path": "src/specflow/coordinator/state_machine.py",
+      "line_number": 61,
+      "excerpt": "class MultiAgentWorkflowEngine:",
+      "match_count": 1
+    },
+    {
+      "relative_path": "src/specflow/coordinator/state_machine.py",
+      "line_number": 62,
+      "excerpt": "\"\"\"Finite-state machine for orchestrating a multi-agent workflow.",
+      "match_count": 1
+    },
+    {
+      "relative_path": "src/specflow/coordinator/state_machine.py",
+      "line_number": 69,
+      "excerpt": "self._state: MultiAgentWorkflowState = MultiAgentWorkflowState.CREATED",
+      "match_count": 2
+    },
+    {
+      "relative_path": "src/specflow/coordinator/state_machine.py",
+      "line_number": 77,
+      "excerpt": "def state(self) -> MultiAgentWorkflowState:",
+      "match_count": 1
+    },
+    {
+      "relative_path": "src/specflow/coordinator/state_machine.py",
+      "line_number": 103,
+      "excerpt": "def transition(self, to_state: MultiAgentWorkflowState, reason: str = \"\") -> None:",
+      "match_count": 1
+    },
+    {
+      "relative_path": "src/specflow/coordinator/state_machine.py",
+      "line_number": 127,
+      "excerpt": "if to_state is MultiAgentWorkflowState.REVISING:",
+      "match_count": 1
+    },
+    {
+      "relative_path": "src/specflow/coordinator/state_machine.py",
+      "line_number": 1,
+      "excerpt": "\"\"\"Multi-agent workflow state machine — tracks lifecycle from creation through completion.\"\"\"",
+      "match_count": 1
+    },
+    {
+      "relative_path": "src/specflow/coordinator/state_machine.py",
+      "line_number": 12,
+      "excerpt": "\"\"\"All possible states of a multi-agent workflow.\"\"\"",
+      "match_count": 1
+    },
+    {
+      "relative_path": "src/specflow/coordinator/state_machine.py",
+      "line_number": 62,
+      "excerpt": "\"\"\"Finite-state machine for orchestrating a multi-agent workflow.",
+      "match_count": 1
+    },
+    {
+      "relative_path": "src/specflow/evaluation/multi_agent_runner.py",
+      "line_number": 6,
+      "excerpt": "from specflow.runner_multi import run_multi_agent",
+      "match_count": 2
+    },
+    {
+      "relative_path": "src/specflow/evaluation/multi_agent_runner.py",
+      "line_number": 26,
+      "excerpt": "multi_agent_scores: dict[str, int]",
+      "match_count": 1
+    },
+    {
+      "relative_path": "src/specflow/evaluation/multi_agent_runner.py",
+      "line_number": 28,
+      "excerpt": "multi_agent_total: int",
+      "match_count": 1
+    },
+    {
+      "relative_path": "src/specflow/evaluation/multi_agent_runner.py",
+      "line_number": 32,
+      "excerpt": "return self.multi_agent_total - self.legacy_total",
+      "match_count": 1
+    },
+    {
+      "relative_path": "src/specflow/evaluation/multi_agent_runner.py",
+      "line_number": 38,
+      "excerpt": "f\"Multi-Agent: {self.multi_agent_total}/20 | \"",
+      "match_count": 2
+    },
+    {
+      "relative_path": "src/specflow/evaluation/multi_agent_runner.py",
+      "line_number": 43,
+      "excerpt": "def compare_legacy_vs_multi_agent(legacy_results: dict, multi_results: dict) -> ABComparisonResult:",
+      "match_count": 2
+    },
+    {
+      "relative_path": "src/specflow/evaluation/multi_agent_runner.py",
+      "line_number": 44,
+      "excerpt": "\"\"\"Compare legacy and multi-agent evaluation results.\"\"\"",
+      "match_count": 1
+    },
+    {
+      "relative_path": "src/specflow/evaluation/multi_agent_runner.py",
+      "line_number": 46,
+      "excerpt": "multi_scores = {d[\"key\"]: d[\"score\"] for d in multi_results.get(\"dimensions\", [])}",
+      "match_count": 2
+    },
+    {
+      "relative_path": "src/specflow/evaluation/multi_agent_runner.py",
+      "line_number": 48,
+      "excerpt": "case_id=multi_results.get(\"case_id\", \"unknown\"),",
+      "match_count": 1
+    },
+    {
+      "relative_path": "src/specflow/evaluation/multi_agent_runner.py",
+      "line_number": 50,
+      "excerpt": "multi_agent_scores=multi_scores,",
+      "match_count": 2
+    },
+    {
+      "relative_path": "src/specflow/evaluation/multi_agent_runner.py",
+      "line_number": 52,
+      "excerpt": "multi_agent_total=sum(multi_scores.values()),",
+      "match_count": 2
+    },
+    {
+      "relative_path": "src/specflow/evaluation/multi_agent_runner.py",
+      "line_number": 59,
+      "excerpt": "multi_output = output / \"multi-agent\"",
+      "match_count": 2
+    },
+    {
+      "relative_path": "src/specflow/evaluation/multi_agent_runner.py",
+      "line_number": 63,
+      "excerpt": "multi_code = run_multi_agent(repo=repo, requirement=requirement, output=multi_output, mock=True)",
+      "match_count": 3
+    },
+    {
+      "relative_path": "src/specflow/evaluation/multi_agent_runner.py",
+      "line_number": 65,
+      "excerpt": "multi_artifact = next(multi_output.glob(\"run-multi-*\"), None)",
+      "match_count": 3
+    },
+    {
+      "relative_path": "src/specflow/evaluation/multi_agent_runner.py",
+      "line_number": 76,
+      "excerpt": "multi = {",
+      "match_count": 1
+    },
+    {
+      "relative_path": "src/specflow/evaluation/multi_agent_runner.py",
+      "line_number": 81,
+      "excerpt": "\"score\": 2 if multi_artifact and multi_code == 0 else 0,",
+      "match_count": 2
+    },
+    {
+      "relative_path": "src/specflow/evaluation/multi_agent_runner.py",
+      "line_number": 86,
+      "excerpt": "return compare_legacy_vs_multi_agent(legacy, multi)",
+      "match_count": 2
+    },
+    {
+      "relative_path": "src/specflow/evaluation/multi_agent_runner.py",
+      "line_number": 38,
+      "excerpt": "f\"Multi-Agent: {self.multi_agent_total}/20 | \"",
+      "match_count": 1
+    },
+    {
+      "relative_path": "src/specflow/evaluation/multi_agent_runner.py",
+      "line_number": 44,
+      "excerpt": "\"\"\"Compare legacy and multi-agent evaluation results.\"\"\"",
+      "match_count": 1
+    },
+    {
+      "relative_path": "src/specflow/evaluation/multi_agent_runner.py",
+      "line_number": 59,
+      "excerpt": "multi_output = output / \"multi-agent\"",
+      "match_count": 1
+    },
+    {
+      "relative_path": "src/specflow/agents/registry.py",
+      "line_number": 1,
+      "excerpt": "\"\"\"Agent registry — central store for agent instances.\"\"\"",
+      "match_count": 2
+    },
+    {
+      "relative_path": "src/specflow/agents/registry.py",
+      "line_number": 5,
+      "excerpt": "from specflow.agents.exceptions import AgentNotFoundError, DuplicateAgentError",
+      "match_count": 3
+    },
+    {
+      "relative_path": "src/specflow/agents/registry.py",
+      "line_number": 6,
+      "excerpt": "from specflow.agents.models import AgentIdentity, AgentRole",
+      "match_count": 3
+    },
+    {
+      "relative_path": "src/specflow/agents/registry.py",
+      "line_number": 7,
+      "excerpt": "from specflow.agents.protocol import Agent",
+      "match_count": 2
+    },
+    {
+      "relative_path": "src/specflow/agents/registry.py",
+      "line_number": 10,
+      "excerpt": "class AgentRegistry:",
+      "match_count": 1
+    },
+    {
+      "relative_path": "src/specflow/agents/registry.py",
+      "line_number": 11,
+      "excerpt": "\"\"\"Registry of Agent instances.",
+      "match_count": 1
+    },
+    {
+      "relative_path": "src/specflow/agents/registry.py",
+      "line_number": 13,
+      "excerpt": "Agents are keyed by ``agent_id``.  Registration, lookup, and",
+      "match_count": 2
+    },
+    {
+      "relative_path": "src/specflow/agents/registry.py",
+      "line_number": 18,
+      "excerpt": "self._agents: dict[str, Agent] = {}",
+      "match_count": 2
+    },
+    {
+      "relative_path": "src/specflow/agents/registry.py",
+      "line_number": 24,
+      "excerpt": "def register(self, agent: Agent) -> None:",
+      "match_count": 2
+    },
+    {
+      "relative_path": "src/specflow/agents/registry.py",
+      "line_number": 25,
+      "excerpt": "\"\"\"Register *agent*.",
+      "match_count": 1
+    }
+  ],
+  "source_hashes": {
+    "src/specflow/agents/models.py": "7ef61f83c94676073da7e33e30beb63d6c68abf373b1ff295a1fa7c7bb3493ee",
+    "src/specflow/trace/models.py": "735833c2331dd62cad6093e2828d8a6524ac434791c49ed8356ed024bda7f5b4",
+    "src/specflow/coordinator/state_machine.py": "4b8b95a802f7f9d806e673bb6a75062164c0cdc122bbd0290fb0f65d1d72983c",
+    "src/specflow/evaluation/multi_agent_runner.py": "a8bc68a8bffbd4974839131593f53350b5332aa28e547d71231f2d6e88b228f5",
+    "src/specflow/agents/registry.py": "f4f00989f5a25b4cc142daa8cb6e8477d110c4bf51f944bc315f686546bd2b62"
+  },
+  "tool_call_records": [
+    {
+      "call_id": "evidence-001",
+      "tool_name": "list_files",
+      "status": "success",
+      "arguments_summary": "include=['*.py', '*.md', '*.yaml', '*.yml', '*.toml', '*.cfg']",
+      "output_summary": "ok, 9206 chars",
+      "duration_ms": 50,
+      "truncated": false,
+      "error_type": null
+    },
+    {
+      "call_id": "evidence-002",
+      "tool_name": "search_code",
+      "status": "success",
+      "arguments_summary": "case_sensitive=False, include=['*.py'], query=agent",
+      "output_summary": "ok, 14712 chars",
+      "duration_ms": 58,
+      "truncated": true,
+      "error_type": null
+    },
+    {
+      "call_id": "evidence-003",
+      "tool_name": "search_code",
+      "status": "success",
+      "arguments_summary": "case_sensitive=False, include=['*.py'], query=multi",
+      "output_summary": "ok, 16803 chars",
+      "duration_ms": 204,
+      "truncated": true,
+      "error_type": null
+    },
+    {
+      "call_id": "evidence-004",
+      "tool_name": "search_code",
+      "status": "success",
+      "arguments_summary": "case_sensitive=False, include=['*.py'], query=multi-agent",
+      "output_summary": "ok, 3934 chars",
+      "duration_ms": 189,
+      "truncated": false,
+      "error_type": null
+    },
+    {
+      "call_id": "evidence-005",
+      "tool_name": "search_code",
+      "status": "success",
+      "arguments_summary": "case_sensitive=False, include=['*.py'], query=orchestration",
+      "output_summary": "ok, 400 chars",
+      "duration_ms": 283,
+      "truncated": false,
+      "error_type": null
+    },
+    {
+      "call_id": "evidence-006",
+      "tool_name": "read_file",
+      "status": "success",
+      "arguments_summary": "path=src/specflow/agents/models.py",
+      "output_summary": "ok, 4241 chars",
+      "duration_ms": 4,
+      "truncated": false,
+      "error_type": null
+    },
+    {
+      "call_id": "evidence-007",
+      "tool_name": "read_file",
+      "status": "success",
+      "arguments_summary": "path=src/specflow/trace/models.py",
+      "output_summary": "ok, 3300 chars",
+      "duration_ms": 4,
+      "truncated": false,
+      "error_type": null
+    },
+    {
+      "call_id": "evidence-008",
+      "tool_name": "read_file",
+      "status": "success",
+      "arguments_summary": "path=src/specflow/coordinator/state_machine.py",
+      "output_summary": "ok, 4980 chars",
+      "duration_ms": 2,
+      "truncated": false,
+      "error_type": null
+    },
+    {
+      "call_id": "evidence-009",
+      "tool_name": "read_file",
+      "status": "success",
+      "arguments_summary": "path=src/specflow/evaluation/multi_agent_runner.py",
+      "output_summary": "ok, 3558 chars",
+      "duration_ms": 1,
+      "truncated": false,
+      "error_type": null
+    },
+    {
+      "call_id": "evidence-010",
+      "tool_name": "read_file",
+      "status": "success",
+      "arguments_summary": "path=src/specflow/agents/registry.py",
+      "output_summary": "ok, 2368 chars",
+      "duration_ms": 1,
+      "truncated": false,
+      "error_type": null
+    }
+  ],
+  "truncated": true,
+  "warnings": [],
+  "evidence_hash": "f3aff81eba52d845c68938d15e235a06dd9d70467ea99e85e0374e18705e6267"
+}

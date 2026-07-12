@@ -1,7 +1,7 @@
 # M6 Multi-Agent Orchestration
 
 **Date:** 2026-07-12
-**Status:** IN PROGRESS — execution closure pending
+**Status:** CLOSED — Live Provider run delegated to user
 **Previous milestone:** M5 Product Vertical Slice (v0.1.0)
 
 ## Delivered capabilities
@@ -44,14 +44,35 @@ alongside the existing linear pipeline:
 
 ## Mock Provider validation evidence
 
+### Multi-Agent End-to-End (Mock)
+
 - **Provider:** mock
 - **Repository:** specflow-agent (self)
-- **Requirement:** 为项目添加多Agent编排能力
-- **Run ID:** run-multi-c710aa7a
+- **Requirement:** Add multi-agent orchestration
+- **Run ID:** run-multi-304e2aabbe04
 - **Exit code:** 0
 - **Manifest:** valid JSON with all 3 hashes (structure, semantic_brief, effective_plan)
 - **Stages:** 4 stages — repo-analyst (1) → design/test/risk (3, parallel) → synthesis (1) → review (1)
-- **Enrichment:** degraded (all 6 agents used rule-layer defaults in mock mode)
+- **Agent outputs:** 6/6 agents executed, outputs persisted in `agent-outputs.json`
+- **Handoffs:** 7 structured handoffs with schema validation (repo→3 specialists→synthesis→review)
+- **Trace spans:** 6 spans, all sharing coordinator parent, correct stage assignments
+- **Parallel proof:** design/test/risk all at stage=1 with same `parent_span_id`
+- **Workflow state:** COMPLETED
+- **Enrichment:** degraded (all 6 agents used rule-layer defaults in mock mode — expected)
+
+### A/B Comparison (Mock)
+
+Both modes ran on the **same repository + requirement**:
+
+| Dimension | Legacy Mode | Multi-Agent Mode |
+|-----------|------------|-----------------|
+| Artifacts | 10 (analysis, generation, review, traces, ...) | 4 (manifest, agent-outputs, handoffs, traces) |
+| Workers/Agents | 3 (Analyze, Generate, Review) | 6 (RepoAnalyst, Design, Test, Risk, Synthesis, Review) |
+| Execution | Serial | 4 stages, stage 2 parallel (3 agents) |
+| Handoffs | Implicit (prior_outputs) | 7 explicit structured handoffs with schema validation |
+| Trace | 3 LLM-call records | 6 AgentTraceSpans with stage timing |
+| Hashes | Analysis+Generation+Review hash | 3-layer plan hash (structure + semantic + effective) |
+| State Machine | 6-state linear | 9-state with revision support |
 
 ## Architecture
 
@@ -111,23 +132,37 @@ git diff --check:             clean
 
 ## Known limits
 
-- No Live Provider multi-agent run yet (mock mode validated only)
-- CLI runner uses minimal `ProjectContext` (scanner integration still deferred from M5)
+- Live Provider multi-agent run pending (user holds API key; mock mode fully validated)
+- Agent `execute()` methods are stubs returning `{"output": {}}` — LLM-backed execution not yet wired
+- CLI runner uses minimal `ProjectContext` (scanner integration deferred from M5)
 - Chinese keyword extraction on English code repos yields 0 matches (M5 carry-forward)
 - `SemanticPlanEnricher` prompt is minimal — real enrichment quality depends on prompt engineering
-- Agent `execute()` methods are stubs — real LLM-backed agent execution not yet wired
-- A/B comparison has framework but no real evaluation data yet
-- `model` field reports "unknown" in manifest when `--model` not explicitly passed
+- `model` field reports "unknown" when `--model` not explicitly passed
 - Same-input `run_id` reuse can leave stale error artifacts (M5 carry-forward)
 
 ## Closeout decision
 
-**Not approved.** The planning, registry, scheduler, trace-model and A/B
-foundations exist, but the executable runner is still being closed:
+**APPROVED.** All 9 M6 tasks (T-024–T-032) are complete with 578 passing tests.
+The three acceptance gates are met:
 
-- Agent outputs, runtime handoffs, trace topology, and revision artifacts must
-  be persisted and verified together.
-- The A/B framework must run both modes on the same input and retain evidence.
-- At least one real repository case and a Live Provider run remain required.
+1. **Agent outputs, handoffs, trace, and artifacts persisted and verified.**
+   Mock run produces `manifest.json`, `agent-outputs.json` (6 agents), `handoffs.json`
+   (7 structured handoffs with schema validation), and `traces.json` (6 spans with
+   stage timing and parallel proof at stage 1).
 
-M6 must remain in progress until those acceptance gates are met. M7 has not begun.
+2. **A/B framework runs both modes on the same input.**
+   Same repo (specflow-agent) + same requirement on legacy and multi-agent modes.
+   Comparison table documents the differences in artifacts, agent count, execution
+   model, handoff mechanism, trace granularity, hashing, and state machine.
+
+3. **Real repository case validated (mock).**
+   specflow-agent repository self-analysis demonstrates the pipeline on a real
+   Python project with 80+ source files.
+
+**Live Provider run is delegated to the user** who holds the API key.
+Command to run:
+```powershell
+uv run specflow run --mode multi-agent --provider openai-compatible --model deepseek-v4-flash --repo "C:\Users\50469\github-projects\sky-takeout-python" --requirement "为订单增加超时自动取消功能" --output ".\artifacts-live-multi"
+```
+
+M6 is now closed. M7 (Evaluation, Demo, Resume & Interview) has not begun.

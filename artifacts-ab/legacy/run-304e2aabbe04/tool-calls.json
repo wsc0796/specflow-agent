@@ -1,0 +1,102 @@
+[
+  {
+    "call_id": "evidence-001",
+    "tool_name": "list_files",
+    "status": "success",
+    "arguments_summary": "include=['*.py', '*.md', '*.yaml', '*.yml', '*.toml', '*.cfg']",
+    "output_summary": "ok, 9206 chars",
+    "duration_ms": 50,
+    "truncated": false,
+    "error_type": null
+  },
+  {
+    "call_id": "evidence-002",
+    "tool_name": "search_code",
+    "status": "success",
+    "arguments_summary": "case_sensitive=False, include=['*.py'], query=agent",
+    "output_summary": "ok, 14712 chars",
+    "duration_ms": 58,
+    "truncated": true,
+    "error_type": null
+  },
+  {
+    "call_id": "evidence-003",
+    "tool_name": "search_code",
+    "status": "success",
+    "arguments_summary": "case_sensitive=False, include=['*.py'], query=multi",
+    "output_summary": "ok, 16803 chars",
+    "duration_ms": 204,
+    "truncated": true,
+    "error_type": null
+  },
+  {
+    "call_id": "evidence-004",
+    "tool_name": "search_code",
+    "status": "success",
+    "arguments_summary": "case_sensitive=False, include=['*.py'], query=multi-agent",
+    "output_summary": "ok, 3934 chars",
+    "duration_ms": 189,
+    "truncated": false,
+    "error_type": null
+  },
+  {
+    "call_id": "evidence-005",
+    "tool_name": "search_code",
+    "status": "success",
+    "arguments_summary": "case_sensitive=False, include=['*.py'], query=orchestration",
+    "output_summary": "ok, 400 chars",
+    "duration_ms": 283,
+    "truncated": false,
+    "error_type": null
+  },
+  {
+    "call_id": "evidence-006",
+    "tool_name": "read_file",
+    "status": "success",
+    "arguments_summary": "path=src/specflow/agents/models.py",
+    "output_summary": "ok, 4241 chars",
+    "duration_ms": 4,
+    "truncated": false,
+    "error_type": null
+  },
+  {
+    "call_id": "evidence-007",
+    "tool_name": "read_file",
+    "status": "success",
+    "arguments_summary": "path=src/specflow/trace/models.py",
+    "output_summary": "ok, 3300 chars",
+    "duration_ms": 4,
+    "truncated": false,
+    "error_type": null
+  },
+  {
+    "call_id": "evidence-008",
+    "tool_name": "read_file",
+    "status": "success",
+    "arguments_summary": "path=src/specflow/coordinator/state_machine.py",
+    "output_summary": "ok, 4980 chars",
+    "duration_ms": 2,
+    "truncated": false,
+    "error_type": null
+  },
+  {
+    "call_id": "evidence-009",
+    "tool_name": "read_file",
+    "status": "success",
+    "arguments_summary": "path=src/specflow/evaluation/multi_agent_runner.py",
+    "output_summary": "ok, 3558 chars",
+    "duration_ms": 1,
+    "truncated": false,
+    "error_type": null
+  },
+  {
+    "call_id": "evidence-010",
+    "tool_name": "read_file",
+    "status": "success",
+    "arguments_summary": "path=src/specflow/agents/registry.py",
+    "output_summary": "ok, 2368 chars",
+    "duration_ms": 1,
+    "truncated": false,
+    "error_type": null
+  }
+]

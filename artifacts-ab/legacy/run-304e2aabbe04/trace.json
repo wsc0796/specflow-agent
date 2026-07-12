@@ -1,0 +1,62 @@
+[
+  {
+    "context_hash": "e9491a0f952400102209959feb2ae5e4666321088a33358d4904c25fc99745eb",
+    "error_type": null,
+    "fallback_level": "none",
+    "input_tokens": 278,
+    "latency_ms": 0,
+    "metadata": {
+      "worker_name": "analyze-worker",
+      "worker_role": "analyze",
+      "worker_version": "1.0.0"
+    },
+    "model": "mock-model",
+    "output_tokens": 134,
+    "prompt_hash": "6e1a197771738dd575d245e2b22aa2f85b863036844a6abf23862cd4610f3d52",
+    "prompt_name": "analyze_requirement",
+    "prompt_version": "1.0.0",
+    "retry_count": 0,
+    "run_id": "run-304e2aabbe04-analyze",
+    "status": "success"
+  },
+  {
+    "context_hash": "bc5bed1777f2ed239fe371762175182af32db7da92c6b7a50516fa3ba2b47005",
+    "error_type": null,
+    "fallback_level": "none",
+    "input_tokens": 447,
+    "latency_ms": 0,
+    "metadata": {
+      "worker_name": "generate-worker",
+      "worker_role": "generate",
+      "worker_version": "1.0.0"
+    },
+    "model": "mock-model",
+    "output_tokens": 216,
+    "prompt_hash": "37fd4ef0ed41008d4ddb5e9f9bf9dedf55341ea29ed840d3a1023bd5f932d668",
+    "prompt_name": "generate_spec",
+    "prompt_version": "1.0.0",
+    "retry_count": 0,
+    "run_id": "run-304e2aabbe04-generate",
+    "status": "success"
+  },
+  {
+    "context_hash": "f8e97af19ff5e2d4919b5d365622e1433cec036663568c372268116a3235753d",
+    "error_type": null,
+    "fallback_level": "none",
+    "input_tokens": 682,
+    "latency_ms": 0,
+    "metadata": {
+      "worker_name": "review-worker",
+      "worker_role": "review",
+      "worker_version": "1.0.0"
+    },
+    "model": "mock-model",
+    "output_tokens": 146,
+    "prompt_hash": "9fe4c87ad8e98049dbd2e0d5d7b7413f5d0391e12d131786ed887db2723de7f4",
+    "prompt_name": "review_generation",
+    "prompt_version": "1.0.0",
+    "retry_count": 0,
+    "run_id": "run-304e2aabbe04-review",
+    "status": "success"
+  }
+]

@@ -1,0 +1,104 @@
+{
+  "run_id": "run-multi-304e2aabbe04",
+  "plan_id": "plan-v1",
+  "structure_hash": "7715d957e762aef2c04e4bc6f23620d1cbded7438037a866f58edd866aec9652",
+  "semantic_brief_hash": "110a6a7c57293f4ba100dd8f671f4078cb414badc5ab7cf7ff6bdda282db9dd2",
+  "effective_plan_hash": "f533f143036b8bcdaf31fca5e0fc0e7eb28bd9824a570aa86eb26aaa562099e0",
+  "stages": [
+    [
+      "repository-analyst-agent-v1"
+    ],
+    [
+      "design-agent-v1",
+      "risk-review-agent-v1",
+      "test-strategy-agent-v1"
+    ],
+    [
+      "synthesis-agent-v1"
+    ],
+    [
+      "review-agent-v1"
+    ]
+  ],
+  "enriched": false,
+  "degraded_agents": [
+    "repository-analyst-agent-v1",
+    "design-agent-v1",
+    "test-strategy-agent-v1",
+    "risk-review-agent-v1",
+    "synthesis-agent-v1",
+    "review-agent-v1"
+  ],
+  "workflow_state": "completed",
+  "workflow_history": [
+    [
+      "created",
+      "planning",
+      "plan compiled",
+      "2026-07-12T07:23:27.571079+00:00"
+    ],
+    [
+      "planning",
+      "analyzing",
+      "analysis stage",
+      "2026-07-12T07:23:27.571079+00:00"
+    ],
+    [
+      "analyzing",
+      "executing_specialists",
+      "specialist stages complete",
+      "2026-07-12T07:23:27.573078+00:00"
+    ],
+    [
+      "executing_specialists",
+      "synthesizing",
+      "synthesis stage complete",
+      "2026-07-12T07:23:27.573078+00:00"
+    ],
+    [
+      "synthesizing",
+      "reviewing",
+      "review stage complete",
+      "2026-07-12T07:23:27.573078+00:00"
+    ],
+    [
+      "reviewing",
+      "completed",
+      "mock review passed",
+      "2026-07-12T07:23:27.573078+00:00"
+    ]
+  ],
+  "stage_results": [
+    {
+      "stage": 0,
+      "agents": [
+        "repository-analyst-agent-v1"
+      ]
+    },
+    {
+      "stage": 1,
+      "agents": [
+        "design-agent-v1",
+        "risk-review-agent-v1",
+        "test-strategy-agent-v1"
+      ]
+    },
+    {
+      "stage": 2,
+      "agents": [
+        "synthesis-agent-v1"
+      ]
+    },
+    {
+      "stage": 3,
+      "agents": [
+        "review-agent-v1"
+      ]
+    }
+  ],
+  "artifacts": {
+    "agent_outputs": "agent-outputs.json",
+    "handoffs": "handoffs.json",
+    "traces": "traces.json"
+  }
+}
