@@ -15,11 +15,20 @@ class StructuralHashInput:
     constraints: list[dict[str, Any]] = field(default_factory=list)
 
 
-def _canonical_json(obj: Any) -> bytes:
-    """Serialize to canonical JSON: sorted keys, compact, UTF-8."""
+def canonical_json_bytes(obj: Any) -> bytes:
+    """Serialize to canonical JSON: sorted keys, compact, UTF-8, no ASCII escaping.
+
+    This is the SINGLE truth source for all JSON hashing in the project.
+    Every hash-producing and hash-verifying code path MUST call this function
+    to ensure ``ensure_ascii=False`` and compact separators are applied consistently.
+    """
     return json.dumps(obj, sort_keys=True, ensure_ascii=False, separators=(",", ":")).encode(
         "utf-8"
     )
+
+
+# Keep private alias for backward-compat within this module
+_canonical_json = canonical_json_bytes
 
 
 def compute_structure_hash(input_: StructuralHashInput) -> str:

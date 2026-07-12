@@ -84,7 +84,8 @@ class TestAgentRunner:
         result = runner.execute({"requirement": "Test"})
         assert result["success"] is False
         assert result["degraded"] is True
-        assert "API down" in result["error"]
+        assert "output" in result  # must carry output for downstream compat
+        assert result["output"]["degraded"] is True
 
     def test_runner_uses_json_response_format(self):
         ident = _make_identity()

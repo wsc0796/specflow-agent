@@ -9,13 +9,13 @@ sender and receiver agents.
 
 from __future__ import annotations
 
-import json
 from collections.abc import Mapping
 from hashlib import sha256
 
 from specflow.agents.models import AgentIdentity
 from specflow.handoff.exceptions import HandoffValidationError
 from specflow.handoff.models import AgentHandoff
+from specflow.plan.hash_utils import canonical_json_bytes
 
 
 class HandoffValidator:
@@ -79,8 +79,6 @@ class HandoffValidator:
             raise HandoffValidationError("Handoff payload agent_id does not match sender")
         if not isinstance(payload.get("role"), str) or not isinstance(payload.get("output"), dict):
             raise HandoffValidationError("Handoff payload does not match the agent output envelope")
-        expected_hash = sha256(
-            json.dumps(dict(payload), ensure_ascii=False, sort_keys=True).encode()
-        ).hexdigest()
+        expected_hash = sha256(canonical_json_bytes(dict(payload))).hexdigest()
         if handoff.output_hash != expected_hash:
             raise HandoffValidationError("Handoff output_hash does not match payload")

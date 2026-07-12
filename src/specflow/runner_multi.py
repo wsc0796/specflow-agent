@@ -26,6 +26,7 @@ from specflow.evidence.models import EvidenceCollectionConfig
 from specflow.handoff.models import AgentHandoff
 from specflow.handoff.validator import HandoffValidator
 from specflow.llm import LLMClient, OpenAICompatibleConfig, OpenAICompatibleLLMClient
+from specflow.plan.hash_utils import canonical_json_bytes
 from specflow.tools import ToolExecutor, ToolRegistry
 from specflow.tools.repository_tools import RepositoryToolSet
 from specflow.trace.models import AgentTraceSpan
@@ -355,7 +356,7 @@ def _validate_stage_inputs(
                 target_input_schema_id=receiver.identity.input_schema_id,
                 payload_ref=f"agent-outputs.json#{payload_ref}",
                 input_hash=sha256(requirement.encode()).hexdigest(),
-                output_hash=sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest(),
+                output_hash=sha256(canonical_json_bytes(payload)).hexdigest(),
             )
             validator.validate(handoff, sender.identity, receiver.identity)
             validator.validate_payload(handoff, sender.identity, {payload_ref: payload})

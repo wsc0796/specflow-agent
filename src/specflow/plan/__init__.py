@@ -1,5 +1,6 @@
 from specflow.plan.compiler import PlanCompiler
 from specflow.plan.enricher import SemanticPlanEnricher
+from specflow.plan.hash_utils import canonical_json_bytes
 from specflow.plan.models import (
     AgentTask,
     CompiledStructuralPlan,
@@ -24,4 +25,5 @@ __all__ = [
     "SemanticPlanEnricher",
     "SemanticTaskBrief",
     "StructuralDelegationSpec",
+    "canonical_json_bytes",
 ]

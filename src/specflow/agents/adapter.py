@@ -8,6 +8,7 @@ from typing import Any
 from specflow.agents.models import AgentIdentity
 from specflow.llm.client import LLMClient
 from specflow.llm.models import LLMMessage, LLMRequest
+from specflow.schema.registry import SchemaRegistry
 
 
 class AgentRunner:
@@ -17,7 +18,8 @@ class AgentRunner:
     provides a callable ``execute(context)`` that goes through the
     real LLM provider.
 
-    On failure, returns a degraded result instead of raising.
+    On failure, returns a degraded result with ``output`` preserved
+    for downstream contract compatibility.
     """
 
     def __init__(
@@ -25,6 +27,7 @@ class AgentRunner:
         identity: AgentIdentity,
         llm_client: LLMClient,
         *,
+        schema_registry: SchemaRegistry | None = None,
         system_prompt: str = "",
         model: str = "unknown",
         temperature: float = 0.0,
@@ -32,6 +35,7 @@ class AgentRunner:
     ) -> None:
         self._identity = identity
         self._llm = llm_client
+        self._schema_registry = schema_registry
         self._system_prompt = system_prompt
         self._model = model
         self._temperature = temperature
@@ -76,6 +80,25 @@ class AgentRunner:
                 )
             )
             data = json.loads(response.content)
+
+            # Validate against agent's output schema if registry is available
+            if self._schema_registry is not None:
+                try:
+                    output_model = self._schema_registry.get(
+                        self._identity.output_schema_id
+                    )
+                    validated = output_model.model_validate(data)
+                    data = validated.model_dump()
+                except Exception:
+                    # Schema validation failed — degrade gracefully
+                    return {
+                        "agent_id": self.agent_id,
+                        "role": self._identity.role.value,
+                        "success": False,
+                        "output": {"degraded": True, "error": "Schema validation failed"},
+                        "degraded": True,
+                    }
+
             return {
                 "agent_id": self.agent_id,
                 "role": self._identity.role.value,
@@ -92,7 +115,7 @@ class AgentRunner:
                 "agent_id": self.agent_id,
                 "role": self._identity.role.value,
                 "success": False,
-                "error": str(exc),
+                "output": {"degraded": True, "error": str(exc)},
                 "degraded": True,
             }
 

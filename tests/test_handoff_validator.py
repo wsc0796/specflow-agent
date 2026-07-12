@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 from hashlib import sha256
 
 import pytest
@@ -11,6 +10,7 @@ from specflow.agents.models import AgentIdentity, AgentRole
 from specflow.handoff.exceptions import HandoffValidationError
 from specflow.handoff.models import AgentHandoff
 from specflow.handoff.validator import HandoffValidator
+from specflow.plan.hash_utils import canonical_json_bytes
 
 
 def _make_identity(
@@ -110,7 +110,7 @@ class TestHandoffValidator:
             "sender", AgentRole.REPOSITORY_ANALYST, output_schema_id="sender/output"
         )
         payload = {"agent_id": "sender", "role": "repository_analyst", "output": {"x": 1}}
-        output_hash = sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest()
+        output_hash = sha256(canonical_json_bytes(payload)).hexdigest()
         handoff = AgentHandoff(
             **{
                 **_make_handoff(source_output_schema_id="sender/output").__dict__,

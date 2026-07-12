@@ -1,7 +1,7 @@
 # M6 Multi-Agent Orchestration
 
 **Date:** 2026-07-12
-**Status:** CLOSED
+**Status:** IMPLEMENTATION COMPLETE — LIVE ACCEPTANCE PENDING
 **Previous milestone:** M5 Product Vertical Slice (v0.1.0)
 
 ## Delivered capabilities
@@ -144,17 +144,22 @@ git diff --check:             clean
 
 ## Closeout decision
 
-**APPROVED.** All 4 closeout conditions are now met:
+**Implementation complete. Live acceptance pending.**
 
 1. **Runtime Handoff with real payload validation** — `HandoffValidator.validate_payload()`
    checks actual payload existence, output_hash, and artifact-relative refs.
 2. **FAILED manifest persistence** — `_persist_failed_run()` writes manifest.json +
    traces.json with state history and error details on runtime exception.
 3. **Provider-backed Agent Adapter** — `AgentRunner` bridges Agent identity to
-   `LLMClient`, builds structured prompts with evidence + prior outputs, and
-   degrades gracefully on LLM failure.
+   `LLMClient`, with SchemaRegistry Pydantic validation, builds structured prompts
+   with evidence + prior outputs, and degrades gracefully with valid `output` field.
 4. **Repository evidence closure** — `EvidenceCollector` runs before agent execution;
-   evidence text (250 files, 17 tool calls, 48 matched files) injected into every
-   agent's prompt and persisted as `sources.json`.
+   evidence text injected into every agent's prompt and persisted as `sources.json`.
+5. **Canonical JSON Hash** — `canonical_json_bytes()` unified across hash creation
+   and verification, fixing `ensure_ascii` mismatch for Chinese output.
 
-M6 is now closed. M7 (Evaluation, Demo, Resume & Interview) has not begun.
+**Remaining before CLOSED:** One successful Live Provider multi-agent run on a
+real repository with Chinese output, confirming AgentRunner → Schema validation →
+Handoff hash consistency → end-to-end artifact production.
+
+M7 (Evaluation, Demo, Resume & Interview) has not begun.
