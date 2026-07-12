@@ -87,5 +87,4 @@ Parameters:
 
 ## Explicitly not implemented
 
-- No Generate or Review worker in the runner pipeline (single AnalyzeWorker path).
 - No T-023 real case evaluation.

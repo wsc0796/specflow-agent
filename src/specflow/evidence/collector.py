@@ -58,6 +58,7 @@ class EvidenceCollector:
         files_output = self._execute_tool(
             "list_files", {"include": ["*.py", "*.md", "*.yaml", "*.yml", "*.toml", "*.cfg"]}
         )
+        discovered_file_count = int(files_output.get("count", 0))
         all_matches: list[dict[str, Any]] = []
         searched_files: set[str] = set()
         total_searched = 0
@@ -119,7 +120,14 @@ class EvidenceCollector:
         total_chars = sum(len(e.excerpt) for e in excerpts)
         if total_chars > self._config.max_total_evidence_chars:
             truncated = True
-            warnings.append("Total evidence exceeds character limit")
+            warnings.append("Total evidence exceeds character limit — excerpts trimmed")
+            kept: list[EvidenceExcerpt] = []
+            running = 0
+            for e in excerpts:
+                if running + len(e.excerpt) <= self._config.max_total_evidence_chars:
+                    kept.append(e)
+                    running += len(e.excerpt)
+            excerpts = kept
 
         bundle = EvidenceBundle(
             run_id=run_id,
@@ -128,6 +136,7 @@ class EvidenceCollector:
             project_summary=project_summary,
             technology_stack=technology_stack,
             searched_terms=keywords,
+            discovered_file_count=discovered_file_count,
             matched_files=tuple(matched_files),
             selected_files=tuple(selected_files),
             excerpts=tuple(excerpts[: self._config.max_search_matches]),

@@ -33,13 +33,16 @@ review `GenerationOutput` and distinguish business `REJECT` from execution
 failure. It still does not implement automatic code generation or M5 behavior.
 
 M5 is in progress. T-018 Tool Framework & Registry, T-019 Safe Read-only
-Repository Tools, and T-020 OpenAI-compatible LLM Provider are complete. The system can
+Repository Tools, T-020 OpenAI-compatible LLM Provider, T-021 Repository
+Evidence Pipeline, and T-022 CLI & Artifact Delivery are complete. The system can
 now define Tool metadata, represent explicit Tool calls and results, register
 tools deterministically, execute one registered Tool through a structured
 executor, list allowed repository files, search text code, and read bounded text
-files inside one validated repository root, and call one explicitly configured
-OpenAI-compatible completion endpoint. It still does not include repository-aware
-Worker integration, shell access, file writes, Git actions, or Tool loops.
+files inside one validated repository root, call one explicitly configured
+OpenAI-compatible completion endpoint, collect real repository evidence through
+the Tool Framework and feed it into the Analyze/Generate/Review Worker chain, and
+run the full `specflow run` CLI with structured JSON + Markdown artifact
+delivery. It still does not include shell access, file writes, Git actions, or Tool loops.
 
 ## T-001 foundation boundary
 

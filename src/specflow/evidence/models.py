@@ -82,6 +82,7 @@ class EvidenceBundle:
     project_summary: str = ""
     technology_stack: tuple[str, ...] = ()
     searched_terms: tuple[str, ...] = ()
+    discovered_file_count: int = 0
     matched_files: tuple[str, ...] = ()
     selected_files: tuple[str, ...] = ()
     excerpts: tuple[EvidenceExcerpt, ...] = ()
@@ -98,6 +99,10 @@ class EvidenceBundle:
             raise EvidenceCollectionError("EvidenceBundle.requirement must not be empty")
         if not self.repository_root.strip():
             raise EvidenceCollectionError("EvidenceBundle.repository_root must not be empty")
+        if self.discovered_file_count < 0:
+            raise EvidenceCollectionError(
+                "EvidenceBundle.discovered_file_count must not be negative"
+            )
         for excerpt in self.excerpts:
             if not isinstance(excerpt, EvidenceExcerpt):
                 raise EvidenceCollectionError(
@@ -142,6 +147,7 @@ class EvidenceBundle:
             "project_summary": sanitize_tool_text(self.project_summary),
             "technology_stack": list(self.technology_stack),
             "searched_terms": list(self.searched_terms),
+            "discovered_file_count": self.discovered_file_count,
             "matched_files": list(self.matched_files),
             "selected_files": list(self.selected_files),
             "excerpts": [

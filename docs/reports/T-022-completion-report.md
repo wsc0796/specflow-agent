@@ -3,8 +3,9 @@
 ## Result
 
 Implemented a `specflow run` CLI entry point that orchestrates the full pipeline
-(evidence collection → AnalyzeWorker → artifact writing) and saves structured
-JSON + Markdown artifacts to a deterministic output directory.
+(evidence collection → AnalyzeWorker → GenerateWorker → ReviewWorker → artifact
+writing) and saves structured JSON + Markdown artifacts to a deterministic
+output directory.
 
 ## Numbering note
 
@@ -19,7 +20,7 @@ specflow run --repo <path> --requirement "<text>"
   → runner.run()
     → ToolRegistry + RepositoryToolSet
     → EvidenceCollector.collect()
-    → ProjectContext + AnalyzeWorker
+    → ProjectContext + AnalyzeWorker + GenerateWorker + ReviewWorker
     → AgentExecutor.execute_until_complete()
     → ArtifactStore.write_run()
       → manifest.json, sources.json, analysis.json
@@ -59,15 +60,21 @@ hashes, review_decision, degraded flag, tool_call_count, warnings.
 ## Tests
 
 `tests/test_artifact_store.py`: 13 tests
-`tests/test_cli.py`: 10 tests
+`tests/test_cli.py`: 12 tests, including complete artifact delivery,
+deterministic run ID, `--max-files`, configuration exit code, human-review exit
+code, trace-artifact content, and secret non-leakage.
+
+`tests/test_evidence_collector.py`: includes a hard total-evidence-character
+limit regression test.
 
 ## Quality gates
 
 - `uv run pytest tests/test_artifact_store.py -v`: 13 passed.
-- `uv run pytest tests/test_cli.py -v`: 10 passed.
-- `uv run pytest -v`: 391 passed, 2 skipped, 1 warning.
-- `uv run ruff check .`: All checks passed.
+- `uv run pytest tests/test_cli.py tests/test_evidence_collector.py -v`: 28 passed.
+- `uv run pytest -v`: 394 passed, 2 skipped, 1 warning.
+- `uv run ruff check .`: passed.
 - `uv run ruff format --check .`: 101 files already formatted.
+- `git diff --check`: passed.
 
 ## Mock CLI smoke test
 
@@ -75,12 +82,13 @@ hashes, review_decision, degraded flag, tool_call_count, warnings.
 uv run specflow run --repo <temp-repo> --requirement "Add health check" --provider mock --output <temp-output>
 ```
 
-Verified: CLI runs, artifacts created, exit code handled, no secrets leaked.
+Verified: CLI reaches `completed`, writes all ten artifacts including the three
+metadata-only Worker traces, honors `--max-files`, uses a deterministic run ID
+for the same repository and requirement, returns 4 for human-review output, and
+does not write the configured API-key sentinel into artifacts.
 
 ## Known limitations
 
-- Runner currently wires only AnalyzeWorker (single-step pipeline).
-- Generate and Review workers not yet integrated into the runner.
 - No real provider smoke test (requires API key).
 
 ## Next task

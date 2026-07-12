@@ -10,7 +10,8 @@ from specflow.artifacts import ArtifactStore, RunManifest
 from specflow.artifacts.models import _hash_text, _now_iso
 from specflow.context import ProjectContext
 from specflow.evidence import EvidenceCollector
-from specflow.executor import AgentExecutor
+from specflow.evidence.models import EvidenceCollectionConfig
+from specflow.executor import AgentExecutor, ExecutionContext
 from specflow.fallback import FallbackManager, RetryStrategy
 from specflow.llm import (
     LLMClient,
@@ -23,8 +24,10 @@ from specflow.token_budget import BudgetPolicy, TokenBudgetManager
 from specflow.tools import ToolExecutor, ToolRegistry
 from specflow.tools.repository_tools import RepositoryToolSet
 from specflow.trace import JsonTraceStorage, TraceRecorder
-from specflow.workers import WorkerContext, WorkerStepHandler
+from specflow.workers import AnalysisOutput, GenerationOutput, WorkerContext, WorkerStepHandler
 from specflow.workers.analyze import AnalyzeWorker
+from specflow.workers.generate import GenerateWorker
+from specflow.workers.review import ReviewWorker
 
 
 def run(
@@ -35,15 +38,35 @@ def run(
     provider: str = "mock",
     model: str = "",
     mock: bool = False,
+    max_files: int = 5,
 ) -> int:
     """Run the complete specification generation pipeline. Returns exit code."""
     started_at = _now_iso()
-    run_id = _generate_run_id(requirement, started_at)
+    run_id = _generate_run_id(repo, requirement)
+    if not requirement.strip() or max_files <= 0:
+        _write_error_artifact(
+            output, run_id, started_at, "Requirement and max_files must be non-empty"
+        )
+        return 2
     use_mock = mock or provider == "mock"
 
-    llm_client = _create_llm_client(provider, model, use_mock)
     effective_provider = "mock" if use_mock else provider
     effective_model = "mock-model" if use_mock else (model or "unknown")
+
+    if use_mock:
+        mock_clients = _create_mock_clients(requirement)
+        analyze_client = mock_clients["analyze"]
+        generate_client = mock_clients["generate"]
+        review_client = mock_clients["review"]
+    else:
+        try:
+            real_client = _create_llm_client(provider, model, use_mock)
+        except LLMConfigurationError as exc:
+            _write_error_artifact(
+                output, run_id, started_at, f"Provider configuration error: {exc}"
+            )
+            return 2
+        analyze_client = generate_client = review_client = real_client
 
     if not repo.exists() or not repo.is_dir():
         _write_error_artifact(output, run_id, started_at, f"Repository not found: {repo}")
@@ -56,8 +79,9 @@ def run(
         _write_error_artifact(output, run_id, started_at, str(exc))
         return 2
 
+    evidence_config = EvidenceCollectionConfig(max_selected_files=max_files)
     tool_executor = ToolExecutor(registry)
-    collector = EvidenceCollector(tool_executor, repo)
+    collector = EvidenceCollector(tool_executor, repo, config=evidence_config)
     try:
         evidence = collector.collect(
             run_id=run_id,
@@ -82,7 +106,7 @@ def run(
         dependency_files=[],
         entry_candidates=[],
         top_level_directories=[],
-        total_files=len(evidence.matched_files),
+        total_files=evidence.discovered_file_count,
         ignored_directories=[],
         oversized_files=[],
         parse_warnings=list(evidence.warnings),
@@ -97,24 +121,58 @@ def run(
     fallback = FallbackManager(RetryStrategy(max_retries=1))
 
     evidence_text = evidence.serialized_context()
-    worker_context = WorkerContext.build(
-        run_id=run_id,
-        requirement=requirement,
-        project_context=evidence_text,
-    )
 
     analyze_worker = AnalyzeWorker(
         project_context=project_context,
-        llm_client=llm_client,
+        llm_client=analyze_client,
+        trace_recorder=trace_recorder,
+        fallback_manager=fallback,
+        budget_manager=TokenBudgetManager(policy),
+        model=effective_model,
+    )
+    generate_worker = GenerateWorker(
+        project_context=project_context,
+        llm_client=generate_client,
+        trace_recorder=trace_recorder,
+        fallback_manager=fallback,
+        budget_manager=TokenBudgetManager(policy),
+        model=effective_model,
+    )
+    review_worker = ReviewWorker(
+        project_context=project_context,
+        llm_client=review_client,
         trace_recorder=trace_recorder,
         fallback_manager=fallback,
         budget_manager=TokenBudgetManager(policy),
         model=effective_model,
     )
 
+    def _build_worker_context(exec_ctx: ExecutionContext) -> WorkerContext:
+        prior_outputs: list[tuple[str, str]] = []
+        for step_name in ("analyze", "generate"):
+            sr = exec_ctx.step_results.get(step_name)
+            if sr is not None:
+                for key, value in sr.metadata.items():
+                    if key.startswith("output."):
+                        prior_outputs.append((key.removeprefix("output."), value))
+        return WorkerContext.build(
+            run_id=run_id,
+            requirement=requirement,
+            project_context=evidence_text,
+            prior_outputs=tuple(prior_outputs),
+        )
+
+    base_worker_context = WorkerContext.build(
+        run_id=run_id,
+        requirement=requirement,
+        project_context=evidence_text,
+    )
+
     executor = AgentExecutor(
         {
-            "analyze": WorkerStepHandler(analyze_worker, worker_context),
+            "analyze": WorkerStepHandler(analyze_worker, base_worker_context),
+            "generate": WorkerStepHandler(generate_worker, _build_worker_context),
+            "review": WorkerStepHandler(review_worker, _build_worker_context),
         }
     )
 
@@ -129,15 +187,16 @@ def run(
         return 3
 
     final = results[-1]
-    analysis_json = final.metadata.get("output.analysis_json", "{}")
-    generation_json = final.metadata.get("output.generation_json", "{}")
-    review_json = final.metadata.get("output.review_json", "{}")
-    analysis_hash = final.metadata.get("output.analysis_hash", "")
-    generation_hash = final.metadata.get("output.generation_hash", "")
-    review_hash = final.metadata.get("output.review_hash", "")
-    review_decision = final.metadata.get("decision", "UNKNOWN")
-    degraded = final.metadata.get("degraded", "false") == "true"
-    requires_review = final.metadata.get("requires_review", "false") == "true"
+    analysis_json = _extract_output(results, "analysis_json")
+    generation_json = _extract_output(results, "generation_json")
+    review_json = _extract_output(results, "review_json")
+    analysis_hash = _extract_output(results, "analysis_hash")
+    generation_hash = _extract_output(results, "generation_hash")
+    review_hash = _extract_output(results, "review_hash")
+    review_decision = _extract_metadata(results, "decision", "UNKNOWN")
+    degraded = _extract_metadata(results, "degraded", "false") == "true"
+    requires_review = _extract_metadata(results, "requires_review", "false") == "true"
+    requires_human_review = _extract_metadata(results, "requires_human_review", "false") == "true"
 
     completed_at = _now_iso()
     manifest = RunManifest(
@@ -157,7 +216,7 @@ def run(
         review_hash=review_hash,
         review_decision=review_decision,
         degraded=degraded,
-        requires_review=requires_review,
+        requires_review=requires_review or requires_human_review,
         tool_call_count=len(evidence.tool_call_records),
         warnings=evidence.warnings,
     )
@@ -176,40 +235,136 @@ def run(
                 ensure_ascii=False,
                 indent=2,
             ),
-            trace_json="[]",
+            trace_json=_load_run_traces(trace_dir, run_id),
         )
     except Exception as exc:
         _write_error_artifact(output, run_id, started_at, str(exc))
         return 3
 
-    if degraded:
+    if degraded or requires_review or requires_human_review:
         return 4
     return 0
 
 
-_MOCK_ANALYSIS = (
-    '{"requirement_summary":"mock","goals":[],"non_goals":[],'
-    '"assumptions":[],"affected_components":[],"risks":[],'
-    '"acceptance_criteria":[],"evidence":[],'
-    '"requires_review":false,"degraded":true}'
-)
-
-
 def _create_llm_client(provider: str, model: str, use_mock: bool) -> LLMClient:
+    """Create a real LLM client; mock clients are created per-worker."""
     if use_mock:
-        return MockLLMClient(response_content=_MOCK_ANALYSIS)
-    try:
-        config = OpenAICompatibleConfig.from_env()
-        return OpenAICompatibleLLMClient(config)
-    except LLMConfigurationError as exc:
-        raise SystemExit(f"Provider configuration error: {exc}") from exc
+        raise LLMConfigurationError("_create_llm_client should not be called in mock mode")
+    config = OpenAICompatibleConfig.from_env()
+    return OpenAICompatibleLLMClient(config)
 
 
-def _generate_run_id(requirement: str, started_at: str) -> str:
-    raw = f"{requirement}|{started_at}"
+def _create_mock_clients(
+    requirement: str,
+    *,
+    requires_human_review: bool = False,
+) -> dict[str, MockLLMClient]:
+    """Build internally consistent deterministic Worker responses for CLI smoke runs."""
+    analysis = AnalysisOutput.from_json(
+        json.dumps(
+            {
+                "requirement_summary": requirement,
+                "goals": ["Produce a reviewable implementation plan."],
+                "non_goals": ["Do not modify the target repository."],
+                "assumptions": ["Repository evidence is read-only."],
+                "affected_components": ["repository"],
+                "risks": ["Repository evidence may be incomplete."],
+                "acceptance_criteria": ["Persist three structured Worker outputs."],
+                "evidence": ["Repository evidence bundle"],
+                "requires_review": False,
+                "degraded": False,
+            },
+            ensure_ascii=False,
+        )
+    )
+    generation = GenerationOutput.from_json(
+        json.dumps(
+            {
+                "requirement_summary": analysis.requirement_summary,
+                "proposed_solution": "Use the existing Worker pipeline to generate a bounded plan.",
+                "architecture_or_design": (
+                    "Analyze evidence, generate a plan, then review the result."
+                ),
+                "affected_components": ["runner", "workers"],
+                "implementation_steps": ["Execute workers in workflow order."],
+                "api_or_data_changes": ["No target repository changes."],
+                "test_plan": ["Validate the complete mock workflow."],
+                "risks": ["Human review remains required for production changes."],
+                "acceptance_criteria_mapping": [
+                    {
+                        "criterion": "Persist three structured Worker outputs.",
+                        "implementation": "Persist each Worker output as an artifact.",
+                    }
+                ],
+                "analysis_hash": analysis.analysis_hash,
+                "requires_review": False,
+                "degraded": False,
+            },
+            ensure_ascii=False,
+        ),
+        analysis_hash=analysis.analysis_hash,
+    )
+    review = json.dumps(
+        {
+            "decision": "PASS",
+            "summary": "Mock generation is structurally consistent with its analysis.",
+            "issues": [],
+            "missing_requirements": [],
+            "risk_findings": [],
+            "acceptance_criteria_results": [
+                {
+                    "criterion": "Persist three structured Worker outputs.",
+                    "passed": True,
+                    "notes": "All three outputs are present.",
+                }
+            ],
+            "severity": "info",
+            "requires_revision": False,
+            "requires_human_review": requires_human_review,
+            "analysis_hash": analysis.analysis_hash,
+            "generation_hash": generation.generation_hash,
+            "degraded": False,
+        },
+        ensure_ascii=False,
+    )
+    return {
+        "analyze": MockLLMClient(response_content=analysis.to_json()),
+        "generate": MockLLMClient(response_content=generation.to_json()),
+        "review": MockLLMClient(response_content=review),
+    }
+
+
+def _extract_output(results: list, key: str, default: str = "{}") -> str:
+    """Walk executor results in reverse and return the first match for output.{key}."""
+    for r in reversed(results):
+        value = r.metadata.get(f"output.{key}")
+        if value:
+            return value
+    return default
+
+
+def _extract_metadata(results: list, key: str, default: str = "") -> str:
+    """Walk executor results in reverse and return the first match for a metadata key."""
+    for r in reversed(results):
+        value = r.metadata.get(key)
+        if value is not None:
+            return value
+    return default
+
+
+def _load_run_traces(trace_dir: Path, run_id: str) -> str:
+    """Return only this run's metadata-only Worker trace records as JSON."""
+    trace_paths = sorted(trace_dir.glob(f"{run_id}-*.json"))
+    traces = [json.loads(path.read_text(encoding="utf-8")) for path in trace_paths]
+    if len(traces) != 3:
+        raise ValueError("Completed workflow must produce exactly three Worker traces")
+    return json.dumps(traces, ensure_ascii=False, indent=2)
+
+
+def _generate_run_id(repo: Path, requirement: str) -> str:
+    raw = f"{repo.resolve()}|{requirement}"
     hash_hex = hashlib.sha256(raw.encode("utf-8")).hexdigest()[:12]
-    safe_date = started_at[:19].replace(":", "-")
-    return f"run-{safe_date}-{hash_hex}"
+    return f"run-{hash_hex}"
 
 
 def _repo_summary(repo: Path) -> str:

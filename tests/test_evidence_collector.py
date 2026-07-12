@@ -134,6 +134,19 @@ def test_evidence_serialized_context_is_bounded(tmp_path: Path) -> None:
     assert len(context) < 10_000
 
 
+def test_total_evidence_character_limit_is_enforced(tmp_path: Path) -> None:
+    (tmp_path / "app.py").write_text("order timeout cancel\n" * 100, encoding="utf-8")
+
+    bundle = _collector(
+        tmp_path,
+        max_total_evidence_chars=20,
+        max_search_keywords=1,
+    ).collect(run_id="run", requirement="order timeout")
+
+    assert sum(len(excerpt.excerpt) for excerpt in bundle.excerpts) <= 20
+    assert bundle.truncated
+
+
 def test_search_keyword_count_is_limited(tmp_path: Path) -> None:
     (tmp_path / "app.py").write_text("a b c d e", encoding="utf-8")
 

@@ -340,6 +340,7 @@ class ReviewWorker(BaseWorker):
                 "degraded": str(output.degraded).lower(),
                 "fallback_level": effective_fallback_level,
                 "generation_hash": output.generation_hash,
+                "requires_human_review": str(output.requires_human_review).lower(),
                 "requires_revision": str(output.requires_revision).lower(),
                 "review_hash": output.review_hash,
             },

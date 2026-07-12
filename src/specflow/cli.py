@@ -19,6 +19,7 @@ def main(argv: list[str] | None = None) -> None:
         provider=args.provider,
         model=args.model or "",
         mock=args.mock,
+        max_files=args.max_files,
     )
     raise SystemExit(exit_code)
 
