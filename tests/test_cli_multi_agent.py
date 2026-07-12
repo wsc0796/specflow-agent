@@ -46,5 +46,101 @@ class TestMultiAgentRunner:
         traces = json.loads((run_dir / "traces.json").read_text())
         assert len(outputs) == 6
         assert len(handoffs) == 7
-        assert len(traces) == 6
-        assert len({trace["parent_span_id"] for trace in traces}) == 1
+        assert len(traces) == 8
+        root = next(trace for trace in traces if trace.get("kind") == "run")
+        coordinator = next(trace for trace in traces if trace.get("kind") == "coordinator")
+        agent_traces = [trace for trace in traces if "agent_id" in trace]
+        assert root["parent_span_id"] is None
+        assert coordinator["parent_span_id"] == root["span_id"]
+        assert len(agent_traces) == 6
+        assert {trace["parent_span_id"] for trace in agent_traces} == {coordinator["span_id"]}
+
+    def test_reject_runs_one_revision_then_completes_when_limit_is_exhausted(
+        self, tmp_path: Path
+    ) -> None:
+        repo = tmp_path / "test-repo"
+        repo.mkdir()
+        output = tmp_path / "output"
+        reviews = 0
+
+        def reject_review(_: dict[str, object]) -> dict[str, object]:
+            nonlocal reviews
+            reviews += 1
+            return {
+                "agent_id": "review-agent-v1",
+                "role": "review",
+                "output": {"decision": "REJECT", "target_agent_id": "design-agent-v1"},
+            }
+
+        assert (
+            run_multi_agent(
+                repo=repo,
+                requirement="Test revision",
+                output=output,
+                mock=True,
+                _executor_overrides={"review-agent-v1": reject_review},
+            )
+            == 0
+        )
+        manifest = json.loads(
+            (next(output.glob("run-multi-*")) / "manifest.json").read_text(encoding="utf-8")
+        )
+        assert reviews == 2
+        assert manifest["workflow_state"] == "completed"
+        assert manifest["revision_count"] == 1
+        assert manifest["revision_exhausted"] is True
+        assert [step[1] for step in manifest["workflow_history"]].count("revising") == 1
+        run_dir = next(output.glob("run-multi-*"))
+        outputs = json.loads((run_dir / "agent-outputs.json").read_text(encoding="utf-8"))
+        assert "stage-1/design-agent-v1" in outputs
+        assert "stage-4/design-agent-v1" in outputs
+        handoffs = json.loads((run_dir / "handoffs.json").read_text(encoding="utf-8"))
+        assert any(
+            handoff["payload_ref"].endswith("stage-1/design-agent-v1") for handoff in handoffs
+        )
+
+    def test_non_mock_provider_is_rejected_without_executing_agents(self, tmp_path: Path) -> None:
+        repo = tmp_path / "test-repo"
+        repo.mkdir()
+        called = False
+
+        def should_not_run(_: dict[str, object]) -> dict[str, object]:
+            nonlocal called
+            called = True
+            return {}
+
+        assert (
+            run_multi_agent(
+                repo=repo,
+                requirement="Test",
+                output=tmp_path / "output",
+                provider="openai-compatible",
+                _executor_overrides={"review-agent-v1": should_not_run},
+            )
+            == 2
+        )
+        assert called is False
+
+    def test_duplicate_run_is_rejected_before_executors_run(self, tmp_path: Path) -> None:
+        repo = tmp_path / "test-repo"
+        repo.mkdir()
+        output = tmp_path / "output"
+        assert run_multi_agent(repo=repo, requirement="Test", output=output, mock=True) == 0
+        called = False
+
+        def should_not_run(_: dict[str, object]) -> dict[str, object]:
+            nonlocal called
+            called = True
+            return {}
+
+        assert (
+            run_multi_agent(
+                repo=repo,
+                requirement="Test",
+                output=output,
+                mock=True,
+                _executor_overrides={"review-agent-v1": should_not_run},
+            )
+            == 3
+        )
+        assert called is False

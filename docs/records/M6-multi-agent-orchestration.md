@@ -1,7 +1,7 @@
 # M6 Multi-Agent Orchestration
 
 **Date:** 2026-07-12
-**Status:** CLOSED — Live Provider run delegated to user
+**Status:** IN PROGRESS — mock execution closure underway; Live Provider multi-agent support is not wired
 **Previous milestone:** M5 Product Vertical Slice (v0.1.0)
 
 ## Delivered capabilities
@@ -142,27 +142,13 @@ git diff --check:             clean
 
 ## Closeout decision
 
-**APPROVED.** All 9 M6 tasks (T-024–T-032) are complete with 578 passing tests.
-The three acceptance gates are met:
+**Not approved.** Current local code has a deterministic Mock execution path,
+but M6 cannot be closed until the following evidence exists:
 
-1. **Agent outputs, handoffs, trace, and artifacts persisted and verified.**
-   Mock run produces `manifest.json`, `agent-outputs.json` (6 agents), `handoffs.json`
-   (7 structured handoffs with schema validation), and `traces.json` (6 spans with
-   stage timing and parallel proof at stage 1).
+1. Runtime handoffs carry and validate actual payloads, rather than only schema IDs.
+2. Infrastructure failures persist a failed manifest, history, and failure trace.
+3. Provider-backed agent adapters exist and a non-mock multi-agent run is independently validated.
+4. A real repository case has artifacts whose claims are grounded in repository evidence.
 
-2. **A/B framework runs both modes on the same input.**
-   Same repo (specflow-agent) + same requirement on legacy and multi-agent modes.
-   Comparison table documents the differences in artifacts, agent count, execution
-   model, handoff mechanism, trace granularity, hashing, and state machine.
-
-3. **Real repository case validated (mock).**
-   specflow-agent repository self-analysis demonstrates the pipeline on a real
-   Python project with 80+ source files.
-
-**Live Provider run is delegated to the user** who holds the API key.
-Command to run:
-```powershell
-uv run specflow run --mode multi-agent --provider openai-compatible --model deepseek-v4-flash --repo "C:\Users\50469\github-projects\sky-takeout-python" --requirement "为订单增加超时自动取消功能" --output ".\artifacts-live-multi"
-```
-
-M6 is now closed. M7 (Evaluation, Demo, Resume & Interview) has not begun.
+Until then, non-mock multi-agent invocation is explicitly rejected instead of
+silently falling back to Mock behavior. M7 has not begun.

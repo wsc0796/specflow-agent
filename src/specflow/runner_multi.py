@@ -1,10 +1,13 @@
-"""Multi-agent runner — orchestrates the 6-agent pipeline via Coordinator."""
+"""Executable, deterministic MVP runner for the fixed six-agent topology."""
 
 from __future__ import annotations
 
 import json
+from collections.abc import Callable, Mapping
+from dataclasses import replace
 from hashlib import sha256
 from pathlib import Path
+from typing import Any
 from uuid import uuid4
 
 from specflow.agents.design import DesignAgent
@@ -15,11 +18,13 @@ from specflow.agents.risk_review import RiskReviewAgent
 from specflow.agents.synthesis import SynthesisAgent
 from specflow.agents.test_strategy import TestStrategyAgent
 from specflow.coordinator.coordinator import Coordinator
-from specflow.coordinator.scheduler import MultiAgentScheduler
+from specflow.coordinator.scheduler import MultiAgentScheduler, StageExecutionResult
 from specflow.coordinator.state_machine import MultiAgentWorkflowState
 from specflow.handoff.models import AgentHandoff
 from specflow.handoff.validator import HandoffValidator
 from specflow.trace.models import AgentTraceSpan
+
+AgentExecutor = Callable[[dict[str, Any]], dict[str, Any]]
 
 
 def run_multi_agent(
@@ -30,100 +35,140 @@ def run_multi_agent(
     mock: bool = False,
     provider: str = "mock",
     model: str = "mock-model",
+    _executor_overrides: Mapping[str, AgentExecutor] | None = None,
 ) -> int:
-    """Run the multi-agent pipeline. Returns exit code."""
-    # 1. Register all 6 agents
-    registry = AgentRegistry()
-    registry.register(RepositoryAnalystAgent())
-    registry.register(DesignAgent())
-    registry.register(TestStrategyAgent())
-    registry.register(RiskReviewAgent())
-    registry.register(SynthesisAgent())
-    registry.register(ReviewAgent())
+    """Execute the fixed plan and persist auditable multi-agent artifacts.
 
-    # 2. Create mock or real LLM client
-    llm_client = _make_llm_client(mock)
-
+    ``_executor_overrides`` is intentionally test-only injection: it lets the
+    runtime contract prove REJECT → one revision → re-review without a network
+    provider or a special production-only branch.
+    """
     if not repo.is_dir() or not requirement.strip():
         return 2
 
-    # 3. Create Coordinator and generate plan
-    coordinator = Coordinator(
-        agent_registry=registry, llm_client=llm_client, model=model, provider=provider
-    )
+    # The six MVP agents are deterministic adapters today. Do not pretend a
+    # provider was invoked until provider-backed adapters exist.
+    if not mock and provider != "mock":
+        return 2
+
     run_id = f"run-multi-{sha256(f'{repo.resolve()}|{requirement}'.encode()).hexdigest()[:12]}"
+    if (output / run_id).exists():
+        return 3
+
+    registry = _build_registry()
+    coordinator = Coordinator(
+        agent_registry=registry,
+        llm_client=_make_llm_client(mock),
+        model=model,
+        provider=provider,
+    )
     plan = coordinator.plan(run_id)
+    executors: dict[str, AgentExecutor] = {
+        identity.agent_id: registry.get(identity.agent_id).execute
+        for identity in registry.list_agents()
+    }
+    executors.update(_executor_overrides or {})
+    base_context: dict[str, Any] = {
+        "run_id": run_id,
+        "repository_root": str(repo.resolve()),
+        "requirement": requirement,
+    }
+    scheduler = MultiAgentScheduler()
+    prior_outputs: dict[str, dict[str, Any]] = {}
+    stages: list[StageExecutionResult] = []
+    revision_exhausted = False
 
     try:
         coordinator.engine.transition(MultiAgentWorkflowState.PLANNING, "plan compiled")
-        coordinator.engine.transition(MultiAgentWorkflowState.ANALYZING, "analysis stage")
-        executors = {
-            identity.agent_id: registry.get(identity.agent_id).execute
-            for identity in registry.list_agents()
-        }
-        stages = MultiAgentScheduler().execute(
-            plan.stages,
-            executors,
-            {"run_id": run_id, "repository_root": str(repo.resolve()), "requirement": requirement},
+        coordinator.engine.transition(MultiAgentWorkflowState.ANALYZING, "repository analysis")
+        _run_and_accumulate(
+            stages, scheduler, plan.stages[0], 0, executors, base_context, prior_outputs
         )
+        coordinator.engine.transition(MultiAgentWorkflowState.EXECUTING_SPECIALISTS, "specialists")
+        _run_and_accumulate(
+            stages, scheduler, plan.stages[1], 1, executors, base_context, prior_outputs
+        )
+        coordinator.engine.transition(MultiAgentWorkflowState.SYNTHESIZING, "synthesis")
+        _run_and_accumulate(
+            stages, scheduler, plan.stages[2], 2, executors, base_context, prior_outputs
+        )
+        coordinator.engine.transition(MultiAgentWorkflowState.REVIEWING, "review")
+        _run_and_accumulate(
+            stages, scheduler, plan.stages[3], 3, executors, base_context, prior_outputs
+        )
+
+        decision = _review_decision(prior_outputs, plan.stages[3][0])
+        if decision == "REJECT":
+            controller = coordinator.revision_controller
+            if controller is None:
+                raise RuntimeError("Coordinator did not initialize RevisionController")
+            target_id = _revision_target(prior_outputs, plan.stages[3][0])
+            target = registry.get(target_id)
+            revision_task = controller.create_revision_task(
+                target_id,
+                target.role,
+                "Review rejected the initial synthesis.",
+                "Revise the output to address the recorded review finding.",
+            )
+            if revision_task is None:
+                revision_exhausted = True
+            else:
+                coordinator.engine.transition(MultiAgentWorkflowState.REVISING, "review rejected")
+                _run_and_accumulate(
+                    stages,
+                    scheduler,
+                    (target_id,),
+                    4,
+                    executors,
+                    {**base_context, "revision_task": revision_task.__dict__},
+                    prior_outputs,
+                )
+                coordinator.engine.transition(
+                    MultiAgentWorkflowState.SYNTHESIZING, "revision complete"
+                )
+                _run_and_accumulate(
+                    stages, scheduler, plan.stages[2], 5, executors, base_context, prior_outputs
+                )
+                coordinator.engine.transition(MultiAgentWorkflowState.REVIEWING, "re-review")
+                _run_and_accumulate(
+                    stages, scheduler, plan.stages[3], 6, executors, base_context, prior_outputs
+                )
+                decision = _review_decision(prior_outputs, plan.stages[3][0])
+                revision_exhausted = decision == "REJECT" and controller.exhausted
+
         coordinator.engine.transition(
-            MultiAgentWorkflowState.EXECUTING_SPECIALISTS, "specialist stages complete"
+            MultiAgentWorkflowState.COMPLETED,
+            "review passed" if decision == "PASS" else "revision limit reached",
         )
-        coordinator.engine.transition(
-            MultiAgentWorkflowState.SYNTHESIZING, "synthesis stage complete"
-        )
-        coordinator.engine.transition(MultiAgentWorkflowState.REVIEWING, "review stage complete")
-        coordinator.engine.transition(MultiAgentWorkflowState.COMPLETED, "mock review passed")
     except Exception:
+        if coordinator.engine.state not in {
+            MultiAgentWorkflowState.COMPLETED,
+            MultiAgentWorkflowState.FAILED,
+        }:
+            coordinator.engine.transition(
+                MultiAgentWorkflowState.FAILED, "runtime execution failure"
+            )
         return 3
 
-    # 4. Write one self-contained, reviewable run directory.
     run_dir = output / run_id
     if run_dir.exists():
         return 3
     run_dir.mkdir(parents=True, exist_ok=False)
     agent_outputs = {
-        agent_id: result for stage in stages for agent_id, result in stage.agent_results.items()
-    }
-    handoffs: list[AgentHandoff] = []
-    validator = HandoffValidator()
-    for task in plan.tasks:
-        receiver = registry.get(task.agent_id)
-        for sender_id in sorted(task.depends_on):
-            sender = registry.get(sender_id)
-            handoff = AgentHandoff(
-                handoff_id=f"handoff-{uuid4().hex}",
-                from_agent_id=sender_id,
-                to_agent_id=task.agent_id,
-                source_output_schema_id=sender.identity.output_schema_id,
-                target_input_schema_id=receiver.identity.input_schema_id,
-                payload_ref=f"agent-outputs.json#{sender_id}",
-                input_hash=sha256(requirement.encode()).hexdigest(),
-                output_hash=sha256(
-                    json.dumps(agent_outputs[sender_id], sort_keys=True).encode()
-                ).hexdigest(),
-            )
-            validator.validate(handoff, sender.identity, receiver.identity)
-            handoffs.append(handoff)
-    coordinator_span_id = f"coordinator-{uuid4().hex}"
-    spans = [
-        AgentTraceSpan(
-            span_id=f"agent-{uuid4().hex}",
-            agent_id=agent_id,
-            agent_role=registry.get(agent_id).role.value,
-            agent_version=registry.get(agent_id).identity.version,
-            parent_span_id=coordinator_span_id,
-            stage=stage.stage_index,
-            stage_started_at=stage.started_at,
-            agent_submitted_at=stage.started_at,
-            agent_completed_at=stage.completed_at,
-            stage_completed_at=stage.completed_at,
-            model=model or "mock-model",
-            status="success",
-        )
+        _output_ref(stage.stage_index, agent_id): result
         for stage in stages
-        for agent_id in sorted(stage.agent_results)
-    ]
+        for agent_id, result in stage.agent_results.items()
+    }
+    initial_output_refs = {
+        agent_id: _output_ref(stage.stage_index, agent_id)
+        for stage in stages
+        if stage.stage_index < 4
+        for agent_id in stage.agent_results
+    }
+    handoffs = _build_handoffs(
+        plan.tasks, registry, agent_outputs, initial_output_refs, requirement
+    )
+    traces = _build_trace_tree(stages, registry, run_id, model, coordinator.engine.state.value)
     manifest = {
         "run_id": run_id,
         "plan_id": plan.plan_id,
@@ -135,6 +180,8 @@ def run_multi_agent(
         "degraded_agents": list(plan.degraded_agents),
         "workflow_state": coordinator.engine.state.value,
         "workflow_history": list(coordinator.engine.history),
+        "revision_count": coordinator.engine.revision_count,
+        "revision_exhausted": revision_exhausted,
         "stage_results": [
             {"stage": result.stage_index, "agents": sorted(result.agent_results)}
             for result in stages
@@ -156,23 +203,155 @@ def run_multi_agent(
         encoding="utf-8",
     )
     (run_dir / "traces.json").write_text(
-        json.dumps([span.as_dict() for span in spans], ensure_ascii=False, indent=2),
-        encoding="utf-8",
+        json.dumps(traces, ensure_ascii=False, indent=2), encoding="utf-8"
     )
     return 0
 
 
+def _build_registry() -> AgentRegistry:
+    registry = AgentRegistry()
+    for agent in (
+        RepositoryAnalystAgent(),
+        DesignAgent(),
+        TestStrategyAgent(),
+        RiskReviewAgent(),
+        SynthesisAgent(),
+        ReviewAgent(),
+    ):
+        registry.register(agent)
+    return registry
+
+
+def _run_and_accumulate(
+    results: list[StageExecutionResult],
+    scheduler: MultiAgentScheduler,
+    agent_ids: tuple[str, ...],
+    stage_index: int,
+    executors: Mapping[str, AgentExecutor],
+    context: Mapping[str, Any],
+    prior_outputs: dict[str, dict[str, Any]],
+) -> None:
+    result = scheduler.execute(
+        (agent_ids,), dict(executors), {**context, "prior_outputs": dict(prior_outputs)}
+    )[0]
+    result = replace(result, stage_index=stage_index)
+    results.append(result)
+    prior_outputs.update(result.agent_results)
+
+
+def _review_decision(outputs: Mapping[str, dict[str, Any]], review_id: str) -> str:
+    output = outputs.get(review_id, {}).get("output", {})
+    decision = output.get("decision") if isinstance(output, dict) else None
+    if decision not in {"PASS", "REJECT"}:
+        raise ValueError("Review agent must return explicit PASS or REJECT decision")
+    return decision
+
+
+def _revision_target(outputs: Mapping[str, dict[str, Any]], review_id: str) -> str:
+    output = outputs.get(review_id, {}).get("output", {})
+    target = output.get("target_agent_id") if isinstance(output, dict) else None
+    return target if isinstance(target, str) and target.strip() else "design-agent-v1"
+
+
+def _build_handoffs(
+    tasks,
+    registry: AgentRegistry,
+    outputs: Mapping[str, dict[str, Any]],
+    output_refs: Mapping[str, str],
+    requirement: str,
+) -> list[AgentHandoff]:
+    handoffs: list[AgentHandoff] = []
+    validator = HandoffValidator()
+    for task in tasks:
+        receiver = registry.get(task.agent_id)
+        for sender_id in sorted(task.depends_on):
+            sender = registry.get(sender_id)
+            handoff = AgentHandoff(
+                handoff_id=f"handoff-{uuid4().hex}",
+                from_agent_id=sender_id,
+                to_agent_id=task.agent_id,
+                source_output_schema_id=sender.identity.output_schema_id,
+                target_input_schema_id=receiver.identity.input_schema_id,
+                payload_ref=f"agent-outputs.json#{output_refs[sender_id]}",
+                input_hash=sha256(requirement.encode()).hexdigest(),
+                output_hash=sha256(
+                    json.dumps(outputs[output_refs[sender_id]], sort_keys=True).encode()
+                ).hexdigest(),
+            )
+            validator.validate(handoff, sender.identity, receiver.identity)
+            handoffs.append(handoff)
+    return handoffs
+
+
+def _output_ref(stage_index: int, agent_id: str) -> str:
+    return f"stage-{stage_index}/{agent_id}"
+
+
+def _build_trace_tree(
+    stages, registry, run_id: str, model: str, status: str
+) -> list[dict[str, object]]:
+    root_id = f"run-{uuid4().hex}"
+    coordinator_id = f"coordinator-{uuid4().hex}"
+    traces: list[dict[str, object]] = [
+        {
+            "span_id": root_id,
+            "parent_span_id": None,
+            "kind": "run",
+            "run_id": run_id,
+            "status": status,
+        },
+        {
+            "span_id": coordinator_id,
+            "parent_span_id": root_id,
+            "kind": "coordinator",
+            "run_id": run_id,
+            "status": status,
+        },
+    ]
+    revision_span_id = (
+        f"revision-{uuid4().hex}" if any(s.stage_index == 4 for s in stages) else None
+    )
+    if revision_span_id is not None:
+        traces.append(
+            {
+                "span_id": revision_span_id,
+                "parent_span_id": coordinator_id,
+                "kind": "revision",
+                "run_id": run_id,
+                "status": status,
+            }
+        )
+    for stage in stages:
+        for agent_id in sorted(stage.agent_results):
+            timing = stage.agent_timings[agent_id]
+            span = AgentTraceSpan(
+                span_id=f"agent-{uuid4().hex}",
+                agent_id=agent_id,
+                agent_role=registry.get(agent_id).role.value,
+                agent_version=registry.get(agent_id).identity.version,
+                parent_span_id=revision_span_id if stage.stage_index == 4 else coordinator_id,
+                stage=stage.stage_index,
+                stage_started_at=stage.started_at,
+                agent_submitted_at=timing.submitted_at,
+                agent_completed_at=timing.completed_at,
+                stage_completed_at=stage.completed_at,
+                model=model or "mock-model",
+                status="success",
+                revision_round=1 if stage.stage_index >= 4 else 0,
+            )
+            traces.append(span.as_dict())
+    return traces
+
+
 def _make_llm_client(mock: bool) -> object:
-    """Create a mock LLM client for the enrichment phase."""
+    """Create a deterministic client for semantic enrichment only."""
 
     class MockClient:
-        """Minimal mock that returns valid JSON for semantic enrichment."""
-
         def complete(self, request) -> object:
             class MockResponse:
                 content = (
-                    '{"task_description": "mock", "analysis_focus": [],'
-                    ' "evaluation_hints": [], "repository_scope_hint": ""}'
+                    '{"task_description":"mock","analysis_focus":[],"evaluation_hints":[], '
+                    '"repository_scope_hint":""}'
                 )
 
             return MockResponse()

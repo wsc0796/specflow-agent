@@ -120,11 +120,10 @@ class MultiAgentScheduler:
                         **context,
                         "prior_outputs": dict(prior_outputs),
                     }
+                    submitted_at = datetime.now(UTC).isoformat()
                     future = executor.submit(agent_executors[agent_id], agent_ctx)
                     future_map[future] = agent_id
-                    agent_timings[agent_id] = AgentExecutionTiming(
-                        submitted_at=datetime.now(UTC).isoformat()
-                    )
+                    agent_timings[agent_id] = AgentExecutionTiming(submitted_at=submitted_at)
 
                 for future in as_completed(future_map):
                     agent_id = future_map[future]
