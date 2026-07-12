@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from enum import StrEnum
 from hashlib import sha256
 
 from specflow.plan.hash_utils import canonical_json_bytes
 
 
-class RunStatus(str):
+class RunStatus(StrEnum):
     COMPLETED = "completed"
     COMPLETED_DEGRADED = "completed_degraded"
     REJECTED = "rejected"

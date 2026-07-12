@@ -134,3 +134,19 @@ class TestAgentRunner:
         ).execute({})
         assert calls == 1
         assert result["output"]["error_code"] == "SECURITY_PATH_TRAVERSAL"
+
+    def test_provider_exception_text_never_enters_result(self):
+        class SecretFailingClient:
+            def complete(self, request):
+                raise RuntimeError("Bearer sk-abcdefghijklmnopqrstuvwxyz C:\\private\\repo")
+
+        result = AgentRunner(
+            _make_identity(),
+            SecretFailingClient(),
+            model="test",
+            schema_registry=_schema_registry(),
+        ).execute({})
+        serialized = json.dumps(result)
+        assert "sk-" not in serialized
+        assert "private" not in serialized
+        assert result["output"]["error_code"] == "INTERNAL_UNEXPECTED"

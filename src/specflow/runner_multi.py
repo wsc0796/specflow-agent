@@ -102,8 +102,9 @@ def run_multi_agent(
         selected_file_count = len(evidence.selected_files)
         referenced_file_count = len({excerpt.relative_path for excerpt in evidence.excerpts})
     except Exception:
-        # Evidence collection is best-effort — proceed without it
-        evidence_text = f"Repository: {repo.name}"
+        # Evidence is a required, untrusted input boundary.  Continuing would
+        # let agents produce an ungrounded plan with no audit evidence.
+        return 3
 
     registry = _build_registry()
 
@@ -273,7 +274,12 @@ def run_multi_agent(
                 )
                 runtime_handoffs.extend(
                     _validate_stage_inputs(
-                        plan.tasks, plan.stages[2], registry, prior_outputs, requirement
+                        plan.tasks,
+                        plan.stages[2],
+                        registry,
+                        prior_outputs,
+                        requirement,
+                        sender_stage_overrides={target_id: 4},
                     )
                 )
                 _run_and_accumulate(
@@ -291,7 +297,12 @@ def run_multi_agent(
                 coordinator.engine.transition(MultiAgentWorkflowState.REVIEWING, "re-review")
                 runtime_handoffs.extend(
                     _validate_stage_inputs(
-                        plan.tasks, plan.stages[3], registry, prior_outputs, requirement
+                        plan.tasks,
+                        plan.stages[3],
+                        registry,
+                        prior_outputs,
+                        requirement,
+                        sender_stage_overrides={"synthesis-agent-v1": 5},
                     )
                 )
                 _run_and_accumulate(
@@ -338,8 +349,17 @@ def run_multi_agent(
     }
     handoffs = runtime_handoffs
     traces = _build_trace_tree(stages, registry, run_id, model, coordinator.engine.state.value)
+    idempotency_key = sha256(
+        f"{sha256(repo.resolve().as_uri().encode()).hexdigest()}"
+        f"|{sha256(requirement.encode()).hexdigest()}"
+        f"|{plan.structure_hash}"
+        f"|{provider}|{model}"
+        .encode()
+    ).hexdigest()
+
     manifest = {
         "run_id": run_id,
+        "idempotency_key": idempotency_key,
         "plan_id": plan.plan_id,
         "structure_hash": plan.structure_hash,
         "semantic_brief_hash": plan.semantic_brief_hash,
@@ -365,6 +385,15 @@ def run_multi_agent(
         "discovered_files": discovered_files,
         "tool_call_count": len(tool_call_records),
     }
+    # Write stage checkpoints
+    checkpoints = [
+        {"stage": s.stage_index, "agents": sorted(s.agent_results),
+         "started": s.started_at, "completed": s.completed_at}
+        for s in stages
+    ]
+    (run_dir / "checkpoints.json").write_text(
+        json.dumps(checkpoints, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
     (run_dir / "manifest.json").write_text(
         json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8"
     )
@@ -566,6 +595,7 @@ def _validate_stage_inputs(
     registry: AgentRegistry,
     prior_outputs: Mapping[str, dict[str, Any]],
     requirement: str,
+    sender_stage_overrides: Mapping[str, int] | None = None,
 ) -> list[AgentHandoff]:
     handoffs: list[AgentHandoff] = []
     validator = HandoffValidator()
@@ -575,7 +605,9 @@ def _validate_stage_inputs(
         receiver = registry.get(task.agent_id)
         for sender_id in sorted(task.depends_on):
             sender = registry.get(sender_id)
-            sender_stage = task_by_id[sender_id].stage
+            sender_stage = (sender_stage_overrides or {}).get(
+                sender_id, task_by_id[sender_id].stage
+            )
             payload_ref = _output_ref(sender_stage, sender_id)
             payload = prior_outputs.get(sender_id)
             if payload is None:
@@ -853,8 +885,13 @@ def _build_multi_agent_metrics(
         status = "degraded"
 
     review_agent_id = plan.stages[-1][0] if hasattr(plan, "stages") else ""
-    decision = _try_review_decision(
-        {s.stage_index: s.agent_results for s in stages}, review_agent_id
+    decision = _review_decision(
+        next(
+            stage.agent_results
+            for stage in reversed(stages)
+            if review_agent_id in stage.agent_results
+        ),
+        review_agent_id,
     )
 
     return RunMetrics(
@@ -904,21 +941,6 @@ def _agent_wall_ms(stage: StageExecutionResult, agent_id: str) -> int:
         return int((end - start).total_seconds() * 1000)
     except (ValueError, TypeError):
         return 0
-
-
-def _try_review_decision(
-    stage_results: dict[int, dict[str, dict[str, Any]]], review_agent_id: str
-) -> str:
-    """Try to extract review decision without raising."""
-    try:
-        for stage_idx, results in stage_results.items():
-            if review_agent_id in results:
-                return _review_decision(
-                    {review_agent_id: results[review_agent_id]}, review_agent_id
-                )
-    except Exception:
-        pass
-    return "UNKNOWN"
 
 
 def _repo_summary(repo: Path) -> str:

@@ -1,12 +1,30 @@
 """Tests for multi-agent runner and CLI --mode multi-agent."""
 
 import json
+from hashlib import sha256
 from pathlib import Path
 
-from specflow.runner_multi import run_multi_agent
+import pytest
+
+from specflow.plan.hash_utils import canonical_json_bytes
+from specflow.policy.models import ExecutionPolicy
+from specflow.runner_multi import _build_registry, _validated_inputs, run_multi_agent
+from specflow.schema import build_schema_registry
 
 
 class TestMultiAgentRunner:
+    def test_receiver_input_schema_is_executed_before_scheduling(self) -> None:
+        registry = _build_registry()
+        schemas = build_schema_registry()
+        with pytest.raises(Exception, match="valid dictionary"):
+            _validated_inputs(
+                ("design-agent-v1",),
+                registry,
+                schemas,
+                {"requirement": "Test"},
+                {"repository-analyst-agent-v1": {"output": "not-a-dict"}},
+            )
+
     def test_run_multi_agent_mock_mode(self, tmp_path: Path) -> None:
         repo = tmp_path / "test-repo"
         repo.mkdir()
@@ -140,6 +158,13 @@ class TestMultiAgentRunner:
         assert any(
             handoff["payload_ref"].endswith("stage-1/design-agent-v1") for handoff in handoffs
         )
+        assert any(handoff["handoff_id"].startswith("handoff-revision-") for handoff in handoffs)
+        for handoff in handoffs:
+            payload_key = handoff["payload_ref"].removeprefix("agent-outputs.json#")
+            assert (
+                handoff["output_hash"]
+                == sha256(canonical_json_bytes(outputs[payload_key])).hexdigest()
+            )
 
     def test_non_mock_provider_is_rejected_without_executing_agents(self, tmp_path: Path) -> None:
         repo = tmp_path / "test-repo"
@@ -186,3 +211,56 @@ class TestMultiAgentRunner:
             == 3
         )
         assert called is False
+
+    def test_required_agent_failure_stops_before_specialists(self, tmp_path: Path) -> None:
+        repo = tmp_path / "test-repo"
+        repo.mkdir()
+        specialists_called = False
+
+        def required_failure(_: dict[str, object]) -> dict[str, object]:
+            return {
+                "agent_id": "repository-analyst-agent-v1",
+                "role": "repository_analyst",
+                "success": False,
+                "output": {"degraded": True, "error_code": "SCHEMA_VALIDATION_FAILED"},
+            }
+
+        def must_not_run(_: dict[str, object]) -> dict[str, object]:
+            nonlocal specialists_called
+            specialists_called = True
+            return {}
+
+        assert (
+            run_multi_agent(
+                repo=repo,
+                requirement="Test required failure",
+                output=tmp_path / "output",
+                mock=True,
+                _executor_overrides={
+                    "repository-analyst-agent-v1": required_failure,
+                    "design-agent-v1": must_not_run,
+                },
+            )
+            == 3
+        )
+        assert specialists_called is False
+
+    def test_llm_call_policy_stops_run_before_unbounded_execution(self, tmp_path: Path) -> None:
+        repo = tmp_path / "test-repo"
+        repo.mkdir()
+        policy = ExecutionPolicy(max_llm_calls=1)
+
+        assert (
+            run_multi_agent(
+                repo=repo,
+                requirement="Policy budget",
+                output=tmp_path / "output",
+                mock=True,
+                policy=policy,
+            )
+            == 3
+        )
+        manifest = json.loads(
+            (next((tmp_path / "output").glob("run-multi-*")) / "manifest.json").read_text()
+        )
+        assert manifest["workflow_state"] == "failed"
