@@ -6,7 +6,7 @@
 ## Baseline
 - Starting commit: `a6e7074` (initial implementation, 11 failures)
 - Fix commit: `e880d46` (dot-path migration, 0 failures)
-- Final commit: **pending** (RuntimeGuard integration)
+- Final commit: see the focused T-040 remediation commit in git history
 
 ## Implemented
 
@@ -26,9 +26,9 @@
 
 ### RuntimeGuard (replaces ExecutionBudget)
 - `consume_llm_call()` — raises CALL_BUDGET_EXCEEDED
-- `consume_tokens(in, out)` — raises TOKEN_BUDGET_EXCEEDED
+- `consume_tokens(in, out)` — enforces per-agent, run input/output, total, and reserved-retry budgets
 - `consume_revision()` — raises REVISION_BUDGET_EXCEEDED
-- `consume_agent()` — raises PARALLEL_AGENT_LIMIT_EXCEEDED (per-stage concurrency check)
+- `check_parallel_agents(count)` — rejects stages exceeding the configured concurrency limit
 - `check_wall_time()` — time source injectable for testing
 - `check_artifact_size(bytes)` — raises ARTIFACT_LIMIT_EXCEEDED
 
@@ -47,12 +47,12 @@
 - All 11 field-reference failures fixed in `e880d46`
 
 ## Tests
-- `tests/test_execution_policy.py`: 32 tests (policy validation, hash, error taxonomy, RuntimeGuard, safe error)
-- All existing tests pass (652 total)
+- `tests/test_execution_policy.py`: 36 tests (policy validation, hash, error taxonomy, RuntimeGuard, safe error)
+- All existing tests pass (current suite count recorded by the final validation command)
 
 ## Validation
 ```
-uv run pytest -v:              652 passed, 2 skipped, 0 failures
+uv run pytest -v:              656 passed, 2 skipped, 3 warnings
 uv run ruff check .:           All checks passed
 uv run ruff format --check .:  All files formatted
 git diff --check:              clean

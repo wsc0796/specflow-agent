@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import time as _time
 from collections.abc import Callable
+from threading import Lock
 
 from specflow.policy.models import (
     ExecutionPolicy,
@@ -31,6 +32,7 @@ class RuntimeGuard:
         self._total_output_tokens = 0
         self._revision_count = 0
         self._agent_count = 0
+        self._lock = Lock()
 
     # ── budget consumption ───────────────────────────────────────
 
@@ -43,16 +45,81 @@ class RuntimeGuard:
                 retryable=False,
             )
 
-    def consume_tokens(self, input_tokens: int, output_tokens: int) -> None:
-        self._total_input_tokens += input_tokens
-        self._total_output_tokens += output_tokens
-        total = self._total_input_tokens + self._total_output_tokens
-        if total > self._policy.tokens.max_run_total_tokens:
+    def consume_tokens(
+        self, input_tokens: int, output_tokens: int, *, is_retry: bool = False
+    ) -> None:
+        """Consume one agent result while enforcing every token boundary.
+
+        Normal calls cannot consume the reserved retry allowance.  Retry calls
+        may use it, but remain bounded by the run-wide total.
+        """
+        if not isinstance(input_tokens, int) or not isinstance(output_tokens, int):
+            raise SpecFlowError(
+                code="TOKEN_BUDGET_EXCEEDED",
+                safe_message="Token usage must be integer values",
+                retryable=False,
+            )
+        if input_tokens < 0 or output_tokens < 0:
+            raise SpecFlowError(
+                code="TOKEN_BUDGET_EXCEEDED",
+                safe_message="Token usage cannot be negative",
+                retryable=False,
+            )
+        token_policy = self._policy.tokens
+        if input_tokens > token_policy.max_agent_input_tokens:
             raise SpecFlowError(
                 code="TOKEN_BUDGET_EXCEEDED",
                 safe_message=(
-                    f"Run token budget exceeded ({self._policy.tokens.max_run_total_tokens})"
+                    f"Agent input token budget exceeded ({token_policy.max_agent_input_tokens})"
                 ),
+                retryable=False,
+            )
+        if output_tokens > token_policy.max_agent_output_tokens:
+            raise SpecFlowError(
+                code="TOKEN_BUDGET_EXCEEDED",
+                safe_message=(
+                    f"Agent output token budget exceeded ({token_policy.max_agent_output_tokens})"
+                ),
+                retryable=False,
+            )
+        with self._lock:
+            next_input = self._total_input_tokens + input_tokens
+            next_output = self._total_output_tokens + output_tokens
+            total = next_input + next_output
+            if next_input > token_policy.max_run_input_tokens:
+                raise SpecFlowError(
+                    code="TOKEN_BUDGET_EXCEEDED",
+                    safe_message=(
+                        f"Run input token budget exceeded ({token_policy.max_run_input_tokens})"
+                    ),
+                    retryable=False,
+                )
+            if next_output > token_policy.max_run_output_tokens:
+                raise SpecFlowError(
+                    code="TOKEN_BUDGET_EXCEEDED",
+                    safe_message=(
+                        f"Run output token budget exceeded ({token_policy.max_run_output_tokens})"
+                    ),
+                    retryable=False,
+                )
+            normal_limit = token_policy.max_run_total_tokens
+            if not is_retry:
+                normal_limit -= token_policy.reserved_retry_tokens
+            if total > normal_limit:
+                raise SpecFlowError(
+                    code="TOKEN_BUDGET_EXCEEDED",
+                    safe_message=(f"Run token budget exceeded ({normal_limit})"),
+                    retryable=False,
+                )
+            self._total_input_tokens = next_input
+            self._total_output_tokens = next_output
+
+    def check_parallel_agents(self, count: int) -> None:
+        """Reject a stage whose declared parallelism exceeds the policy."""
+        if count < 0 or count > self._policy.max_parallel_agents:
+            raise SpecFlowError(
+                code="PARALLEL_AGENT_LIMIT_EXCEEDED",
+                safe_message=f"Parallel agent limit exceeded ({self._policy.max_parallel_agents})",
                 retryable=False,
             )
 

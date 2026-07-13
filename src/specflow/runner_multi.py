@@ -151,7 +151,7 @@ def run_multi_agent(
                 ),
                 model=model,
                 temperature=0.0,
-                max_tokens=2048,
+                max_tokens=policy.tokens.max_agent_output_tokens,
             )
             executors[identity.agent_id] = runner.execute
     executors.update(_executor_overrides or {})
@@ -160,7 +160,7 @@ def run_multi_agent(
         "requirement": requirement,
         "repository_evidence": evidence_text,
     }
-    scheduler = MultiAgentScheduler()
+    scheduler = MultiAgentScheduler(max_parallel_workers=policy.max_parallel_agents)
     prior_outputs: dict[str, dict[str, Any]] = {}
     stages: list[StageExecutionResult] = []
     runtime_handoffs: list[AgentHandoff] = []
@@ -483,6 +483,7 @@ def _run_and_accumulate(
     guard: RuntimeGuard,
 ) -> None:
     guard.check_wall_time()
+    guard.check_parallel_agents(len(agent_ids))
     validated_inputs = _validated_inputs(
         agent_ids, registry, schema_registry, context, prior_outputs
     )
@@ -507,9 +508,7 @@ def _budgeted_executor(
         guard.check_wall_time()
         result = executor({**context, "validated_input": validated_input})
         usage = result.get("usage", {})
-        guard.consume_tokens(
-            usage.get("input_tokens", 0), usage.get("output_tokens", 0)
-        )
+        guard.consume_tokens(usage.get("input_tokens", 0), usage.get("output_tokens", 0))
         return result
 
     return run

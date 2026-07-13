@@ -264,3 +264,22 @@ class TestMultiAgentRunner:
             (next((tmp_path / "output").glob("run-multi-*")) / "manifest.json").read_text()
         )
         assert manifest["workflow_state"] == "failed"
+
+    def test_parallel_policy_stops_stage_before_agents_start(self, tmp_path: Path) -> None:
+        repo = tmp_path / "test-repo"
+        repo.mkdir()
+        output = tmp_path / "output"
+        policy = ExecutionPolicy(max_parallel_agents=2)
+
+        assert (
+            run_multi_agent(
+                repo=repo,
+                requirement="Parallel policy",
+                output=output,
+                mock=True,
+                policy=policy,
+            )
+            == 3
+        )
+        manifest = json.loads((next(output.glob("run-multi-*")) / "manifest.json").read_text())
+        assert manifest["workflow_state"] == "failed"

@@ -134,6 +134,35 @@ class TestRuntimeGuard:
         with pytest.raises(SpecFlowError, match="budget exceeded"):
             g.consume_tokens(300, 300)
 
+    def test_token_sub_budgets_and_reserved_retry_are_enforced(self):
+        policy = TokenPolicy(
+            max_run_input_tokens=200,
+            max_run_output_tokens=200,
+            max_run_total_tokens=250,
+            max_agent_input_tokens=40,
+            max_agent_output_tokens=40,
+            reserved_retry_tokens=50,
+        )
+        g = RuntimeGuard(ExecutionPolicy(tokens=policy))
+        with pytest.raises(SpecFlowError):
+            g.consume_tokens(41, 0)
+        g.consume_tokens(40, 40)
+        g.consume_tokens(40, 40)
+        with pytest.raises(SpecFlowError):
+            g.consume_tokens(40, 40)
+        g.consume_tokens(40, 40, is_retry=True)
+
+    def test_negative_token_usage_is_rejected(self):
+        g = RuntimeGuard(ExecutionPolicy())
+        with pytest.raises(SpecFlowError, match="cannot be negative"):
+            g.consume_tokens(-1, 0)
+
+    def test_parallel_stage_limit_is_checked_before_execution(self):
+        g = RuntimeGuard(ExecutionPolicy(max_parallel_agents=2))
+        g.check_parallel_agents(2)
+        with pytest.raises(SpecFlowError):
+            g.check_parallel_agents(3)
+
     def test_revision_within_budget(self):
         g = RuntimeGuard(ExecutionPolicy(max_revisions=2))
         g.consume_revision()
