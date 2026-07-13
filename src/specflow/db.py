@@ -5,7 +5,19 @@ from datetime import datetime
 from pathlib import Path
 from uuid import uuid4
 
-from sqlalchemy import JSON, DateTime, ForeignKey, Integer, String, Text, create_engine, event, func
+from sqlalchemy import (
+    JSON,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    create_engine,
+    event,
+    func,
+    inspect,
+    text,
+)
 from sqlalchemy.orm import (
     DeclarativeBase,
     Mapped,
@@ -60,6 +72,11 @@ class WorkflowRun(Base):
     state_payload: Mapped[dict | None] = mapped_column(JSON)
     version: Mapped[int] = mapped_column(Integer, default=1)
     result_status: Mapped[str | None] = mapped_column(String(32))
+    requirement_hash: Mapped[str | None] = mapped_column(String(64))
+    repository_alias: Mapped[str | None] = mapped_column(String(200))
+    policy_hash: Mapped[str | None] = mapped_column(String(64))
+    artifact_directory: Mapped[str | None] = mapped_column(String(512))
+    error_code: Mapped[str | None] = mapped_column(String(128))
     paused_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
@@ -82,6 +99,33 @@ class Database:
 
     def create_schema(self) -> None:
         Base.metadata.create_all(self.engine)
+        self._add_workflow_run_metadata_columns()
+
+    def _add_workflow_run_metadata_columns(self) -> None:
+        """Reconcile additive T-056 fields for pre-existing SQLite databases.
+
+        `create_all` deliberately does not alter existing tables.  This small,
+        idempotent compatibility bridge adds only nullable metadata columns and
+        avoids introducing a migration framework for the portfolio's SQLite
+        single-process deployment scope.
+        """
+        if self.engine.dialect.name != "sqlite":
+            return
+
+        existing = {column["name"] for column in inspect(self.engine).get_columns("workflow_runs")}
+        missing_columns = {
+            "requirement_hash": "VARCHAR(64)",
+            "repository_alias": "VARCHAR(200)",
+            "policy_hash": "VARCHAR(64)",
+            "artifact_directory": "VARCHAR(512)",
+            "error_code": "VARCHAR(128)",
+        }
+        with self.engine.begin() as connection:
+            for name, definition in missing_columns.items():
+                if name not in existing:
+                    connection.execute(
+                        text(f"ALTER TABLE workflow_runs ADD COLUMN {name} {definition}")
+                    )
 
     def sessions(self) -> Generator[Session, None, None]:
         session = self.factory()

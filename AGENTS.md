@@ -11,10 +11,12 @@ strict payload-schema follow-up work:
 - M6: Multi-Agent Orchestration (Live Provider validated)
 - M7: Evaluation, Demo & Resume (portfolio-ready)
 
-661 passing tests, 2 skipped, 3 known warnings. M8 production hardening remains
-limited to the implemented policy, schema, fallback, evidence, and artifact
-boundaries; it does not claim a new live-provider validation, API-service, or
-deployment work.
+667 passing tests, 2 skipped, 3 known warnings after T-056.
+M8 production hardening remains limited to the implemented policy, schema,
+fallback, evidence, and artifact boundaries; it does not claim a new
+live-provider validation or deployment work. T-056 adds a separately specified
+minimal mock-only Run API and SQLite lifecycle slice; it is not a queue,
+background-worker, or production deployment.
 
 All tasks T-001 through T-032 are completed. Implemented:
 health endpoint, Project persistence API, safe scanning, deterministic technology

@@ -235,6 +235,32 @@ Open `http://127.0.0.1:8000/health`. Expected response:
 
 Interactive API documentation is available at `http://127.0.0.1:8000/docs`.
 
+## Run API (mock-only, single process)
+
+The minimal Run API executes the existing controlled multi-agent workflow for a
+previously registered local project. It accepts neither arbitrary repository
+paths nor output paths, runs only the deterministic mock provider, and stores
+the lifecycle in SQLite. It is a portfolio-service slice, not a production job
+queue or live-provider endpoint.
+
+```powershell
+# First create a registered project, then retain its returned `id`.
+$project = Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8000/api/v1/projects `
+  -ContentType 'application/json' `
+  -Body '{"name":"Example API","repository_path":"C:\\projects\\example-api"}'
+
+$run = Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8000/api/v1/runs `
+  -ContentType 'application/json' `
+  -Body (@{project_id=$project.id;requirement="Add a search endpoint"} | ConvertTo-Json)
+
+Invoke-RestMethod -Uri "http://127.0.0.1:8000/api/v1/runs/$($run.id)"
+Invoke-RestMethod -Uri "http://127.0.0.1:8000/api/v1/runs/$($run.id)/artifacts"
+```
+
+Run artifacts are written beneath ignored `data/runs/`. The API returns only a
+bounded list of relative filenames: it does not expose an absolute filesystem
+path or arbitrary artifact contents.
+
 To register a project record (this does not scan or validate the path yet):
 
 ```powershell
