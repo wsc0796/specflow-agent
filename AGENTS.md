@@ -11,7 +11,7 @@ strict payload-schema follow-up work:
 - M6: Multi-Agent Orchestration (Live Provider validated)
 - M7: Evaluation, Demo & Resume (portfolio-ready)
 
-660 passing tests, 2 skipped, 3 known warnings. M8 production hardening remains
+661 passing tests, 2 skipped, 3 known warnings. M8 production hardening remains
 limited to the implemented policy, schema, fallback, evidence, and artifact
 boundaries; it does not claim a new live-provider validation, API-service, or
 deployment work.
@@ -38,8 +38,8 @@ The legacy `--mode legacy` pipeline (Analyze→Generate→Review) is preserved
 unchanged as the T-029 A/B baseline. Multi-agent mode is accessed via
 `--mode multi-agent`.
 
-T-047 through T-051 are complete. The branch is ready for a Draft PR; future
-work requires a separately frozen task specification.
+v1.0.0 is merged to `main` and v1.0.1 reconciles release metadata and CI.
+Future work requires a separately frozen task specification.
 Future task IDs are not permission to implement future features.
 
 ## Mandatory workflow

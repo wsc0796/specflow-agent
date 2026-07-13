@@ -1,5 +1,8 @@
 # SpecFlow Agent
 
+**Current release: v1.0.1.** This is a metadata and CI reconciliation release
+following the merged `v1.0.0` portfolio release. See [CHANGELOG.md](CHANGELOG.md).
+
 A controlled multi-agent repository-analysis system for local Python projects.
 It turns a requirement plus read-only repository evidence into structured
 analysis, a technical plan, test strategy, risk review and auditable artifacts.
@@ -56,10 +59,9 @@ from the separately documented M6 live-provider validation.
 
 ## Current milestone
 
-**M8 independent-review remediation — CLOSED on
-`feature/m8-production-hardening`; not merged to `main`.** The follow-up T-040
+**M8 independent-review remediation — CLOSED and released to `main` in v1.0.0.** The follow-up T-040
 and T-041 work adds RuntimeGuard budget enforcement and strict inter-agent
-payload schemas. The current local baseline is **660 passed, 2 skipped, 3 known
+payload schemas. The current local baseline is **661 passed, 2 skipped, 3 known
 warnings**. M8 is local mock acceptance and does not claim a new live-provider
 run. See `docs/reports/T-040-completion-report.md`,
 `docs/reports/T-041-completion-report.md`, and
