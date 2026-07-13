@@ -11,6 +11,27 @@ def main(argv: list[str] | None = None) -> None:
     """Parse arguments and delegate to the runner."""
     args = _parse_args(argv or sys.argv[1:])
 
+    if args.command == "benchmark":
+        from specflow.evaluation.benchmark import (
+            load_benchmark_cases,
+            normalized_baseline,
+            run_mock_benchmark,
+            write_json,
+        )
+
+        try:
+            report = run_mock_benchmark(
+                load_benchmark_cases(Path(args.suite)),
+                repo=Path(args.repo),
+                output=Path(args.output),
+            )
+            write_json(report, Path(args.output) / "benchmark-report.json")
+            if args.baseline:
+                write_json(normalized_baseline(report), Path(args.baseline))
+        except (OSError, ValueError) as exc:
+            print(f"Benchmark error: {exc}", file=sys.stderr)
+            raise SystemExit(2) from exc
+        raise SystemExit(0 if report["status"] == "passed" else 3)
     if args.mode == "multi-agent":
         from specflow.runner_multi import run_multi_agent
 
@@ -49,6 +70,24 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
     run_parser.add_argument("--requirement", required=True, help="Requirement description")
     run_parser.add_argument(
         "--output", default="./artifacts", help="Output directory for artifacts"
+    )
+
+    benchmark_parser = subparsers.add_parser(
+        "benchmark", help="Run the deterministic mock portfolio benchmark"
+    )
+    benchmark_parser.add_argument(
+        "--suite", required=True, help="Directory of 12 benchmark JSON cases"
+    )
+    benchmark_parser.add_argument(
+        "--repo", required=True, help="Committed read-only fixture repository"
+    )
+    benchmark_parser.add_argument(
+        "--output", required=True, help="Empty directory for generated artifacts"
+    )
+    benchmark_parser.add_argument(
+        "--baseline",
+        default="",
+        help="Optional path for normalized, commit-safe mock baseline JSON",
     )
     run_parser.add_argument(
         "--provider",

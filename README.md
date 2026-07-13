@@ -1,7 +1,9 @@
 # SpecFlow Agent
 
-A **controlled multi-agent specification analysis system** for local Python
-repositories. Built from scratch without LangGraph or agent frameworks.
+A controlled multi-agent repository-analysis system for local Python projects.
+It turns a requirement plus read-only repository evidence into structured
+analysis, a technical plan, test strategy, risk review and auditable artifacts.
+The orchestration is built from scratch without LangGraph or agent frameworks.
 
 ## Highlights
 
@@ -15,6 +17,7 @@ repositories. Built from scratch without LangGraph or agent frameworks.
 - **Agent-level trace topology** — stage timing, parent/child spans, submission/completion timestamps
 - **Dual pipeline** — legacy linear (Analyze→Generate→Review) preserved as A/B baseline
 - **Live Provider validated** — DeepSeek v4-flash on sky-takeout-python: 6/6 agents, 7 handoffs, PASS
+- **Reproducible benchmark** — 12 committed mock cases with a normalized artifact-contract baseline
 
 ## Quick start
 
@@ -28,12 +31,39 @@ $env:SPECFLOW_LLM_API_KEY = "<key>"
 uv run specflow run --mode multi-agent --provider openai-compatible --model deepseek-v4-flash --repo . --requirement "Add a search endpoint" --output ./out
 ```
 
+## Portfolio benchmark (mock-only)
+
+Run the committed 12-case fixture suite through the existing multi-agent
+pipeline. It produces ignored per-case artifacts plus a normalized, commit-safe
+baseline; it proves deterministic artifact and schema contracts, not live model
+quality.
+
+```powershell
+uv run specflow benchmark `
+  --suite benchmarks/cases `
+  --repo benchmarks/fixtures/portfolio-python `
+  --output artifacts/benchmark-t048 `
+  --baseline benchmarks/results/mock-baseline.json
+```
+
+Inspect `artifacts/benchmark-t048/benchmark-report.json` for runtime metrics
+(including latency) and `benchmarks/results/mock-baseline.json` for the stable
+portfolio baseline.
+
+For a credential-free walkthrough, read
+`docs/demo/portfolio-release-demo.md`. It distinguishes mock contract evidence
+from the separately documented M6 live-provider validation.
+
 ## Current milestone
 
-**M8 independent-review remediation — CLOSED.** 637 tests passed, 2 skipped.
-The remediation adds fail-closed schema enforcement, bounded execution policy,
-safe error artifacts, deterministic evidence aliases for Chinese requirements,
-and revision audit edges. See `docs/reports/M8-review-fix-report.md`.
+**M8 independent-review remediation — CLOSED on
+`feature/m8-production-hardening`; not merged to `main`.** The follow-up T-040
+and T-041 work adds RuntimeGuard budget enforcement and strict inter-agent
+payload schemas. The current local baseline is **660 passed, 2 skipped, 3 known
+warnings**. M8 is local mock acceptance and does not claim a new live-provider
+run. See `docs/reports/T-040-completion-report.md`,
+`docs/reports/T-041-completion-report.md`, and
+`docs/roadmap/2026-07-13-portfolio-release-plan.md`.
 
 M6 remains the latest live-provider validation milestone. M8 validation in this
 repository is local mock acceptance; it does not add a new live-provider claim.

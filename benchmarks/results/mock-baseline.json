@@ -1,0 +1,118 @@
+{
+  "case_count": 12,
+  "categories": {
+    "change_planning": {
+      "passed": 4,
+      "total": 4
+    },
+    "repository_understanding": {
+      "passed": 4,
+      "total": 4
+    },
+    "review_risk": {
+      "passed": 4,
+      "total": 4
+    }
+  },
+  "metrics": {
+    "completed_count": 12,
+    "degraded_count": 0,
+    "degraded_rate": 0.0,
+    "error_code_counts": {},
+    "failed_count": 0,
+    "fallback_rate": 0.0,
+    "run_success_rate": 1.0,
+    "schema_pass_rate": 1.0,
+    "total_input_tokens": 0,
+    "total_output_tokens": 0
+  },
+  "mode": "mock_contract",
+  "runs": [
+    {
+      "case_id": "authentication_flow",
+      "category": "repository_understanding",
+      "error_codes": [],
+      "schema_validated": true,
+      "status": "passed"
+    },
+    {
+      "case_id": "order_lifecycle",
+      "category": "repository_understanding",
+      "error_codes": [],
+      "schema_validated": true,
+      "status": "passed"
+    },
+    {
+      "case_id": "catalog_search",
+      "category": "repository_understanding",
+      "error_codes": [],
+      "schema_validated": true,
+      "status": "passed"
+    },
+    {
+      "case_id": "cache_ownership",
+      "category": "repository_understanding",
+      "error_codes": [],
+      "schema_validated": true,
+      "status": "passed"
+    },
+    {
+      "case_id": "add_coupon",
+      "category": "change_planning",
+      "error_codes": [],
+      "schema_validated": true,
+      "status": "passed"
+    },
+    {
+      "case_id": "add_role_check",
+      "category": "change_planning",
+      "error_codes": [],
+      "schema_validated": true,
+      "status": "passed"
+    },
+    {
+      "case_id": "add_product_search",
+      "category": "change_planning",
+      "error_codes": [],
+      "schema_validated": true,
+      "status": "passed"
+    },
+    {
+      "case_id": "order_timeout",
+      "category": "change_planning",
+      "error_codes": [],
+      "schema_validated": true,
+      "status": "passed"
+    },
+    {
+      "case_id": "login_rate_limit_risk",
+      "category": "review_risk",
+      "error_codes": [],
+      "schema_validated": true,
+      "status": "passed"
+    },
+    {
+      "case_id": "cache_consistency_risk",
+      "category": "review_risk",
+      "error_codes": [],
+      "schema_validated": true,
+      "status": "passed"
+    },
+    {
+      "case_id": "order_race_risk",
+      "category": "review_risk",
+      "error_codes": [],
+      "schema_validated": true,
+      "status": "passed"
+    },
+    {
+      "case_id": "api_contract_risk",
+      "category": "review_risk",
+      "error_codes": [],
+      "schema_validated": true,
+      "status": "passed"
+    }
+  ],
+  "schema_version": "1.0",
+  "status": "passed"
+}

@@ -1,0 +1,7 @@
+{
+  "case_id": "authentication_flow",
+  "category": "repository_understanding",
+  "title": "Explain authentication flow",
+  "requirement": "Explain the authentication flow for an order submission and identify the responsible modules.",
+  "expected_file_patterns": ["app/main.py", "app/auth.py"]
+}

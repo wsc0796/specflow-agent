@@ -19,7 +19,7 @@ class ExecutionBudget:
     revisions: int = 0
 
     def check_wall_time(self) -> None:
-        if time.monotonic() - self.started_at > self.policy.max_wall_seconds:
+        if time.monotonic() - self.started_at > self.policy.max_wall_time_seconds:
             raise RuntimeError(ErrorCode.BUDGET_WALL_TIME.value)
 
     def reserve_llm_call(self) -> None:

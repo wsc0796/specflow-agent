@@ -1,0 +1,7 @@
+{
+  "case_id": "cache_consistency_risk",
+  "category": "review_risk",
+  "title": "Review cache consistency",
+  "requirement": "Review product cache invalidation for stale-data, concurrency, rollback, and test risks.",
+  "expected_file_patterns": ["app/cache.py", "app/catalog.py"]
+}

@@ -1,0 +1,7 @@
+{
+  "case_id": "api_contract_risk",
+  "category": "review_risk",
+  "title": "Review API contract risk",
+  "requirement": "Review the order submission API for validation, error contract, authentication, and test coverage risks.",
+  "expected_file_patterns": ["app/main.py", "app/auth.py", "app/orders.py"]
+}

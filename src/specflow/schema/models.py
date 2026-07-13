@@ -102,4 +102,4 @@ class ReviewOutput(BaseModel):
     agent_id: str
     role: str
     output: dict[str, Any] = Field(default_factory=dict)
-    decision: str = Field(default="PASS")
+    decision: str = Field(default="")

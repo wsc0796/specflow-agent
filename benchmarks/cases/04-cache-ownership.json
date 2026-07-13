@@ -1,0 +1,7 @@
+{
+  "case_id": "cache_ownership",
+  "category": "repository_understanding",
+  "title": "Analyze cache ownership",
+  "requirement": "Identify cache ownership and explain how product cache invalidation is performed.",
+  "expected_file_patterns": ["app/cache.py"]
+}

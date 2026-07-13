@@ -1,0 +1,7 @@
+{
+  "case_id": "catalog_search",
+  "category": "repository_understanding",
+  "title": "Explain product search",
+  "requirement": "Explain how product search works and which module owns catalog data.",
+  "expected_file_patterns": ["app/catalog.py"]
+}

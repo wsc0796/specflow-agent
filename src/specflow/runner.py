@@ -87,9 +87,9 @@ def run(
         return 2
 
     evidence_config = EvidenceCollectionConfig(
-        max_selected_files=min(max_files, policy.max_selected_files),
-        max_total_evidence_chars=policy.max_evidence_chars,
-        max_tool_calls=policy.max_tool_calls,
+        max_selected_files=min(max_files, policy.repository.max_selected_files),
+        max_total_evidence_chars=policy.repository.max_total_evidence_chars,
+        max_tool_calls=20,
     )
     tool_executor = ToolExecutor(registry)
     collector = EvidenceCollector(tool_executor, repo, config=evidence_config)
@@ -129,8 +129,8 @@ def run(
     trace_dir.mkdir(parents=True, exist_ok=True)
     trace_recorder = TraceRecorder(JsonTraceStorage(trace_dir))
     token_policy = BudgetPolicy(
-        max_tokens=policy.max_agent_input_tokens + policy.max_agent_output_tokens,
-        reserved_response_tokens=policy.max_agent_output_tokens,
+        max_tokens=(policy.tokens.max_agent_input_tokens + policy.tokens.max_agent_output_tokens),
+        reserved_response_tokens=policy.tokens.max_agent_output_tokens,
     )
     fallback = FallbackManager(RetryStrategy(max_retries=1))
 
