@@ -6,6 +6,8 @@ import argparse
 import sys
 from pathlib import Path
 
+from specflow import __version__
+
 
 def main(argv: list[str] | None = None) -> None:
     """Parse arguments and delegate to the runner."""
@@ -62,6 +64,12 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         prog="specflow",
         description="SpecFlow Agent — spec-driven development assistant",
+    )
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=f"%(prog)s {__version__}",
+        help="Show the installed package version and exit",
     )
     subparsers = parser.add_subparsers(dest="command")
 

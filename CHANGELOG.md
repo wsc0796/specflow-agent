@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.1.0 (Unreleased)
+
+- Added a release-truth gate: package metadata now drives the OpenAPI version
+  and `specflow --version` CLI output.
+- Added deterministic tests and CI smoke coverage that keep package, runtime,
+  CLI and current release documentation aligned.
+
 ## v1.0.1, 2026-07-13
 
 - Reconciled package and release metadata after the `v1.0.0` portfolio release.

@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+from specflow import __version__
 from specflow.cli import main
 
 
@@ -12,6 +13,14 @@ def test_cli_help_exits_gracefully() -> None:
     with pytest.raises(SystemExit) as exc_info:
         main(["run", "--help"])
     assert exc_info.value.code == 0
+
+
+def test_cli_version_reports_installed_package_version(capsys) -> None:
+    with pytest.raises(SystemExit) as exc_info:
+        main(["--version"])
+
+    assert exc_info.value.code == 0
+    assert capsys.readouterr().out.strip() == f"specflow {__version__}"
 
 
 def test_cli_no_command_shows_help() -> None:

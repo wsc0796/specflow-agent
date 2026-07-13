@@ -1,8 +1,7 @@
 # SpecFlow Agent — Current Resume Evidence
 
-> Current evidence baseline: `main` code commit `07b38c5` (T-057), checked on
-> 2026-07-13. This is not a release tag. The latest published release remains
-> `v1.0.1` at `a4fc16c`.
+> Current evidence baseline: v1.1.0 unreleased main candidate, checked on
+> 2026-07-13. The latest published release remains `v1.0.1` at `a4fc16c`.
 
 ## Verifiable facts
 
@@ -15,9 +14,9 @@
 - T-057 adds a mock-only FastAPI/SQLite Run API lifecycle slice and safely marks
   interrupted persisted runs as `failed_runtime` with `INTERRUPTED` on the next
   single-process startup. It is not a queue, retry, resume, or deployment claim.
-- Quality evidence at `07b38c5`: 669 passed, 2 skipped, 3 known warnings; Ruff,
-  package build, secret scan, benchmark baseline, and GitHub Actions run
-  `29227064939` passed.
+- Quality evidence for the v1.1.0 candidate: 671 passed, 2 skipped, 3 known
+  warnings; Ruff, package build, secret scan, benchmark baseline and CI are
+  required release-truth gates.
 
 ## Current resume bullet
 
@@ -25,7 +24,7 @@
 > with deterministic orchestration, schema contracts, runtime guardrails,
 > auditable artifacts, a reproducible 12-case benchmark, and a mock-only
 > FastAPI/SQLite lifecycle slice; validated the current `main` baseline with
-> 669 passing automated tests and CI-backed quality gates.
+> 671 passing automated tests and CI-backed quality gates.
 
 ## Boundaries to preserve in interviews
 

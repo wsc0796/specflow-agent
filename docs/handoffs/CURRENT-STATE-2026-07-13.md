@@ -8,8 +8,8 @@
 - 本地路径：`D:\Documents\暑假计划\specflow-agent`
 - 当前分支：`main`
 - 已发布版本：`v1.0.1`（tag/Release commit `a4fc16c chore(release): reconcile v1.0.1 metadata and CI`）
-- 当前代码基线：`07b38c5 fix(runs): recover interrupted lifecycle records`（T-057；发布标签之后的未发布 main 工作）
-- 质量证据：`669 passed, 2 skipped, 3 warnings`；GitHub Actions run `29227064939` 通过
+- 当前候选：`v1.1.0`（未发布 main；仅补 release truth gate，不新增 Agent 功能）
+- 质量证据：`671 passed, 2 skipped, 3 warnings`；Ruff、build、secret scan、benchmark baseline 与远端 CI 是候选门禁
 - 工作区：应仅存在可解释的本地文件；不要覆盖或纳入未知 `.claude/` 文件
 - 远程：`origin` 已配置为 GitHub 仓库
 
@@ -46,7 +46,7 @@ SpecFlow Agent 是一个 spec-driven 的 Python/FastAPI 软件工程助手。它
 
 ```text
 uv run pytest -v
-669 passed, 2 skipped, 3 warnings
+671 passed, 2 skipped, 3 warnings
 
 uv run ruff check .
 All checks passed!
@@ -80,8 +80,8 @@ passed
 
 ## 当前建议下一步
 
-1. 完成 T-058 当前文档/交接/简历证据收口，再完成 T-059 v1.1.0 release truth gate；两者均不扩展产品功能。
-2. 后续增强必须从新的 task spec 开始，不得重开已关闭的 T-040～T-057。
+1. 运行并审查 T-059 v1.1.0 release truth gate；获得用户明确授权后，才创建 tag 或 GitHub Release。
+2. 后续增强必须从新的 task spec 开始，不得重开已关闭的 T-040～T-059。
 3. 当前最有价值的后续产品证据仍是严格 Schema 版本的真实 Provider 验收，前提是有授权凭据。
 
 ## 新窗口启动提示词
@@ -94,7 +94,7 @@ passed
 - README.md
 - docs/00-SPEC-BASELINE.md
 
-当前分支是 main；已发布版本是 v1.0.1（a4fc16c），当前代码基线是 T-057 的 07b38c5。不要假设聊天历史，以上交接文档是当前事实来源。开始任何修改前先执行：
+当前分支是 main；已发布版本是 v1.0.1（a4fc16c），当前候选是未发布 v1.1.0。不要假设聊天历史，以上交接文档是当前事实来源。开始任何修改前先执行：
 
 git status --short --branch
 git log --oneline -8
@@ -104,7 +104,7 @@ git log --oneline -8
 
 ## 交接状态
 
-- stage_state: T-057 closed; T-058/T-059 are planned release-truth closeout tasks
-- verdict: v1.0.1 is published; T-057 main baseline has remote CI; mock benchmark and credential-free demo evidence are ready; live validation is skipped
+- stage_state: T-058 closed; T-059 v1.1.0 release-truth candidate is in progress
+- verdict: v1.0.1 is published; v1.1.0 is untagged until release-truth gates and explicit user release authorization; mock benchmark and credential-free demo evidence are ready; live validation is skipped
 - blocking_decision: do not run a live provider without authorized credentials and an approved read-only target repository
-- recommended_next_step: complete T-058 then T-059; do not start a new product slice during release-truth closeout
+- recommended_next_step: after remote CI, request explicit user authorization before creating a v1.1.0 tag or GitHub Release; do not start a new product slice during release-truth closeout

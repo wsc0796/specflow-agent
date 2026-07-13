@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "specflow-agent"
-version = "1.0.1"
+version = "1.1.0"
 description = "A spec-driven development assistant for Python/FastAPI projects."
 readme = "README.md"
 requires-python = ">=3.12"

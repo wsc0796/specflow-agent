@@ -1,11 +1,9 @@
 # SpecFlow Agent
 
-**Published release: v1.0.1** at `a4fc16c` (metadata and CI reconciliation
-following the merged v1.0.0 portfolio release). The current `main` development
-baseline is T-057 code commit `07b38c5`, validated with 669 passed, 2 skipped,
-and 3 known warnings; its CI run is
-[29227064939](https://github.com/wsc0796/specflow-agent/actions/runs/29227064939).
-See [CHANGELOG.md](CHANGELOG.md) and
+**Current release candidate: v1.1.0 (unreleased).** The latest published release
+remains **v1.0.1** at `a4fc16c` (metadata and CI reconciliation following the
+merged v1.0.0 portfolio release). The v1.1.0 candidate adds release-truth
+verification only; it does not add an Agent capability. See [CHANGELOG.md](CHANGELOG.md) and
 [current resume evidence](docs/resume/current-resume-evidence.md).
 
 A controlled multi-agent repository-analysis system for local Python projects.
@@ -66,8 +64,8 @@ from the separately documented M6 live-provider validation.
 
 **M8 independent-review remediation — CLOSED and released to `main` in v1.0.0.** The follow-up T-040
 and T-041 work adds RuntimeGuard budget enforcement and strict inter-agent
-payload schemas. The current code baseline is **669 passed, 2 skipped, 3 known
-warnings** at `07b38c5`; the published tag remains v1.0.1 at `a4fc16c`.
+payload schemas. The current v1.1.0 candidate baseline is **671 passed, 2 skipped,
+3 known warnings**; the published tag remains v1.0.1 at `a4fc16c`.
 M8 is local mock acceptance and does not claim a new live-provider run. See `docs/reports/T-040-completion-report.md`,
 `docs/reports/T-041-completion-report.md`, and
 `docs/roadmap/2026-07-13-portfolio-release-plan.md`.
