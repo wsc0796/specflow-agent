@@ -3,8 +3,8 @@
 **Current release candidate: v1.1.0 (unreleased).** The latest published release
 remains **v1.0.1** at `a4fc16c` (metadata and CI reconciliation following the
 merged v1.0.0 portfolio release). The v1.1.0 candidate adds release-truth
-verification only; it does not add an Agent capability. See [CHANGELOG.md](CHANGELOG.md) and
-[current resume evidence](docs/resume/current-resume-evidence.md).
+verification and a mock-only, human-in-the-loop change-review decision slice.
+See [CHANGELOG.md](CHANGELOG.md) and [current resume evidence](docs/resume/current-resume-evidence.md).
 
 A controlled multi-agent repository-analysis system for local Python projects.
 It turns a requirement plus read-only repository evidence into structured
@@ -26,6 +26,7 @@ The orchestration is built from scratch without LangGraph or agent frameworks.
   run on sky-takeout-python (6/6 agents, 7 handoffs); it is not v1.1.0 candidate
   or mock-benchmark evidence
 - **Reproducible benchmark** — 12 committed mock cases with a normalized artifact-contract baseline
+- **Change-review decision loop** — a reviewer can inspect a bounded completed-Run package and append an unverified `accepted` or `needs_changes` rationale without changing execution state
 
 ## Quick start
 
@@ -68,7 +69,8 @@ copy is in `docs/resume/specflow-resume-v0.md`.
 
 **M8 independent-review remediation — CLOSED and released to `main` in v1.0.0.** The follow-up T-040
 and T-041 work adds RuntimeGuard budget enforcement and strict inter-agent
-payload schemas. The current v1.1.0 candidate baseline is **671 passed, 2 skipped,
+payload schemas. T-061 adds a separately bounded, mock-only reviewer-decision
+record to the Run API. The current v1.1.0 candidate baseline is **674 passed, 2 skipped,
 3 known warnings**; the published tag remains v1.0.1 at `a4fc16c`.
 M8 is local mock acceptance and does not claim a new live-provider run. See `docs/reports/T-040-completion-report.md`,
 `docs/reports/T-041-completion-report.md`, and
@@ -262,11 +264,20 @@ $run = Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8000/api/v1/runs `
 
 Invoke-RestMethod -Uri "http://127.0.0.1:8000/api/v1/runs/$($run.id)"
 Invoke-RestMethod -Uri "http://127.0.0.1:8000/api/v1/runs/$($run.id)/artifacts"
+Invoke-RestMethod -Uri "http://127.0.0.1:8000/api/v1/runs/$($run.id)/review-package"
+
+Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:8000/api/v1/runs/$($run.id)/review-decisions" `
+  -ContentType 'application/json' `
+  -Body '{"decision":"accepted","reviewer_label":"Engineering lead","rationale":"Proceed with implementation after human review."}'
 ```
 
 Run artifacts are written beneath ignored `data/runs/`. The API returns only a
 bounded list of relative filenames: it does not expose an absolute filesystem
-path or arbitrary artifact contents.
+path or arbitrary artifact contents. A completed or completed-degraded Run may
+also expose a bounded review package and append-only reviewer decisions.
+`reviewer_label` is unverified display metadata, not an authenticated identity;
+this single-process/mock-only slice has no user accounts, authorization, queue,
+async execution, or repository write capability.
 
 To register a project record (this does not scan or validate the path yet):
 

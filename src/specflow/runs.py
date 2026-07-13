@@ -10,16 +10,17 @@ from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field
-from sqlalchemy import func, update
+from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
-from specflow.db import Database, Project, WorkflowRun
+from specflow.db import Database, Project, ReviewDecision, WorkflowRun
 from specflow.policy import DEFAULT_POLICY, RunStatus
 from specflow.runner_multi import run_multi_agent
 
 router = APIRouter(prefix="/api/v1/runs", tags=["runs"])
 _MAX_ARTIFACT_FILES = 32
 _INTERRUPTED_ERROR_CODE = "INTERRUPTED"
+_REVIEWABLE_RUN_STATES = frozenset({RunStatus.COMPLETED, RunStatus.COMPLETED_DEGRADED})
 
 
 class RunCreate(BaseModel):
@@ -48,6 +49,30 @@ class RunArtifactsRead(BaseModel):
     files: list[str]
 
 
+class ReviewDecisionCreate(BaseModel):
+    decision: Literal["accepted", "needs_changes"]
+    reviewer_label: str = Field(min_length=1, max_length=100, pattern=r"\S")
+    rationale: str = Field(min_length=1, max_length=2000, pattern=r"\S")
+
+
+class ReviewDecisionRead(BaseModel):
+    id: int
+    decision: str
+    reviewer_label: str
+    rationale: str
+    created_at: datetime
+
+
+class ReviewPackageRead(BaseModel):
+    run: RunRead
+    artifact_files: list[str]
+    decisions: list[ReviewDecisionRead]
+
+
+class ReviewUnavailableError(ValueError):
+    """The Run cannot safely be presented for or receive a review decision."""
+
+
 class RunRepository:
     def get(self, session: Session, run_id: str) -> WorkflowRun | None:
         return session.get(WorkflowRun, run_id)
@@ -56,6 +81,27 @@ class RunRepository:
         session.add(run)
         session.flush()
         return run
+
+    def decisions_for_run(self, session: Session, run_id: str) -> list[ReviewDecision]:
+        statement = (
+            select(ReviewDecision)
+            .where(ReviewDecision.run_id == run_id)
+            .order_by(ReviewDecision.id)
+        )
+        return list(session.scalars(statement))
+
+    def add_decision(
+        self, session: Session, run: WorkflowRun, payload: ReviewDecisionCreate
+    ) -> ReviewDecision:
+        decision = ReviewDecision(
+            run_id=run.id,
+            decision=payload.decision,
+            reviewer_label=payload.reviewer_label,
+            rationale=payload.rationale,
+        )
+        session.add(decision)
+        session.flush()
+        return decision
 
 
 class RunService:
@@ -125,6 +171,30 @@ class RunService:
             raise FileNotFoundError("artifacts not found")
         return files
 
+    def review_package(
+        self, session: Session, run_id: str
+    ) -> tuple[WorkflowRun, list[str], list[ReviewDecision]]:
+        run = self.get(session, run_id)
+        files = self._reviewable_artifact_files(run)
+        return run, files, self.repository.decisions_for_run(session, run.id)
+
+    def record_decision(
+        self, session: Session, run_id: str, payload: ReviewDecisionCreate
+    ) -> ReviewDecision:
+        run = self.get(session, run_id)
+        self._reviewable_artifact_files(run)
+        decision = self.repository.add_decision(session, run, payload)
+        session.commit()
+        return decision
+
+    def _reviewable_artifact_files(self, run: WorkflowRun) -> list[str]:
+        if run.current_state not in _REVIEWABLE_RUN_STATES:
+            raise ReviewUnavailableError("run is not reviewable")
+        try:
+            return self.artifact_files(run)
+        except FileNotFoundError as error:
+            raise ReviewUnavailableError("review artifacts are unavailable") from error
+
     def _artifact_directory(self, output: Path) -> str | None:
         if not output.is_dir():
             return None
@@ -187,6 +257,43 @@ def create_run(payload: RunCreate, request: Request, session: SessionDependency)
         raise HTTPException(404, "Project not found.") from error
 
 
+@router.get("/{run_id}/review-package", response_model=ReviewPackageRead)
+def get_review_package(
+    run_id: str, request: Request, session: SessionDependency
+) -> ReviewPackageRead:
+    service = _service(request)
+    try:
+        run, files, decisions = service.review_package(session, run_id)
+        return ReviewPackageRead(
+            run=_to_read(run),
+            artifact_files=files,
+            decisions=[_to_decision_read(decision) for decision in decisions],
+        )
+    except LookupError as error:
+        raise HTTPException(404, "Run not found.") from error
+    except ReviewUnavailableError as error:
+        raise HTTPException(409, "Run is not ready for review.") from error
+
+
+@router.post(
+    "/{run_id}/review-decisions",
+    response_model=ReviewDecisionRead,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_review_decision(
+    run_id: str,
+    payload: ReviewDecisionCreate,
+    request: Request,
+    session: SessionDependency,
+) -> ReviewDecisionRead:
+    try:
+        return _to_decision_read(_service(request).record_decision(session, run_id, payload))
+    except LookupError as error:
+        raise HTTPException(404, "Run not found.") from error
+    except ReviewUnavailableError as error:
+        raise HTTPException(409, "Run is not ready for review.") from error
+
+
 @router.get("/{run_id}", response_model=RunRead)
 def get_run(run_id: str, request: Request, session: SessionDependency) -> RunRead:
     try:
@@ -223,4 +330,14 @@ def _to_read(run: WorkflowRun) -> RunRead:
         started_at=run.started_at,
         finished_at=run.finished_at,
         artifact_available=run.artifact_directory is not None,
+    )
+
+
+def _to_decision_read(decision: ReviewDecision) -> ReviewDecisionRead:
+    return ReviewDecisionRead(
+        id=decision.id,
+        decision=decision.decision,
+        reviewer_label=decision.reviewer_label,
+        rationale=decision.rationale,
+        created_at=decision.created_at,
     )

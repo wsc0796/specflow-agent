@@ -154,6 +154,182 @@ def test_empty_artifact_directory_is_not_exposed_as_a_valid_artifact_index(tmp_p
             path.unlink()
 
         assert client.get(f"/api/v1/runs/{body['id']}/artifacts").status_code == 404
+        assert (
+            client.post(
+                f"/api/v1/runs/{body['id']}/review-decisions",
+                json={
+                    "decision": "accepted",
+                    "reviewer_label": "Reviewer",
+                    "rationale": "Artifacts must exist before a decision is recorded.",
+                },
+            ).status_code
+            == 409
+        )
+
+
+def test_completed_run_exposes_review_package_and_append_only_decisions(tmp_path: Path) -> None:
+    repository = tmp_path / "repository"
+    repository.mkdir()
+    (repository / "README.md").write_text("# Fixture repository\n", encoding="utf-8")
+
+    with client_for(tmp_path) as client:
+        project_id = register_project(client, repository)
+        created = client.post(
+            "/api/v1/runs",
+            json={"project_id": project_id, "requirement": "Add an order search endpoint"},
+        )
+        run_id = created.json()["id"]
+        artifact_directory = next((tmp_path / "run-artifacts" / run_id).iterdir())
+        for index in range(40):
+            (artifact_directory / f"z-evidence-{index:02d}.txt").write_text(
+                "bounded", encoding="utf-8"
+            )
+
+        package = client.get(f"/api/v1/runs/{run_id}/review-package")
+        assert package.status_code == 200
+        assert package.json()["run"]["id"] == run_id
+        assert package.json()["run"]["status"] == RunStatus.COMPLETED
+        assert package.json()["decisions"] == []
+        assert "manifest.json" in package.json()["artifact_files"]
+        assert len(package.json()["artifact_files"]) == 32
+        assert repository.resolve().as_posix() not in json.dumps(package.json())
+
+        accepted = client.post(
+            f"/api/v1/runs/{run_id}/review-decisions",
+            json={
+                "decision": "accepted",
+                "reviewer_label": "Engineering lead",
+                "rationale": "Evidence and test plan are sufficient for implementation.",
+            },
+        )
+        assert accepted.status_code == 201
+        assert accepted.json()["decision"] == "accepted"
+
+        needs_changes = client.post(
+            f"/api/v1/runs/{run_id}/review-decisions",
+            json={
+                "decision": "needs_changes",
+                "reviewer_label": "Engineering lead",
+                "rationale": "Clarify rollback behavior before approval.",
+            },
+        )
+        assert needs_changes.status_code == 201
+
+        updated_package = client.get(f"/api/v1/runs/{run_id}/review-package")
+        decisions = updated_package.json()["decisions"]
+        assert [decision["decision"] for decision in decisions] == ["accepted", "needs_changes"]
+        assert [decision["id"] for decision in decisions] == sorted(
+            decision["id"] for decision in decisions
+        )
+        assert client.get(f"/api/v1/runs/{run_id}").json()["status"] == RunStatus.COMPLETED
+
+
+def test_review_decision_rejects_unknown_nonreviewable_and_invalid_runs(tmp_path: Path) -> None:
+    with client_for(tmp_path) as client:
+        assert client.get("/api/v1/runs/missing/review-package").status_code == 404
+        assert (
+            client.post(
+                "/api/v1/runs/missing/review-decisions",
+                json={
+                    "decision": "accepted",
+                    "reviewer_label": "Reviewer",
+                    "rationale": "Missing run should not be decided.",
+                },
+            ).status_code
+            == 404
+        )
+
+        repository = tmp_path / "repository"
+        repository.mkdir()
+        project_id = register_project(client, repository)
+        with next(client.app.state.database.sessions()) as session:
+            session.add(
+                WorkflowRun(
+                    id="created-for-review",
+                    project_id=project_id,
+                    workflow_type="multi-agent",
+                    current_state=RunStatus.CREATED,
+                )
+            )
+            session.commit()
+
+        assert client.get("/api/v1/runs/created-for-review/review-package").status_code == 409
+        assert (
+            client.post(
+                "/api/v1/runs/created-for-review/review-decisions",
+                json={
+                    "decision": "accepted",
+                    "reviewer_label": "Reviewer",
+                    "rationale": "This run has no completed review package.",
+                },
+            ).status_code
+            == 409
+        )
+        assert (
+            client.post(
+                "/api/v1/runs/created-for-review/review-decisions",
+                json={
+                    "decision": "rejected",
+                    "reviewer_label": "Reviewer",
+                    "rationale": "Unsupported decision.",
+                },
+            ).status_code
+            == 422
+        )
+        assert (
+            client.post(
+                "/api/v1/runs/created-for-review/review-decisions",
+                json={
+                    "decision": "accepted",
+                    "reviewer_label": "x" * 101,
+                    "rationale": "Reviewer labels are bounded.",
+                },
+            ).status_code
+            == 422
+        )
+        assert (
+            client.post(
+                "/api/v1/runs/created-for-review/review-decisions",
+                json={
+                    "decision": "accepted",
+                    "reviewer_label": "Reviewer",
+                    "rationale": " ",
+                },
+            ).status_code
+            == 422
+        )
+
+
+def test_completed_degraded_run_remains_reviewable(tmp_path: Path) -> None:
+    repository = tmp_path / "repository"
+    repository.mkdir()
+    (repository / "README.md").write_text("# Fixture repository\n", encoding="utf-8")
+
+    with client_for(tmp_path) as client:
+        project_id = register_project(client, repository)
+        created = client.post(
+            "/api/v1/runs",
+            json={"project_id": project_id, "requirement": "Add a feature"},
+        )
+        run_id = created.json()["id"]
+        with next(client.app.state.database.sessions()) as session:
+            run = session.get(WorkflowRun, run_id)
+            assert run is not None
+            run.current_state = RunStatus.COMPLETED_DEGRADED
+            run.result_status = RunStatus.COMPLETED_DEGRADED
+            session.commit()
+
+        assert client.get(f"/api/v1/runs/{run_id}/review-package").status_code == 200
+        decision = client.post(
+            f"/api/v1/runs/{run_id}/review-decisions",
+            json={
+                "decision": "needs_changes",
+                "reviewer_label": "Reviewer",
+                "rationale": "The degraded output requires a follow-up before implementation.",
+            },
+        )
+        assert decision.status_code == 201
+        assert client.get(f"/api/v1/runs/{run_id}").json()["status"] == RunStatus.COMPLETED_DEGRADED
 
 
 def test_startup_adds_run_metadata_to_a_legacy_sqlite_database(tmp_path: Path) -> None:
@@ -193,6 +369,7 @@ def test_startup_adds_run_metadata_to_a_legacy_sqlite_database(tmp_path: Path) -
         "artifact_directory",
         "error_code",
     } <= columns
+    assert "review_decisions" in inspect(app.state.database.engine).get_table_names()
 
 
 def test_startup_recovers_interrupted_running_run_once(tmp_path: Path, monkeypatch) -> None:

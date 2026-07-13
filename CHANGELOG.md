@@ -6,6 +6,10 @@
   and `specflow --version` CLI output.
 - Added deterministic tests and CI smoke coverage that keep package, runtime,
   CLI and current release documentation aligned.
+- Added a mock-only, human-in-the-loop change-review decision slice: completed
+  Runs expose bounded review packages and retain append-only `accepted` or
+  `needs_changes` decisions. Reviewer labels are unverified metadata; no
+  authentication, asynchronous execution or repository-write capability is implied.
 
 ## v1.0.1, 2026-07-13
 

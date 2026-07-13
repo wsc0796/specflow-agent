@@ -1,6 +1,6 @@
 # SpecFlow Agent Portfolio Demo
 
-> Current evidence baseline: v1.1.0 unreleased main candidate, 671 passed,
+> Current evidence baseline: v1.1.0 unreleased main candidate, 674 passed,
 > 2 skipped and 3 known warnings. Latest published release: `v1.0.1` at
 > `a4fc16c`. The benchmark remains mock-only.
 
@@ -71,10 +71,21 @@ integrity. It does not measure live model quality or real provider cost. A
 previous M6 live-provider validation remains documented separately; T-049 was
 skipped for this portfolio release because no provider credentials were present.
 
+## 6. Optional business-loop proof
+
+Start the local API, register a fixture repository, and create a mock Run as
+shown in the README. Then fetch `/api/v1/runs/{run_id}/review-package` and post
+an `accepted` or `needs_changes` rationale to `/review-decisions`. Explain that
+the decision is append-only and does not rewrite the controlled Run state.
+
+This demonstrates a development-change planning review loop, not an automated
+PR reviewer: it does not read Git diffs, authenticate a reviewer, run in a
+queue, or modify a repository.
+
 ## Final command
 
 ```powershell
 uv run pytest -v
 ```
 
-The expected current result is 671 passed, 2 skipped and 3 known warnings.
+The expected current result is 674 passed, 2 skipped and 3 known warnings.

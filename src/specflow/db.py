@@ -85,6 +85,20 @@ class WorkflowRun(Base):
     )
     last_error: Mapped[str | None] = mapped_column(Text)
     project: Mapped[Project] = relationship(back_populates="runs")
+    review_decisions: Mapped[list["ReviewDecision"]] = relationship(back_populates="run")
+
+
+class ReviewDecision(Base):
+    """Append-only, unverified human feedback attached to a reviewable Run."""
+
+    __tablename__ = "review_decisions"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    run_id: Mapped[str] = mapped_column(ForeignKey("workflow_runs.id"))
+    decision: Mapped[str] = mapped_column(String(32))
+    reviewer_label: Mapped[str] = mapped_column(String(100))
+    rationale: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    run: Mapped[WorkflowRun] = relationship(back_populates="review_decisions")
 
 
 class Database:

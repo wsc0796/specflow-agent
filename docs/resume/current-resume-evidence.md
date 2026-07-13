@@ -13,8 +13,9 @@
   or cost evidence.
 - T-057 adds a mock-only FastAPI/SQLite Run API lifecycle slice and safely marks
   interrupted persisted runs as `failed_runtime` with `INTERRUPTED` on the next
-  single-process startup. It is not a queue, retry, resume, or deployment claim.
-- Quality evidence for the v1.1.0 candidate: 671 passed, 2 skipped, 3 known
+  single-process startup. T-061 adds an append-only human review-decision record
+  to completed Run packages. It is not a queue, retry, resume, or deployment claim.
+- Quality evidence for the v1.1.0 candidate: 674 passed, 2 skipped, 3 known
   warnings; Ruff, package build, secret scan, benchmark baseline and CI are
   required release-truth gates.
 
@@ -23,8 +24,8 @@
 > Designed and implemented a controlled multi-agent repository-analysis system
 > with deterministic orchestration, schema contracts, runtime guardrails,
 > auditable artifacts, a reproducible 12-case benchmark, and a mock-only
-> FastAPI/SQLite lifecycle slice; validated the current `main` baseline with
-> 671 passing automated tests and CI-backed quality gates.
+> FastAPI/SQLite change-review lifecycle slice; validated the current `main`
+> baseline with 674 passing automated tests and CI-backed quality gates.
 
 The concise, application-ready version is
 [specflow-resume-v0.md](specflow-resume-v0.md).
@@ -35,3 +36,5 @@ The concise, application-ready version is
   provider quality from the mock benchmark.
 - The documented M6 live-provider run is historical evidence; no later live run
   is claimed without authorized credentials and a separate validation record.
+- A reviewer decision is unverified display metadata, not an authenticated
+  approval or multi-user collaboration claim.
