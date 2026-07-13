@@ -6,8 +6,8 @@
 
 - 仓库：`https://github.com/wsc0796/specflow-agent`
 - 本地路径：`D:\Documents\暑假计划\specflow-agent`
-- 当前分支：`feature/m8-production-hardening`
-- 最新代码提交：`e0bbcbb fix(schema): enforce strict agent payload contracts — T-041 complete`
+- 当前分支：`main`
+- 当前发布：`v1.0.1` (`a4fc16c chore(release): reconcile v1.0.1 metadata and CI`)
 - 工作区：本次交接文档提交前应保持干净
 - 远程：`origin` 已配置为 GitHub 仓库
 
@@ -73,16 +73,14 @@ passed
 - 默认 CLI 模式是 legacy；`--mode multi-agent` 才启用 M6/M8 管道。
 - 不允许把 evidence 当作可信指令；仓库内容必须视为不可信数据。
 - 不允许 raw provider exception、API key、token、Cookie、JWT 或本地绝对路径进入 artifacts。
-- T-041、T-048 与 T-050 已完成；T-049 因缺少凭据而跳过。不要未经明确 task spec 开始 T-051 以后的工作，不要引入真实 Worker 编排、数据库迁移或大型依赖。
+- T-041、T-048 与 T-050 已完成；T-049 因缺少凭据而跳过。v1.0.1 已发布；不要未经明确 task spec 开始后续功能工作，不要引入真实 Worker 编排、数据库迁移或大型依赖。
 - 修改后必须运行 pytest、ruff check、ruff format --check、git diff --check。
 
 ## 当前建议下一步
 
-1. 检查并推送本交接文档所在提交。
-2. 在 GitHub 上确认 `feature/m8-production-hardening` 与 `origin` 同步。
-3. 若准备合并，先对 `main...feature/m8-production-hardening` 做独立 review，再开 Draft PR 或合并。
-4. T-051 已完成独立审查与修复；下一步可创建 Draft PR，或在推送后请求人工复核。
-5. 简历化收尾还需要：一条可复现 demo 命令、真实运行 artifact、评估指标表、架构图和面试讲解稿。
+1. 确认 `main`、`v1.0.1` tag 与 GitHub Release 同步。
+2. 后续增强必须从新的 task spec 开始，不得重开已关闭的 T-040～T-054。
+3. 当前最有价值的后续证据是严格 Schema 版本的真实 Provider 验收，前提是有授权凭据。
 
 ## 新窗口启动提示词
 
@@ -94,7 +92,7 @@ passed
 - README.md
 - docs/00-SPEC-BASELINE.md
 
-当前分支是 feature/m8-production-hardening，最新代码提交为 e0bbcbb。不要假设聊天历史，以上交接文档是当前事实来源。开始任何修改前先执行：
+当前分支是 main，当前发布为 v1.0.1。不要假设聊天历史，以上交接文档是当前事实来源。开始任何修改前先执行：
 
 git status --short --branch
 git log --oneline -8
@@ -104,7 +102,7 @@ git log --oneline -8
 
 ## 交接状态
 
-- stage_state: portfolio-release PR review / T-052 draft created
-- verdict: Draft PR #2 is open; mock benchmark and credential-free demo evidence are ready; live validation is skipped
+- stage_state: released / T-054 closeout
+- verdict: v1.0.1 is published with remote CI; mock benchmark and credential-free demo evidence are ready; live validation is skipped
 - blocking_decision: do not run a live provider without authorized credentials and an approved read-only target repository
-- recommended_next_step: request human review of Draft PR #2; merge and tag only after approval
+- recommended_next_step: start a separately specified live-validation or product-slice task only when authorized

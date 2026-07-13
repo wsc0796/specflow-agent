@@ -4,8 +4,8 @@
 
 **Target:** `v0.1.0-portfolio`
 
-**Current branch:** `feature/m8-production-hardening`
-**Planning status:** T-047 closed; later tasks require their own task specs.
+**Release state:** `main` contains v1.0.1; the portfolio release is closed.
+**Planning status:** T-047 through T-054 are closed; later tasks require their own task specs.
 
 ## Purpose
 
@@ -37,7 +37,7 @@ T-047 facts and documentation closure
   -> T-049 bounded live validation (optional; credentials required)
   -> T-050 portfolio demo release
   -> T-051 independent branch review
-  -> v0.1.0-portfolio draft release
+  -> v1.0.1 released portfolio metadata and CI
 ```
 
 Each task is independently mergeable. A missing live-provider credential skips
