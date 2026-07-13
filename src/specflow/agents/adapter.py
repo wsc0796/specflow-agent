@@ -107,6 +107,10 @@ class AgentRunner:
 
             try:
                 output_model = self._schema_registry.get(self._identity.output_schema_id)
+            except Exception:
+                return _failed_result(self._identity, "SCHEMA_NOT_FOUND")
+
+            try:
                 validated = output_model.model_validate(data)
                 data = validated.model_dump()
             except Exception:
