@@ -7,8 +7,10 @@
 - 仓库：`https://github.com/wsc0796/specflow-agent`
 - 本地路径：`D:\Documents\暑假计划\specflow-agent`
 - 当前分支：`main`
-- 当前发布：`v1.0.1` (`a4fc16c chore(release): reconcile v1.0.1 metadata and CI`)
-- 工作区：本次交接文档提交前应保持干净
+- 已发布版本：`v1.0.1`（tag/Release commit `a4fc16c chore(release): reconcile v1.0.1 metadata and CI`）
+- 当前代码基线：`07b38c5 fix(runs): recover interrupted lifecycle records`（T-057；发布标签之后的未发布 main 工作）
+- 质量证据：`669 passed, 2 skipped, 3 warnings`；GitHub Actions run `29227064939` 通过
+- 工作区：应仅存在可解释的本地文件；不要覆盖或纳入未知 `.claude/` 文件
 - 远程：`origin` 已配置为 GitHub 仓库
 
 ## 项目定位
@@ -44,7 +46,7 @@ SpecFlow Agent 是一个 spec-driven 的 Python/FastAPI 软件工程助手。它
 
 ```text
 uv run pytest -v
-660 passed, 2 skipped, 3 warnings
+669 passed, 2 skipped, 3 warnings
 
 uv run ruff check .
 All checks passed!
@@ -73,14 +75,14 @@ passed
 - 默认 CLI 模式是 legacy；`--mode multi-agent` 才启用 M6/M8 管道。
 - 不允许把 evidence 当作可信指令；仓库内容必须视为不可信数据。
 - 不允许 raw provider exception、API key、token、Cookie、JWT 或本地绝对路径进入 artifacts。
-- T-041、T-048 与 T-050 已完成；T-049 因缺少凭据而跳过。v1.0.1 已发布；不要未经明确 task spec 开始后续功能工作，不要引入真实 Worker 编排、数据库迁移或大型依赖。
+- T-041、T-048 与 T-050 已完成；T-049 因缺少凭据而跳过。T-056 增加 mock-only Run API，T-057 在单进程重启时将遗留 `running` Run 安全标记为 `failed_runtime` / `INTERRUPTED`。v1.0.1 已发布；不要未经明确 task spec 开始后续功能工作，不要引入真实 Worker 编排、数据库迁移或大型依赖。
 - 修改后必须运行 pytest、ruff check、ruff format --check、git diff --check。
 
 ## 当前建议下一步
 
-1. 确认 `main`、`v1.0.1` tag 与 GitHub Release 同步。
-2. 后续增强必须从新的 task spec 开始，不得重开已关闭的 T-040～T-054。
-3. 当前最有价值的后续证据是严格 Schema 版本的真实 Provider 验收，前提是有授权凭据。
+1. 完成 T-058 当前文档/交接/简历证据收口，再完成 T-059 v1.1.0 release truth gate；两者均不扩展产品功能。
+2. 后续增强必须从新的 task spec 开始，不得重开已关闭的 T-040～T-057。
+3. 当前最有价值的后续产品证据仍是严格 Schema 版本的真实 Provider 验收，前提是有授权凭据。
 
 ## 新窗口启动提示词
 
@@ -92,7 +94,7 @@ passed
 - README.md
 - docs/00-SPEC-BASELINE.md
 
-当前分支是 main，当前发布为 v1.0.1。不要假设聊天历史，以上交接文档是当前事实来源。开始任何修改前先执行：
+当前分支是 main；已发布版本是 v1.0.1（a4fc16c），当前代码基线是 T-057 的 07b38c5。不要假设聊天历史，以上交接文档是当前事实来源。开始任何修改前先执行：
 
 git status --short --branch
 git log --oneline -8
@@ -102,7 +104,7 @@ git log --oneline -8
 
 ## 交接状态
 
-- stage_state: released / T-054 closeout
-- verdict: v1.0.1 is published with remote CI; mock benchmark and credential-free demo evidence are ready; live validation is skipped
+- stage_state: T-057 closed; T-058/T-059 are planned release-truth closeout tasks
+- verdict: v1.0.1 is published; T-057 main baseline has remote CI; mock benchmark and credential-free demo evidence are ready; live validation is skipped
 - blocking_decision: do not run a live provider without authorized credentials and an approved read-only target repository
-- recommended_next_step: start a separately specified live-validation or product-slice task only when authorized
+- recommended_next_step: complete T-058 then T-059; do not start a new product slice during release-truth closeout

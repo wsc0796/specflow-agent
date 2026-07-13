@@ -1,5 +1,9 @@
 # SpecFlow Agent — 项目掌握文档
 
+> **历史学习快照（M6/M7）**：本文保留 593 测试和早期 HTTP 边界的学习材料；
+> 不代表当前 main。当前可引用事实见
+> [current-resume-evidence.md](current-resume-evidence.md)。
+
 > 面试前 30 分钟看一遍这个文件。所有内容均可从代码和 Git 历史验证。
 
 ---

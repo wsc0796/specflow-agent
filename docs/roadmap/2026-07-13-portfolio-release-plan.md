@@ -1,5 +1,9 @@
 # SpecFlow Agent Portfolio Release Plan
 
+> **历史路线图快照**：其中的 660 测试数、Draft PR 和“不含 API/持久化”边界
+> 反映发布规划时的事实，不能作为当前状态。当前事实以 README、handoff 和
+> `docs/resume/current-resume-evidence.md` 为准。
+
 **Date:** 2026-07-13
 
 **Target:** `v0.1.0-portfolio`

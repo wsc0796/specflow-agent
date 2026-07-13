@@ -1,15 +1,19 @@
 # SpecFlow Agent — 简历描述与 STAR 故事
 
+> 当前版本：请优先引用 [current-resume-evidence.md](current-resume-evidence.md)
+> 的 `main` 基线（`07b38c5`，669 passed）和发布边界。本文的 STAR 细节保留
+> M6/M7 历史证据；其中出现的 607 测试数是当时快照，不是当前测试总数。
+
 ## 通用版简历 Bullets（AI/后端开发）
 
 **SpecFlow Agent | 面向代码仓库的可控多智能体规格分析系统**
-*Python 3.12 · Pydantic v2 · FastAPI · SQLAlchemy · pytest (607 tests) · DeepSeek API*
+*Python 3.12 · Pydantic v2 · FastAPI · SQLAlchemy · pytest (669 passed at `07b38c5`) · DeepSeek API*
 
 - 独立设计并实现固定六 Agent 编排架构（Coordinator + RepositoryAnalyst + Design ‖ TestStrategy ‖ RiskReview → Synthesis → Review），由确定性 Coordinator 生成 Agent 拓扑、依赖图和执行阶段，LLM 仅补充语义任务描述（M6-ADR-001）
 - 基于 Kahn 算法实现 DAG 编译与分层并行调度，Design/TestStrategy/RiskReview 三个 Specialist 并行执行，`ThreadPoolExecutor` 管理并发
 - 建立版本化 Agent/Schema Registry、结构化 AgentHandoff（含 source/target schema 校验 + canonical JSON SHA-256 hash）、AgentTraceSpan（stage timing + parent/child topology），实现 Agent 间契约与全链路可审计
 - 接入 OpenAI-compatible LLM Provider 与只读仓库 Evidence Pipeline，在真实 Python/FastAPI 仓库（sky-takeout-python）上完成 DeepSeek 六 Agent 端到端运行，6/6 Agent 执行、7 条 Handoff 校验通过、52 个仓库文件命中
-- 保留 Legacy 线性管道（Analyze→Generate→Review）作为 A/B 基线，建立 10 维度评测框架（需求覆盖、风险覆盖、测试完整度、Token 成本、延迟、Fallback 率等），607 测试全绿
+- 保留 Legacy 线性管道（Analyze→Generate→Review）作为 A/B 基线，建立 10 维度评测框架（需求覆盖、风险覆盖、测试完整度、Token 成本、延迟、Fallback 率等）；当前基线 669 passed，历史 M6 快照为 607
 - 实现有界返工（max 1 轮 Revision）、角色级降级、FAILED 运行审计持久化、canonical JSON 哈希一致性（修复中文输出 `ensure_ascii` Bug）
 
 ---
@@ -19,7 +23,7 @@
 > 针对 MiniMax JD 的关键词：多 Agent、自研框架、工具调用、评测体系
 
 **SpecFlow Agent | 自研多智能体需求分析系统**
-*Python · Pydantic · FastAPI · DeepSeek · pytest (607 tests)*
+*Python · Pydantic · FastAPI · DeepSeek · pytest (669 passed at `07b38c5`)*
 
 - **多 Agent 编排**：从零设计 Coordinator-Subagent 架构，6 个专职 Agent（分析/设计/测试策略/风险审查/综合/终审）通过确定性 DAG 编译和分层并行调度协作，不依赖 LangGraph 等第三方框架
 - **Agent 工程化**：建立 AgentRegistry（身份/角色/Schema/权限）、结构化 Handoff（source/target schema 校验 + SHA-256 hash）、AgentTraceSpan（stage timing + 全链路拓扑），Agent 间契约可审计、可复现
@@ -34,7 +38,7 @@
 > 针对复保科技 JD 的关键词：FastAPI、Pydantic、确定性、异常处理、持久化
 
 **SpecFlow Agent | 可控多智能体代码分析服务**
-*Python 3.12 · FastAPI · Pydantic v2 · SQLAlchemy · pytest (607 tests)*
+*Python 3.12 · FastAPI · Pydantic v2 · SQLAlchemy · pytest (669 passed at `07b38c5`)*
 
 - **确定性工作流引擎**：设计 9 状态 MultiAgentWorkflowEngine + 6 状态 WorkflowEngine，所有状态转换可审计、可恢复、可快照回放，业务拒绝 ≠ 系统故障
 - **Pydantic 契约体系**：SchemaRegistry（版本化、冻结语义）+ AgentIdentity.input_schema_id/output_schema_id + HandoffValidator（运行时 Schema 校验 + payload hash 验证），全链路类型安全
@@ -46,7 +50,7 @@
 
 ## 30 秒项目介绍
 
-> "我做了一个多 Agent 代码分析系统，叫 SpecFlow。它不依赖 LangGraph——Coordinator、状态机、并行调度、Agent 注册和 Handoff 校验都是自己写的。6 个 Agent 分工协作，3 个 Specialist 并行执行。DeepSeek 上跑过真实 Python 项目的端到端分析，607 个测试全绿。代码在 GitHub 上开源。"
+> "我做了一个多 Agent 代码分析系统，叫 SpecFlow。它不依赖 LangGraph——Coordinator、状态机、并行调度、Agent 注册和 Handoff 校验都是自己写的。6 个 Agent 分工协作，3 个 Specialist 并行执行。DeepSeek 上跑过真实 Python 项目的端到端分析；当前 main 基线为 669 个测试通过。代码在 GitHub 上开源。"
 
 ---
 

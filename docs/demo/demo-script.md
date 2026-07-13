@@ -1,5 +1,9 @@
 # SpecFlow Agent — Demo 脚本
 
+> **历史快照（M6，测试数 607）**：保留用于复盘最初的 live-provider
+> 演示，不是当前入口。当前无凭据 Demo 请使用
+> [portfolio-release-demo.md](portfolio-release-demo.md)。
+
 > 目标时长：3-5 分钟。可在终端直接演示，也可录屏。
 
 ## 准备
