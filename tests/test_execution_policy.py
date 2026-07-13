@@ -195,13 +195,6 @@ class TestRuntimeGuard:
         with pytest.raises(SpecFlowError, match="exceeds limit"):
             g.check_artifact_size(200)
 
-    def test_agent_limit_exceeded(self):
-        g = RuntimeGuard(ExecutionPolicy(max_parallel_agents=2))
-        g.consume_agent()
-        g.consume_agent()
-        with pytest.raises(SpecFlowError):
-            g.consume_agent()
-
 
 class TestErrorTaxonomy:
     def test_transient_retryable(self):

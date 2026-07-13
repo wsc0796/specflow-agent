@@ -31,7 +31,6 @@ class RuntimeGuard:
         self._total_input_tokens = 0
         self._total_output_tokens = 0
         self._revision_count = 0
-        self._agent_count = 0
         self._lock = Lock()
 
     # ── budget consumption ───────────────────────────────────────
@@ -129,15 +128,6 @@ class RuntimeGuard:
             raise SpecFlowError(
                 code="REVISION_BUDGET_EXCEEDED",
                 safe_message=f"Revision budget exceeded ({self._policy.max_revisions})",
-                retryable=False,
-            )
-
-    def consume_agent(self) -> None:
-        self._agent_count += 1
-        if self._agent_count > self._policy.max_parallel_agents:
-            raise SpecFlowError(
-                code="PARALLEL_AGENT_LIMIT_EXCEEDED",
-                safe_message=f"Parallel agent limit exceeded ({self._policy.max_parallel_agents})",
                 retryable=False,
             )
 

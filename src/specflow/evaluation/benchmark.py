@@ -132,6 +132,9 @@ def normalized_baseline(report: dict[str, object]) -> dict[str, object]:
                 "run_success_rate",
                 "degraded_rate",
                 "fallback_rate",
+                "completed_count",
+                "degraded_count",
+                "failed_count",
                 "total_input_tokens",
                 "total_output_tokens",
                 "error_code_counts",
@@ -223,6 +226,9 @@ def _aggregate(runs: list[dict[str, object]]) -> dict[str, object]:
         "case_count": total,
         "categories": categories,
         "metrics": {
+            "completed_count": passed,
+            "degraded_count": sum(run.get("degraded", False) for run in runs),
+            "failed_count": total - passed,
             "schema_pass_rate": _rate(
                 sum(run.get("schema_validated", False) for run in runs), total
             ),

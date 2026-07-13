@@ -31,7 +31,13 @@ from specflow.handoff.models import AgentHandoff
 from specflow.handoff.validator import HandoffValidator
 from specflow.llm import LLMClient, OpenAICompatibleConfig, OpenAICompatibleLLMClient
 from specflow.plan.hash_utils import canonical_json_bytes
-from specflow.policy import DEFAULT_POLICY, ExecutionPolicy, PolicyValidator, RuntimeGuard
+from specflow.policy import (
+    DEFAULT_POLICY,
+    ExecutionPolicy,
+    PolicyValidator,
+    RuntimeGuard,
+    SpecFlowError,
+)
 from specflow.tools import ToolExecutor, ToolRegistry
 from specflow.tools.repository_tools import RepositoryToolSet
 from specflow.trace.models import AgentTraceSpan
@@ -409,30 +415,20 @@ def run_multi_agent(
         }
         for s in stages
     ]
-    (run_dir / "checkpoints.json").write_text(
-        json.dumps(checkpoints, ensure_ascii=False, indent=2), encoding="utf-8"
-    )
-    (run_dir / "manifest.json").write_text(
-        json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8"
-    )
-    (run_dir / "agent-outputs.json").write_text(
-        json.dumps(agent_outputs, ensure_ascii=False, indent=2, sort_keys=True), encoding="utf-8"
-    )
-    (run_dir / "handoffs.json").write_text(
-        json.dumps([handoff.__dict__ for handoff in handoffs], ensure_ascii=False, indent=2),
-        encoding="utf-8",
-    )
-    (run_dir / "traces.json").write_text(
-        json.dumps(traces, ensure_ascii=False, indent=2), encoding="utf-8"
-    )
-    (run_dir / "sources.json").write_text(
-        json.dumps(
+    try:
+        _safe_write(run_dir, "checkpoints.json", checkpoints, guard)
+        _safe_write(run_dir, "manifest.json", manifest, guard)
+        _safe_write(run_dir, "agent-outputs.json", agent_outputs, guard, sort_keys=True)
+        _safe_write(run_dir, "handoffs.json", [handoff.__dict__ for handoff in handoffs], guard)
+        _safe_write(run_dir, "traces.json", traces, guard)
+        _safe_write(
+            run_dir,
+            "sources.json",
             {"evidence": evidence_text, "tool_calls": tool_call_records},
-            ensure_ascii=False,
-            indent=2,
-        ),
-        encoding="utf-8",
-    )
+            guard,
+        )
+    except SpecFlowError:
+        return 3
     # Persist unified metrics for A/B comparison
     wall_ms = int((time.monotonic() - t0) * 1000)
     metrics = _build_multi_agent_metrics(
@@ -450,9 +446,10 @@ def run_multi_agent(
         provider=provider,
         model=model,
     )
-    (run_dir / "metrics.json").write_text(
-        json.dumps(metrics.as_dict(), ensure_ascii=False, indent=2), encoding="utf-8"
-    )
+    try:
+        _safe_write(run_dir, "metrics.json", metrics.as_dict(), guard)
+    except SpecFlowError:
+        return 3
     return 0
 
 

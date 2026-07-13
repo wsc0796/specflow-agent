@@ -15,8 +15,11 @@
     }
   },
   "metrics": {
+    "completed_count": 12,
+    "degraded_count": 0,
     "degraded_rate": 0.0,
     "error_code_counts": {},
+    "failed_count": 0,
     "fallback_rate": 0.0,
     "run_success_rate": 1.0,
     "schema_pass_rate": 1.0,
