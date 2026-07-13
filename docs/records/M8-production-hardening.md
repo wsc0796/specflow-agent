@@ -12,16 +12,22 @@ evidence-derived metrics. It deliberately excludes API/deployment work.
 
 ## Validation
 
-See `docs/reports/M8-review-fix-report.md` for the full command and artifact
-evidence. The final quality gate reports 637 passed tests and 2 skipped.
+The original M8 remediation acceptance evidence is preserved in
+`docs/reports/M8-review-fix-report.md` (637 passed, 2 skipped at that time).
+Subsequent T-040 and T-041 closure work raised the current local baseline to 656
+passed, 2 skipped, and 3 known warnings; see their completion reports.
 
 ## Commits
 
-The M8 remediation commits are on `feat/m8-production-hardening`; no merge to
-`main` was performed. The final closeout commit records the complete scope.
+The M8 remediation and subsequent closures are on
+`feature/m8-production-hardening`; no merge to `main` was performed. T-040
+RuntimeGuard closure is recorded at `b7e5311`; T-041 strict payload schema
+closure is recorded at `e0bbcbb`.
 
 ## Known limits and next gate
 
-M8 mock acceptance is not a new live-provider claim. Deferred M8 API service,
+M8 mock acceptance is not a new live-provider claim. Deferred API service,
 authentication, deployment, and golden-evaluation work require separately
-authorized task specifications.
+authorized task specifications. T-047 has closed the current documentation
+facts; T-048 Benchmark Harness must be separately specified. See
+`docs/roadmap/2026-07-13-portfolio-release-plan.md`.

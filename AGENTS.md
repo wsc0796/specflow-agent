@@ -3,16 +3,18 @@
 ## Current phase
 
 The project has completed all milestones through M7. M8 independent-review
-remediation is complete and has passed local mock acceptance:
+remediation is complete and T-040/T-041 have closed the execution-policy and
+strict payload-schema follow-up work:
 - M3: Agent Runtime Foundation
 - M4: Agent Workflow
 - M5: Tool Use & Repository Intelligence
 - M6: Multi-Agent Orchestration (Live Provider validated)
 - M7: Evaluation, Demo & Resume (portfolio-ready)
 
-637 passing tests, 2 skipped. M8 production hardening remains limited to the
-implemented policy, schema, fallback, evidence, and artifact boundaries; it
-does not claim the deferred API-service or deployment work listed in M7.
+656 passing tests, 2 skipped, 3 known warnings. M8 production hardening remains
+limited to the implemented policy, schema, fallback, evidence, and artifact
+boundaries; it does not claim a new live-provider validation, API-service, or
+deployment work.
 
 All tasks T-001 through T-032 are completed. Implemented:
 health endpoint, Project persistence API, safe scanning, deterministic technology
@@ -36,7 +38,9 @@ The legacy `--mode legacy` pipeline (Analyze→Generate→Review) is preserved
 unchanged as the T-029 A/B baseline. Multi-agent mode is accessed via
 `--mode multi-agent`.
 
-The next milestone is the separately scoped M8 follow-up work, if authorized.
+T-047 facts and documentation closure is complete. The planned
+portfolio-release tasks after it, beginning with T-048 Benchmark Harness,
+require their own frozen task specifications.
 Future task IDs are not permission to implement future features.
 
 ## Mandatory workflow

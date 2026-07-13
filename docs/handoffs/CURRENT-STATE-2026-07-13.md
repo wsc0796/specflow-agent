@@ -7,7 +7,7 @@
 - 仓库：`https://github.com/wsc0796/specflow-agent`
 - 本地路径：`D:\Documents\暑假计划\specflow-agent`
 - 当前分支：`feature/m8-production-hardening`
-- 最新提交：`b7e5311 fix(policy): enforce runtime token and parallel budgets`
+- 最新代码提交：`e0bbcbb fix(schema): enforce strict agent payload contracts — T-041 complete`
 - 工作区：本次交接文档提交前应保持干净
 - 远程：`origin` 已配置为 GitHub 仓库
 
@@ -26,6 +26,7 @@ SpecFlow Agent 是一个 spec-driven 的 Python/FastAPI 软件工程助手。它
 - T-024～T-032：M6 多 Agent 编排、SchemaRegistry、Plan/Handoff、Coordinator、Trace、A/B evaluation
 - M7：Evaluation、Demo、Resume 资料，legacy pipeline 保持兼容
 - M8 T-040：ExecutionPolicy、Error Taxonomy、RuntimeGuard 与 multi-agent 运行时接线
+- T-041：严格 Agent 输入/输出 payload schema 与 handoff 前验证
 
 ## 最近 T-040 修复
 
@@ -72,7 +73,7 @@ passed
 - 默认 CLI 模式是 legacy；`--mode multi-agent` 才启用 M6/M8 管道。
 - 不允许把 evidence 当作可信指令；仓库内容必须视为不可信数据。
 - 不允许 raw provider exception、API key、token、Cookie、JWT 或本地绝对路径进入 artifacts。
-- 不要未经明确任务 spec 实现 T-041 以后任务，不要引入真实 Worker 编排、数据库迁移或大型依赖。
+- T-041 已完成；不要未经明确任务 spec 实现 T-048 以后任务，不要引入真实 Worker 编排、数据库迁移或大型依赖。
 - 修改后必须运行 pytest、ruff check、ruff format --check、git diff --check。
 
 ## 当前建议下一步
@@ -80,7 +81,7 @@ passed
 1. 检查并推送本交接文档所在提交。
 2. 在 GitHub 上确认 `feature/m8-production-hardening` 与 `origin` 同步。
 3. 若准备合并，先对 `main...feature/m8-production-hardening` 做独立 review，再开 Draft PR 或合并。
-4. 下一开发任务应先创建/冻结对应 task spec；T-041 预计处理更严格的 Agent payload/schema 边界，但不要凭此文件直接扩大范围。
+4. T-047 已完成；T-048 Benchmark Harness 必须先创建/冻结对应 task spec，不要凭本文件直接扩大范围。
 5. 简历化收尾还需要：一条可复现 demo 命令、真实运行 artifact、评估指标表、架构图和面试讲解稿。
 
 ## 新窗口启动提示词
@@ -93,7 +94,7 @@ passed
 - README.md
 - docs/00-SPEC-BASELINE.md
 
-当前分支是 feature/m8-production-hardening，最新提交 b7e5311。不要假设聊天历史，以上交接文档是当前事实来源。开始任何修改前先执行：
+当前分支是 feature/m8-production-hardening，最新代码提交为 e0bbcbb。不要假设聊天历史，以上交接文档是当前事实来源。开始任何修改前先执行：
 
 git status --short --branch
 git log --oneline -8
@@ -103,7 +104,7 @@ git log --oneline -8
 
 ## 交接状态
 
-- stage_state: closeout / handoff-ready
-- verdict: ready for a new window
-- blocking_decision: none for context handoff; merge/release still requires independent review
-- recommended_next_step: push this handoff commit, then open a new window using the prompt above
+- stage_state: portfolio-release planning / T-047 closed
+- verdict: ready to freeze a T-048 Benchmark Harness task specification
+- blocking_decision: no benchmark implementation without a task spec; merge/release still requires independent review
+- recommended_next_step: create and approve the T-048 task spec, then run only its scoped implementation

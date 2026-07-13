@@ -30,10 +30,14 @@ uv run specflow run --mode multi-agent --provider openai-compatible --model deep
 
 ## Current milestone
 
-**M8 independent-review remediation — CLOSED.** 637 tests passed, 2 skipped.
-The remediation adds fail-closed schema enforcement, bounded execution policy,
-safe error artifacts, deterministic evidence aliases for Chinese requirements,
-and revision audit edges. See `docs/reports/M8-review-fix-report.md`.
+**M8 independent-review remediation — CLOSED on
+`feature/m8-production-hardening`; not merged to `main`.** The follow-up T-040
+and T-041 work adds RuntimeGuard budget enforcement and strict inter-agent
+payload schemas. The current local baseline is **656 passed, 2 skipped, 3 known
+warnings**. M8 is local mock acceptance and does not claim a new live-provider
+run. See `docs/reports/T-040-completion-report.md`,
+`docs/reports/T-041-completion-report.md`, and
+`docs/roadmap/2026-07-13-portfolio-release-plan.md`.
 
 M6 remains the latest live-provider validation milestone. M8 validation in this
 repository is local mock acceptance; it does not add a new live-provider claim.
