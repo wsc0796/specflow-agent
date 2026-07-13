@@ -81,7 +81,7 @@ passed
 
 ## 当前建议下一步
 
-1. 完成 T-061 的完整本地与远端 CI 门禁；获得用户明确授权后，才创建 v1.1.0 tag 或 GitHub Release。
+1. T-061 的完整本地与远端 CI 门禁已通过；获得用户明确授权后，才创建 v1.1.0 tag 或 GitHub Release。
 2. 后续增强必须从新的 task spec 开始，不得重开已关闭的 T-040～T-061。
 3. 先用实际开发者/负责人试用验证“变更方案评审”工作流；没有标注数据前，不要宣称风险发现率或节省成本。
 
@@ -105,7 +105,7 @@ git log --oneline -8
 
 ## 交接状态
 
-- stage_state: T-061 execution; v1.1.0 release-truth candidate remains untagged
-- verdict: v1.0.1 is published; v1.1.0 awaits T-061 full/remote gates and explicit user release authorization; mock benchmark and credential-free demo evidence are ready; live validation is skipped
+- stage_state: T-061 closed; v1.1.0 release-truth candidate remains untagged
+- verdict: v1.0.1 is published; T-061 local gates and GitHub Actions CI 29252665568 passed; v1.1.0 still requires explicit user release authorization; mock benchmark and credential-free demo evidence are ready; live validation is skipped
 - blocking_decision: do not run a live provider without authorized credentials and an approved read-only target repository
-- recommended_next_step: after T-061 remote CI, request explicit user authorization before creating a v1.1.0 tag or GitHub Release; do not start a new product slice without a separately frozen task spec
+- recommended_next_step: request explicit user authorization before creating a v1.1.0 tag or GitHub Release; do not start a new product slice without a separately frozen task spec

@@ -54,8 +54,8 @@ quality_gates: no new skip or xfail; deterministic API and SQLite integration co
 uncovered_risks:
   - no authentication, authorization, multi-user concurrency control or reviewer identity proof
   - mock benchmark remains a contract test, not a live-model quality or business-impact measure
-  - remote CI remains required after push
-next_recommended_gate: inspect remote GitHub Actions before any v1.1.0 release decision
+  - no authentication, multi-user conflict resolution or asynchronous ownership exists
+next_recommended_gate: obtain explicit release authorization before any v1.1.0 tag decision
 ```
 
 ## Self-review
@@ -84,5 +84,8 @@ This is a self-review in the same coding context, not an independent review.
 
 ## Release status
 
-Local gates are complete. The focused commit and remote CI verification are the
-remaining closeout steps; this report does not authorize a tag or GitHub Release.
+Focused implementation commit: `2de78ef feat(runs): add change review decision loop`.
+Remote GitHub Actions [CI run 29252665568](https://github.com/wsc0796/specflow-agent/actions/runs/29252665568)
+passed its `quality`, `security` and `benchmark` jobs. This task is closed; the
+result does not authorize a v1.1.0 tag or GitHub Release without explicit user
+authorization.

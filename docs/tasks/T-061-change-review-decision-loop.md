@@ -1,7 +1,7 @@
 ---
 task_id: T-061
 title: Change Review Decision Loop
-stage_state: closeout
+stage_state: closed
 owner: Codex
 branch: main
 ---
