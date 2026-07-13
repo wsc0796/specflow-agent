@@ -19,4 +19,22 @@ jobs:
       - run: uv run pytest -q
       - run: uv run ruff check .
       - run: uv run ruff format --check .
+      - run: uv build
+      - run: uv run specflow run --help
+
+  benchmark:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+      - run: uv sync --all-groups
+      - run: uv run specflow benchmark --suite benchmarks/cases --repo benchmarks/fixtures/portfolio-python --output artifacts/ci-benchmark --baseline artifacts/ci-benchmark/baseline.json
+      - run: git diff --no-index --exit-code benchmarks/results/mock-baseline.json artifacts/ci-benchmark/baseline.json
+
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
       - run: python scripts/check_secrets.py
