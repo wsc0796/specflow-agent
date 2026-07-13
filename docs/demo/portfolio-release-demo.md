@@ -70,4 +70,4 @@ skipped for this portfolio release because no provider credentials were present.
 uv run pytest -v
 ```
 
-The expected current result is 661 passed, 2 skipped and 3 known warnings.
+The expected current result is 660 passed, 2 skipped and 3 known warnings.

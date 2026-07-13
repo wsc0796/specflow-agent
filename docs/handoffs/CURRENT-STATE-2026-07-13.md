@@ -44,7 +44,7 @@ SpecFlow Agent 是一个 spec-driven 的 Python/FastAPI 软件工程助手。它
 
 ```text
 uv run pytest -v
-661 passed, 2 skipped, 3 warnings
+660 passed, 2 skipped, 3 warnings
 
 uv run ruff check .
 All checks passed!
@@ -81,7 +81,7 @@ passed
 1. 检查并推送本交接文档所在提交。
 2. 在 GitHub 上确认 `feature/m8-production-hardening` 与 `origin` 同步。
 3. 若准备合并，先对 `main...feature/m8-production-hardening` 做独立 review，再开 Draft PR 或合并。
-4. T-050 已完成；下一步是对 `main...feature/m8-production-hardening` 进行独立 T-051 branch review，之后再决定 Draft PR。
+4. T-051 已完成独立审查与修复；下一步可创建 Draft PR，或在推送后请求人工复核。
 5. 简历化收尾还需要：一条可复现 demo 命令、真实运行 artifact、评估指标表、架构图和面试讲解稿。
 
 ## 新窗口启动提示词
@@ -104,7 +104,7 @@ git log --oneline -8
 
 ## 交接状态
 
-- stage_state: portfolio-release review / T-050 closed
+- stage_state: portfolio-release closeout / T-051 approved
 - verdict: mock benchmark and credential-free demo evidence are ready; live validation is skipped
-- blocking_decision: do not run a live provider without authorized credentials and an approved read-only target repository; do not merge without independent review
-- recommended_next_step: perform T-051 independent review of main...feature/m8-production-hardening
+- blocking_decision: do not run a live provider without authorized credentials and an approved read-only target repository
+- recommended_next_step: push the reviewed branch and create a Draft PR for human merge review

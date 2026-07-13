@@ -59,7 +59,7 @@ from the separately documented M6 live-provider validation.
 **M8 independent-review remediation — CLOSED on
 `feature/m8-production-hardening`; not merged to `main`.** The follow-up T-040
 and T-041 work adds RuntimeGuard budget enforcement and strict inter-agent
-payload schemas. The current local baseline is **661 passed, 2 skipped, 3 known
+payload schemas. The current local baseline is **660 passed, 2 skipped, 3 known
 warnings**. M8 is local mock acceptance and does not claim a new live-provider
 run. See `docs/reports/T-040-completion-report.md`,
 `docs/reports/T-041-completion-report.md`, and

@@ -18,7 +18,7 @@ release prioritizes reproducible evidence over new platform surface area.
 - M8 hardening includes RuntimeGuard-based multi-agent budget enforcement and
   strict sender/receiver agent payload validation (T-040 and T-041).
 - The default CLI remains the legacy pipeline; multi-agent mode is opt-in.
-- The current local quality baseline is **661 passed, 2 skipped, 3 warnings**.
+- The current local quality baseline is **660 passed, 2 skipped, 3 warnings**.
 - M8 is branch-only and has no new live-provider claim.
 
 ## Explicit non-goals
@@ -53,7 +53,7 @@ handoff, and a completion report. Historical reports retain their original
 dated validation results and gain no retrospective claim.
 
 **Acceptance:** current documents identify T-040/T-041 as complete, report the
-661/2/3 baseline, name `feature/m8-production-hardening`, and state that M8 has
+660/2/3 baseline, name `feature/m8-production-hardening`, and state that M8 has
 not been merged to `main`.
 
 ## T-048 — Reproducible benchmark harness
@@ -63,7 +63,8 @@ than an anecdotal demo.
 
 **Scope:** 12 cases: four repository-understanding cases, four change-planning
 cases, and four review/risk cases. Each case declares its requirement, permitted
-read-only fixture/repository, and evidence-based rubric. The runner produces a
+read-only fixture/repository, and a machine-checkable evidence contract of
+expected fixture paths. The runner produces a
 machine-readable aggregate report from existing run artifacts.
 
 **Metrics:** schema pass rate, completion/degraded/failure counts, fallback
