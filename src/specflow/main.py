@@ -7,6 +7,7 @@ from fastapi import FastAPI
 
 from specflow.db import Database, default_url
 from specflow.projects import router as projects_router
+from specflow.runs import recover_interrupted_runs
 from specflow.runs import router as runs_router
 
 
@@ -20,6 +21,7 @@ def create_app(database_url: str | None = None, artifact_root: Path | None = Non
         application.state.artifact_root = run_artifact_root
         run_artifact_root.mkdir(parents=True, exist_ok=True)
         database.create_schema()
+        recover_interrupted_runs(database)
         yield
 
     application = FastAPI(title="SpecFlow Agent", version="1.0.1", lifespan=lifespan)

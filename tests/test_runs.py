@@ -5,7 +5,9 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 from sqlalchemy import inspect
 
+from specflow.db import WorkflowRun
 from specflow.main import create_app
+from specflow.policy import RunStatus
 
 
 def client_for(tmp_path: Path) -> TestClient:
@@ -191,3 +193,103 @@ def test_startup_adds_run_metadata_to_a_legacy_sqlite_database(tmp_path: Path) -
         "artifact_directory",
         "error_code",
     } <= columns
+
+
+def test_startup_recovers_interrupted_running_run_once(tmp_path: Path, monkeypatch) -> None:
+    database_path = tmp_path / "restart.db"
+    database_url = f"sqlite:///{database_path.as_posix()}"
+    artifacts = tmp_path / "artifacts"
+    initial_app = create_app(database_url, artifact_root=artifacts)
+
+    with TestClient(initial_app) as client:
+        project_id = register_project(client, tmp_path / "repository")
+        with next(initial_app.state.database.sessions()) as session:
+            session.add(
+                WorkflowRun(
+                    id="interrupted-run",
+                    project_id=project_id,
+                    workflow_type="multi-agent",
+                    current_state=RunStatus.RUNNING,
+                    version=7,
+                )
+            )
+            session.commit()
+
+    def fail_if_runner_called(**_: object) -> int:
+        raise AssertionError("startup recovery must not execute the runner")
+
+    monkeypatch.setattr("specflow.runs.run_multi_agent", fail_if_runner_called)
+    restarted_app = create_app(database_url, artifact_root=artifacts)
+    with TestClient(restarted_app) as client:
+        response = client.get("/api/v1/runs/interrupted-run")
+        assert response.status_code == 200
+        body = response.json()
+        assert body["finished_at"] is not None
+        assert body["status"] == RunStatus.FAILED_RUNTIME
+        assert body["result_status"] == RunStatus.FAILED_RUNTIME
+        assert body["error_code"] == "INTERRUPTED"
+        with next(restarted_app.state.database.sessions()) as session:
+            recovered = session.get(WorkflowRun, "interrupted-run")
+            assert recovered is not None
+            assert recovered.version == 8
+
+    second_restart = create_app(database_url, artifact_root=artifacts)
+    with TestClient(second_restart):
+        with next(second_restart.state.database.sessions()) as session:
+            recovered = session.get(WorkflowRun, "interrupted-run")
+            assert recovered is not None
+            assert recovered.version == 8
+
+
+def test_startup_leaves_non_running_runs_untouched(tmp_path: Path) -> None:
+    database_path = tmp_path / "states.db"
+    database_url = f"sqlite:///{database_path.as_posix()}"
+    app = create_app(database_url, artifact_root=tmp_path / "artifacts")
+
+    with TestClient(app) as client:
+        project_id = register_project(client, tmp_path / "repository")
+        states = [
+            RunStatus.CREATED,
+            RunStatus.COMPLETED,
+            RunStatus.COMPLETED_DEGRADED,
+            RunStatus.REJECTED,
+            RunStatus.FAILED_RUNTIME,
+            RunStatus.FAILED_SECURITY,
+            RunStatus.BUDGET_EXCEEDED,
+            RunStatus.CANCELLED,
+        ]
+        with next(app.state.database.sessions()) as session:
+            session.add_all(
+                [
+                    WorkflowRun(
+                        id=f"non-running-{index}",
+                        project_id=project_id,
+                        workflow_type="multi-agent",
+                        current_state=run_status,
+                        result_status=None if run_status == RunStatus.CREATED else run_status,
+                        error_code=(
+                            "REPOSITORY_UNAVAILABLE"
+                            if run_status == RunStatus.FAILED_SECURITY
+                            else None
+                        ),
+                        version=index + 3,
+                    )
+                    for index, run_status in enumerate(states)
+                ]
+            )
+            session.commit()
+
+    restarted_app = create_app(database_url, artifact_root=tmp_path / "artifacts")
+    with TestClient(restarted_app):
+        with next(restarted_app.state.database.sessions()) as session:
+            for index, run_status in enumerate(states):
+                preserved = session.get(WorkflowRun, f"non-running-{index}")
+                assert preserved is not None
+                assert preserved.current_state == run_status
+                assert preserved.result_status == (
+                    None if run_status == RunStatus.CREATED else run_status
+                )
+                assert preserved.error_code == (
+                    "REPOSITORY_UNAVAILABLE" if run_status == RunStatus.FAILED_SECURITY else None
+                )
+                assert preserved.version == index + 3

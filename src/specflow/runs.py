@@ -10,14 +10,16 @@ from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field
+from sqlalchemy import func, update
 from sqlalchemy.orm import Session
 
-from specflow.db import Project, WorkflowRun
+from specflow.db import Database, Project, WorkflowRun
 from specflow.policy import DEFAULT_POLICY, RunStatus
 from specflow.runner_multi import run_multi_agent
 
 router = APIRouter(prefix="/api/v1/runs", tags=["runs"])
 _MAX_ARTIFACT_FILES = 32
+_INTERRUPTED_ERROR_CODE = "INTERRUPTED"
 
 
 class RunCreate(BaseModel):
@@ -133,6 +135,27 @@ class RunService:
         if not candidate.is_relative_to(self.artifact_root):
             return None
         return candidate.relative_to(self.artifact_root).as_posix()
+
+
+def recover_interrupted_runs(database: Database) -> int:
+    """Resolve runs left active by a previous single-process interruption.
+
+    This does not retry or resume work: after a process restart, the synchronous
+    mock executor that owned a durable ``running`` row no longer exists.
+    """
+    with database.engine.begin() as connection:
+        result = connection.execute(
+            update(WorkflowRun)
+            .where(WorkflowRun.current_state == RunStatus.RUNNING)
+            .values(
+                current_state=RunStatus.FAILED_RUNTIME,
+                result_status=RunStatus.FAILED_RUNTIME,
+                error_code=_INTERRUPTED_ERROR_CODE,
+                finished_at=datetime.now(UTC),
+                version=func.coalesce(WorkflowRun.version, 0) + 1,
+            )
+        )
+    return result.rowcount or 0
 
 
 def _outcome_from_exit_code(exit_code: int) -> tuple[str, str, str | None]:
