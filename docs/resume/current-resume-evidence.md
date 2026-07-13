@@ -26,6 +26,9 @@
 > FastAPI/SQLite lifecycle slice; validated the current `main` baseline with
 > 671 passing automated tests and CI-backed quality gates.
 
+The concise, application-ready version is
+[specflow-resume-v0.md](specflow-resume-v0.md).
+
 ## Boundaries to preserve in interviews
 
 - Do not claim production deployment, user traffic, semantic accuracy, or live

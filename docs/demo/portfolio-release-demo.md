@@ -7,6 +7,9 @@
 This demo takes 3 to 5 minutes. It uses no provider credential and makes no
 live-provider claim.
 
+For a spoken interview introduction rather than a terminal walkthrough, use
+[specflow-three-minute-talk.md](specflow-three-minute-talk.md).
+
 ## 1. What to say first
 
 SpecFlow is a controlled repository-analysis system. It keeps workflow authority

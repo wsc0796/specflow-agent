@@ -22,7 +22,9 @@ The orchestration is built from scratch without LangGraph or agent frameworks.
 - **Execution policy** — bounded LLM calls, revisions, wall time, evidence/tool limits, and classified retry behavior
 - **Agent-level trace topology** — stage timing, parent/child spans, submission/completion timestamps
 - **Dual pipeline** — legacy linear (Analyze→Generate→Review) preserved as A/B baseline
-- **Live Provider validated** — DeepSeek v4-flash on sky-takeout-python: 6/6 agents, 7 handoffs, PASS
+- **Historical M6 live-provider validation** — a separately documented DeepSeek
+  run on sky-takeout-python (6/6 agents, 7 handoffs); it is not v1.1.0 candidate
+  or mock-benchmark evidence
 - **Reproducible benchmark** — 12 committed mock cases with a normalized artifact-contract baseline
 
 ## Quick start
@@ -58,7 +60,9 @@ portfolio baseline.
 
 For a credential-free walkthrough, read
 `docs/demo/portfolio-release-demo.md`. It distinguishes mock contract evidence
-from the separately documented M6 live-provider validation.
+from the separately documented M6 live-provider validation. For an interview
+walkthrough, use `docs/demo/specflow-three-minute-talk.md`; the current resume
+copy is in `docs/resume/specflow-resume-v0.md`.
 
 ## Current milestone
 
