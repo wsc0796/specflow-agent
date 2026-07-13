@@ -38,9 +38,8 @@ The legacy `--mode legacy` pipeline (Analyze→Generate→Review) is preserved
 unchanged as the T-029 A/B baseline. Multi-agent mode is accessed via
 `--mode multi-agent`.
 
-T-047 facts and documentation closure is complete. The planned
-portfolio-release tasks after it, beginning with T-048 Benchmark Harness,
-require their own frozen task specifications.
+T-047 through T-051 are complete. The branch is ready for a Draft PR; future
+work requires a separately frozen task specification.
 Future task IDs are not permission to implement future features.
 
 ## Mandatory workflow

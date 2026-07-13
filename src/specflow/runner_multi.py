@@ -340,6 +340,7 @@ def run_multi_agent(
             stages=stages,
             plan=plan,
             discovered_files=discovered_files,
+            guard=guard,
             error="MULTI_AGENT_RUN_FAILED",
         )
         return 3
@@ -782,6 +783,7 @@ def _persist_failed_run(
     stages: list[StageExecutionResult],
     plan: object,
     discovered_files: int,
+    guard: RuntimeGuard,
     error: str,
 ) -> None:
     """Persist FAILED manifest, state history, and partial traces for audit."""
@@ -814,22 +816,15 @@ def _persist_failed_run(
             "stages_completed": len(stages),
             "discovered_files": discovered_files,
         }
-        (run_dir / "manifest.json").write_text(
-            json.dumps(failed_manifest, ensure_ascii=False, indent=2), encoding="utf-8"
-        )
-        (run_dir / "traces.json").write_text(
-            json.dumps(traces, ensure_ascii=False, indent=2), encoding="utf-8"
-        )
+        _safe_write(run_dir, "manifest.json", failed_manifest, guard)
+        _safe_write(run_dir, "traces.json", traces, guard)
         # Persist partial agent outputs for debugging
         agent_outputs = {
             f"stage-{s.stage_index}/{aid}": result
             for s in stages
             for aid, result in s.agent_results.items()
         }
-        (run_dir / "agent-outputs.json").write_text(
-            json.dumps(agent_outputs, ensure_ascii=False, indent=2, sort_keys=True),
-            encoding="utf-8",
-        )
+        _safe_write(run_dir, "agent-outputs.json", agent_outputs, guard, sort_keys=True)
     except Exception:
         # Artifact persistence is best-effort — don't hide the original error.
         import logging

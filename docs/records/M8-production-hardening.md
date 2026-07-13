@@ -28,6 +28,6 @@ closure is recorded at `e0bbcbb`.
 
 M8 mock acceptance is not a new live-provider claim. Deferred API service,
 authentication, deployment, and golden-evaluation work require separately
-authorized task specifications. T-047 has closed the current documentation
-facts; T-048 Benchmark Harness must be separately specified. See
+authorized task specifications. T-047 through T-051 have closed the portfolio
+release preparation; the next gate is a Draft PR and human merge review. See
 `docs/roadmap/2026-07-13-portfolio-release-plan.md`.
