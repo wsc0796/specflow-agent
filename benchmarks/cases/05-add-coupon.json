@@ -1,0 +1,7 @@
+{
+  "case_id": "add_coupon",
+  "category": "change_planning",
+  "title": "Plan coupon support",
+  "requirement": "Plan a coupon feature for order submission, including validation, order data changes, risks, and tests.",
+  "expected_file_patterns": ["app/main.py", "app/orders.py"]
+}

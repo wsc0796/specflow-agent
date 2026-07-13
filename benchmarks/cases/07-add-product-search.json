@@ -1,0 +1,7 @@
+{
+  "case_id": "add_product_search",
+  "category": "change_planning",
+  "title": "Plan product search endpoint",
+  "requirement": "Plan a product search API endpoint with query validation, response contract, and tests.",
+  "expected_file_patterns": ["app/catalog.py", "app/main.py"]
+}

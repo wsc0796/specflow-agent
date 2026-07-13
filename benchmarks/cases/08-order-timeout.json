@@ -1,0 +1,7 @@
+{
+  "case_id": "order_timeout",
+  "category": "change_planning",
+  "title": "Plan order timeout",
+  "requirement": "Plan automatic cancellation for expired pending orders with idempotency, state race, and test considerations.",
+  "expected_file_patterns": ["app/orders.py", "tests/test_orders.py"]
+}

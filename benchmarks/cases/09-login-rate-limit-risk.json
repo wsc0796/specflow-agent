@@ -1,0 +1,7 @@
+{
+  "case_id": "login_rate_limit_risk",
+  "category": "review_risk",
+  "title": "Review login rate-limit risk",
+  "requirement": "Review failed login rate limiting for security, concurrency, reset behavior, and missing tests.",
+  "expected_file_patterns": ["app/auth.py"]
+}

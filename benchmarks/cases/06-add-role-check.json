@@ -1,0 +1,7 @@
+{
+  "case_id": "add_role_check",
+  "category": "change_planning",
+  "title": "Plan role authorization",
+  "requirement": "Plan role-based authorization for order administration and identify authentication integration risks.",
+  "expected_file_patterns": ["app/auth.py", "app/main.py"]
+}

@@ -28,12 +28,31 @@ $env:SPECFLOW_LLM_API_KEY = "<key>"
 uv run specflow run --mode multi-agent --provider openai-compatible --model deepseek-v4-flash --repo . --requirement "Add a search endpoint" --output ./out
 ```
 
+## Portfolio benchmark (mock-only)
+
+Run the committed 12-case fixture suite through the existing multi-agent
+pipeline. It produces ignored per-case artifacts plus a normalized, commit-safe
+baseline; it proves deterministic artifact and schema contracts, not live model
+quality.
+
+```powershell
+uv run specflow benchmark `
+  --suite benchmarks/cases `
+  --repo benchmarks/fixtures/portfolio-python `
+  --output artifacts/benchmark-t048 `
+  --baseline benchmarks/results/mock-baseline.json
+```
+
+Inspect `artifacts/benchmark-t048/benchmark-report.json` for runtime metrics
+(including latency) and `benchmarks/results/mock-baseline.json` for the stable
+portfolio baseline.
+
 ## Current milestone
 
 **M8 independent-review remediation — CLOSED on
 `feature/m8-production-hardening`; not merged to `main`.** The follow-up T-040
 and T-041 work adds RuntimeGuard budget enforcement and strict inter-agent
-payload schemas. The current local baseline is **656 passed, 2 skipped, 3 known
+payload schemas. The current local baseline is **661 passed, 2 skipped, 3 known
 warnings**. M8 is local mock acceptance and does not claim a new live-provider
 run. See `docs/reports/T-040-completion-report.md`,
 `docs/reports/T-041-completion-report.md`, and

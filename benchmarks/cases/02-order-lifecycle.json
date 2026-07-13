@@ -1,0 +1,7 @@
+{
+  "case_id": "order_lifecycle",
+  "category": "repository_understanding",
+  "title": "Explain order lifecycle",
+  "requirement": "Analyze the order lifecycle from creation to cancellation and identify state transitions.",
+  "expected_file_patterns": ["app/orders.py"]
+}
