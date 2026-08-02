@@ -6,7 +6,7 @@
   "status": "completed",
   "provider_type": "mock",
   "model": "mock-model",
-  "repository_root": "D:\\Documents\\暑假计划\\specflow-agent",
+  "repository_root": "fixture://specflow-agent",
   "requirement": "Add multi-agent orchestration",
   "requirement_hash": "187f69001ee6fe0af9ce486647a54a541fdade89bab162abad55e223f9115080",
   "evidence_hash": "f3aff81eba52d845c68938d15e235a06dd9d70467ea99e85e0374e18705e6267",

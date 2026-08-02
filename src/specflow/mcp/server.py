@@ -34,7 +34,7 @@ class McpServer:
     def __init__(self, registry: ToolRegistry) -> None:
         self._executor = ToolExecutor(registry)
         self._catalog = McpToolCatalog(registry)
-        self._initialized = False
+        self._state = "new"
 
     def handle_message(self, message: object) -> dict[str, Any] | None:
         """Handle one decoded JSON-RPC message.
@@ -52,12 +52,20 @@ class McpServer:
         params = message.get("params")
 
         if method == "initialize":
-            return self._handle_initialize(params)
+            if self._state != "new":
+                raise McpInvalidRequestError("initialize may only be called once")
+            response = self._handle_initialize(params)
+            self._state = "initializing"
+            return response
         if request_id is None:
             if method == "notifications/initialized":
-                self._initialized = True
+                if self._state != "initializing":
+                    raise McpNotInitializedError(
+                        "notifications/initialized requires a successful initialize request"
+                    )
+                self._state = "initialized"
             return None
-        if not self._initialized:
+        if self._state != "initialized":
             raise McpNotInitializedError("Server not initialized; call initialize first")
         if method == "ping":
             return {}
@@ -70,8 +78,11 @@ class McpServer:
     def _handle_initialize(self, params: Any) -> dict[str, Any]:
         if not isinstance(params, dict) or not isinstance(params.get("protocolVersion"), str):
             raise McpInvalidParamsError("initialize params must include protocolVersion")
+        requested_version = params["protocolVersion"]
         return {
-            "protocolVersion": params["protocolVersion"],
+            "protocolVersion": (
+                requested_version if requested_version == PROTOCOL_VERSION else PROTOCOL_VERSION
+            ),
             "capabilities": {"tools": {"listChanged": False}},
             "serverInfo": {"name": "specflow-agent", "version": __version__},
         }

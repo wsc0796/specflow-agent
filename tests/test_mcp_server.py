@@ -119,6 +119,28 @@ class TestHandshake:
         with pytest.raises(McpInvalidParamsError):
             server.handle_message({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}})
 
+    def test_unsupported_protocol_negotiates_server_version(self, server) -> None:
+        response = server.handle_message(
+            {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "initialize",
+                "params": {"protocolVersion": "unsupported-version"},
+            }
+        )
+        assert response["protocolVersion"] == "2025-06-18"
+
+    def test_initialized_notification_cannot_bypass_initialize(self, server) -> None:
+        with pytest.raises(McpNotInitializedError):
+            server.handle_message({"jsonrpc": "2.0", "method": "notifications/initialized"})
+        with pytest.raises(McpNotInitializedError):
+            server.handle_message({"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}})
+
+    def test_initialize_cannot_be_repeated(self, server) -> None:
+        server.handle_message(_INITIALIZE_REQUEST)
+        with pytest.raises(McpInvalidRequestError):
+            server.handle_message(_INITIALIZE_REQUEST)
+
     def test_methods_rejected_before_initialized(self, server) -> None:
         with pytest.raises(McpNotInitializedError):
             server.handle_message({"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}})
@@ -172,6 +194,7 @@ class TestToolsCall:
         )
         assert response["isError"] is True
         assert response["content"][0]["text"] == "simulated failure"
+        assert response["structuredContent"]["error_type"] == "RuntimeError"
 
     def test_unknown_tool_is_error_not_exception(self, server) -> None:
         _initialize(server)
@@ -262,6 +285,8 @@ class TestRunStdio:
         repo = tmp_path / "repo"
         repo.mkdir()
         (repo / "a.txt").write_text("hello from smoke", encoding="utf-8")
+        (repo / ".env").write_text("API_KEY=SUBPROCESS_SECRET_MARKER", encoding="utf-8")
+        (tmp_path / "outside.txt").write_text("outside repository", encoding="utf-8")
         script_dir = Path(sys.executable).parent
         executable = script_dir / ("specflow.exe" if os.name == "nt" else "specflow")
         assert executable.exists(), f"CLI entry point not found: {executable}"
@@ -287,9 +312,21 @@ class TestRunStdio:
                         '{"jsonrpc":"2.0","id":4,"method":"tools/call",'
                         '"params":{"name":"unknown_tool","arguments":{}}}'
                     ),
+                    (
+                        '{"jsonrpc":"2.0","id":5,"method":"tools/call",'
+                        '"params":{"name":"read_file","arguments":{"path":123}}}'
+                    ),
+                    (
+                        '{"jsonrpc":"2.0","id":6,"method":"tools/call",'
+                        '"params":{"name":"read_file","arguments":{"path":"../outside.txt"}}}'
+                    ),
+                    (
+                        '{"jsonrpc":"2.0","id":7,"method":"tools/call",'
+                        '"params":{"name":"read_file","arguments":{"path":".env"}}}'
+                    ),
                 ]
             )
-            output, _ = process.communicate(script + "\n", timeout=60)
+            output, stderr = process.communicate(script + "\n", timeout=60)
         finally:
             if process.poll() is None:
                 process.kill()
@@ -300,6 +337,16 @@ class TestRunStdio:
         assert responses[2]["result"]["isError"] is False
         assert "hello from smoke" in responses[2]["result"]["content"][0]["text"]
         assert responses[3]["result"]["isError"] is True
+        assert responses[3]["result"]["structuredContent"]["error_type"]
+        assert responses[4]["result"]["isError"] is True
+        assert responses[4]["result"]["structuredContent"]["error_type"]
+        assert responses[5]["result"]["isError"] is True
+        assert responses[5]["result"]["structuredContent"]["error_type"]
+        assert responses[6]["result"]["isError"] is True
+        assert responses[6]["result"]["structuredContent"]["error_type"]
+        assert "SUBPROCESS_SECRET_MARKER" not in output
+        assert process.returncode == 0
+        assert stderr == ""
 
 
 def _initialize(server: McpServer) -> None:

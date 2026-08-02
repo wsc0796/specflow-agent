@@ -137,6 +137,22 @@ def cost_metrics(run_dir: Path) -> dict[str, object]:
         if nested:
             metrics_path = nested[0]
     if not metrics_path.is_file():
+        manifest = _read_json(run_dir / "manifest.json") or _read_json(
+            run_dir / "run-*" / "manifest.json"
+        )
+        if manifest and manifest.get("provider_type") == "mock":
+            return {
+                "provider_call_attempts": 0,
+                "successful_provider_calls": 0,
+                "failed_provider_calls": 0,
+                "input_tokens": None,
+                "output_tokens": None,
+                "total_tokens": None,
+                "unknown_usage_calls": 0,
+                "wall_clock_ms": 0,
+                "revision_rounds": 0,
+                "accounting": "mock_no_provider",
+            }
         return {"missing": True}
     metrics = json.loads(metrics_path.read_text(encoding="utf-8"))
     snapshot = metrics.get("budget_snapshot", {})
@@ -162,11 +178,11 @@ def blind_pack(candidates: list[EvaluationCandidate], seed: int = 0) -> dict[str
     order = list(range(len(candidates)))
     rng.shuffle(order)
     packs = []
-    for index in order:
-        candidate = candidates[index]
+    for anonymous_index, source_index in enumerate(order):
+        candidate = candidates[source_index]
         packs.append(
             {
-                "anonymous_id": f"ANON-{index:03d}",
+                "anonymous_id": f"ANON-{anonymous_index:03d}",
                 "case_id": candidate.case_id,
                 "proposed_changes": list(candidate.proposed_changes),
                 "affected_files": list(candidate.affected_files),
@@ -178,7 +194,7 @@ def blind_pack(candidates: list[EvaluationCandidate], seed: int = 0) -> dict[str
                 "uncertainties": list(candidate.uncertainties),
             }
         )
-    return {"seed": seed, "packs": packs}
+    return {"packs": packs}
 
 
 def run_pilot_mock_smoke(
@@ -213,18 +229,26 @@ def run_pilot_mock_smoke(
                     provider="mock",
                     max_files=5,
                 )
-                manifest = _read_json(run_dir / "manifest.json")
+                manifest = _read_json(run_dir / "run-*" / "manifest.json")
             else:
-                exit_code, manifest = _run_single_mock(case, run_dir)
+                exit_code, manifest = _run_single_mock(
+                    case.case_id,
+                    case.requirement,
+                    run_dir,
+                )
             candidate = _derive_candidate(case, pipeline, run_dir, manifest, exit_code)
             results.append(candidate.as_dict())
     return tuple(results)
 
 
-def _run_single_mock(case: EvaluationCase, run_dir: Path) -> tuple[int, dict[str, Any] | None]:
+def _run_single_mock(
+    case_id: str,
+    requirement: str,
+    run_dir: Path,
+) -> tuple[int, dict[str, Any] | None]:
     """Deterministic mock single-agent pipeline (harness validation only)."""
     manifest = {
-        "case_id": case.case_id,
+        "case_id": case_id,
         "pipeline": "single",
         "execution_mode": "mock",
         "workflow_state": "completed",
@@ -238,12 +262,12 @@ def _run_single_mock(case: EvaluationCase, run_dir: Path) -> tuple[int, dict[str
     (run_dir / "candidate.json").write_text(
         json.dumps(
             {
-                "proposed_changes": ["Plan generated for: " + case.title],
-                "affected_files": list(case.expected_file_patterns),
-                "evidence_refs": list(case.expected_file_patterns),
-                "implementation_steps": ["step-1", "step-2"],
-                "test_plan": ["test-case-1"],
-                "risks": list(case.expected_risks[:2]),
+                "proposed_changes": ["Plan generated for requirement: " + requirement],
+                "affected_files": [],
+                "evidence_refs": [],
+                "implementation_steps": ["Inspect evidence", "Draft a bounded plan"],
+                "test_plan": ["Validate the requested behavior"],
+                "risks": [],
                 "rollback": "restore previous commit",
                 "uncertainties": ["mock single-agent has no evidence collection"],
             },
@@ -303,6 +327,38 @@ def _derive_candidate(
             risks = list(candidate.get("risks", []))
             test_plan = list(candidate.get("test_plan", []))
             uncertainties = list(candidate.get("uncertainties", []))
+        else:
+            legacy_dirs = [path for path in run_dir.glob("run-*") if path.is_dir()]
+            if legacy_dirs:
+                legacy_dir = legacy_dirs[0]
+                generation = _read_json(legacy_dir / "generation.json") or {}
+                review = _read_json(legacy_dir / "review.json") or {}
+                sources = _read_json(legacy_dir / "sources.json") or {}
+                proposed = [
+                    item
+                    for item in generation.get("implementation_steps", [])
+                    if isinstance(item, str)
+                ]
+                if not proposed and isinstance(generation.get("proposed_solution"), str):
+                    proposed = [generation["proposed_solution"]]
+                affected = [
+                    item
+                    for item in generation.get("affected_components", [])
+                    if isinstance(item, str)
+                ]
+                evidence_refs = [
+                    item for item in sources.get("selected_files", []) if isinstance(item, str)
+                ]
+                risks = [item for item in generation.get("risks", []) if isinstance(item, str)]
+                test_plan = [
+                    item for item in generation.get("test_plan", []) if isinstance(item, str)
+                ]
+                uncertainties = [
+                    item
+                    for key in ("issues", "missing_requirements")
+                    for item in review.get(key, [])
+                    if isinstance(item, str)
+                ]
 
     return EvaluationCandidate(
         case_id=case.case_id,

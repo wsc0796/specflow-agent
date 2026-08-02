@@ -89,7 +89,11 @@ def test_blind_pack_hides_pipeline_identity() -> None:
     assert "six-role" not in serialized
     assert "legacy" not in serialized
     assert len(pack["packs"]) == 2
-    assert pack["seed"] == 7
+    assert "seed" not in pack
+    assert [item["anonymous_id"] for item in pack["packs"]] == [
+        "ANON-000",
+        "ANON-001",
+    ]
 
 
 def test_mock_smoke_produces_fifteen_runs(tmp_path: Path) -> None:
@@ -111,3 +115,12 @@ def test_mock_smoke_produces_fifteen_runs(tmp_path: Path) -> None:
     for result in results:
         assert result["execution_mode"] == "mock"
         assert result["pipeline"] in {"single", "legacy", "six-role"}
+
+    by_pipeline = {result["pipeline"]: result for result in results}
+    single = by_pipeline["single"]
+    assert "app/orders.py" not in single["affected_files"]
+    assert "非法状态流转" not in single["risks"]
+
+    legacy = by_pipeline["legacy"]
+    assert legacy["proposed_changes"]
+    assert legacy["test_plan"]

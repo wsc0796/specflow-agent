@@ -1,7 +1,7 @@
 {
   "run_id": "run-304e2aabbe04",
   "requirement": "Add multi-agent orchestration",
-  "repository_root": "D:\\Documents\\暑假计划\\specflow-agent",
+  "repository_root": "fixture://specflow-agent",
   "project_summary": "Python project with pyproject.toml at specflow-agent",
   "technology_stack": [],
   "searched_terms": [
