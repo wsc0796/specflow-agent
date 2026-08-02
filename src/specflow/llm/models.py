@@ -65,9 +65,9 @@ class LLMResponse:
 
     content: str
     model: str
-    usage: LLMUsage
     latency_ms: int
     finish_reason: str
+    usage: LLMUsage | None = None
 
     def __post_init__(self) -> None:
         if not self.content.strip():

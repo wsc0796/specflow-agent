@@ -110,12 +110,12 @@ class OpenAICompatibleLLMClient:
             payload["response_format"] = {"type": response_type}
         return payload
 
-    def _parse_response(self, payload: Any) -> tuple[str, str, LLMUsage, str]:
+    def _parse_response(self, payload: Any) -> tuple[str, str, LLMUsage | None, str]:
         if not isinstance(payload, dict):
             self._invalid_response()
         choices = payload.get("choices")
         usage_payload = payload.get("usage")
-        if not isinstance(choices, list) or not choices or not isinstance(usage_payload, dict):
+        if not isinstance(choices, list) or not choices:
             self._invalid_response()
         first = choices[0]
         if not isinstance(first, dict) or not isinstance(first.get("message"), dict):
@@ -124,8 +124,6 @@ class OpenAICompatibleLLMClient:
         content = message.get("content")
         finish_reason = first.get("finish_reason")
         model = payload.get("model") or self._config.model
-        input_tokens = self._token_count(usage_payload, "prompt_tokens")
-        output_tokens = self._token_count(usage_payload, "completion_tokens")
         if (
             not isinstance(content, str)
             or not content.strip()
@@ -135,10 +133,15 @@ class OpenAICompatibleLLMClient:
             or not finish_reason.strip()
         ):
             self._invalid_response()
+        usage: LLMUsage | None = None
+        if isinstance(usage_payload, dict):
+            input_tokens = self._token_count(usage_payload, "prompt_tokens")
+            output_tokens = self._token_count(usage_payload, "completion_tokens")
+            usage = LLMUsage(input_tokens=input_tokens, output_tokens=output_tokens)
         return (
             content,
             model,
-            LLMUsage(input_tokens=input_tokens, output_tokens=output_tokens),
+            usage,
             finish_reason,
         )
 

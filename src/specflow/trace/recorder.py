@@ -44,8 +44,8 @@ class TraceRecorder:
                     context_hash=context_hash,
                     model=response.model,
                     latency_ms=elapsed_ms,
-                    input_tokens=response.usage.input_tokens,
-                    output_tokens=response.usage.output_tokens,
+                    input_tokens=response.usage.input_tokens if response.usage else 0,
+                    output_tokens=response.usage.output_tokens if response.usage else 0,
                     status="success",
                 )
             )
