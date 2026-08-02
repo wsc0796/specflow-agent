@@ -5,7 +5,7 @@
   "base_commit": "bc76214",
   "branch": "fix/security-claim-audit",
   "status": "PASS",
-  "result_commit": "PENDING_FINALIZED_IN_COMMIT_B",
+  "result_commit": "e44a9b9",
   "deliverables": [
     "artifacts/workflow/audit/security-claim-audit.md",
     "artifacts/workflow/audit/claim-evidence-update.md",
