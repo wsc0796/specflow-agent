@@ -116,8 +116,7 @@ def verify(artifact_dir: Path) -> list[str]:
 
     if isinstance(evidence_index, dict):
         known_evidence = set(evidence_index.get("evidence", {}).keys()) | set(
-            reference.get("evidence_id", "")
-            for reference in evidence_index.get("references", [])
+            reference.get("evidence_id", "") for reference in evidence_index.get("references", [])
         )
         if isinstance(task_briefs, dict):
             for brief in task_briefs.get("briefs", []):
