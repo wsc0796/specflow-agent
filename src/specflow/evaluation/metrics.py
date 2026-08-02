@@ -75,6 +75,23 @@ class RunMetrics:
     handoff_count: int = 0
     agent_metrics: list[AgentMetrics] = field(default_factory=list)
 
+    # Phase 3 unified accounting (mock/live separated)
+    configured_role_count: int = 0
+    agent_invocations_scheduled: int = 0
+    agent_invocations_completed: int = 0
+    agent_invocations_failed: int = 0
+    provider_call_attempts: int = 0
+    successful_provider_calls: int = 0
+    failed_provider_calls: int = 0
+    peak_active_provider_calls: int = 0
+    synthetic_model_calls: int = 0
+    token_usage_known: bool = False
+    token_usage_unknown_calls: int = 0
+    revision_agent_invocations: int = 0
+    re_review_invocations: int = 0
+    provider_latency_ms: int = 0
+    budget_snapshot: dict[str, object] = field(default_factory=dict)
+
     # Derived: parallel speedup (multi-agent only)
     parallel_theoretical_ms: int = 0
     parallel_actual_ms: int = 0
@@ -111,5 +128,20 @@ class RunMetrics:
             "parallel_theoretical_ms": self.parallel_theoretical_ms,
             "parallel_actual_ms": self.parallel_actual_ms,
             "parallel_speedup": self.parallel_speedup,
+            "configured_role_count": self.configured_role_count,
+            "agent_invocations_scheduled": self.agent_invocations_scheduled,
+            "agent_invocations_completed": self.agent_invocations_completed,
+            "agent_invocations_failed": self.agent_invocations_failed,
+            "provider_call_attempts": self.provider_call_attempts,
+            "successful_provider_calls": self.successful_provider_calls,
+            "failed_provider_calls": self.failed_provider_calls,
+            "peak_active_provider_calls": self.peak_active_provider_calls,
+            "synthetic_model_calls": self.synthetic_model_calls,
+            "token_usage_known": self.token_usage_known,
+            "token_usage_unknown_calls": self.token_usage_unknown_calls,
+            "revision_agent_invocations": self.revision_agent_invocations,
+            "re_review_invocations": self.re_review_invocations,
+            "provider_latency_ms": self.provider_latency_ms,
+            "budget_snapshot": self.budget_snapshot,
             "agent_metrics": [a.as_dict() for a in self.agent_metrics],
         }

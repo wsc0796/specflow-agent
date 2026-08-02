@@ -101,11 +101,13 @@ class ExecutionPolicy:
 
     policy_version: str = "1.0.0"
     max_wall_time_seconds: int = 300
-    max_llm_calls: int = 10
+    max_provider_call_attempts: int = 10
     max_parallel_agents: int = 3
+    max_parallel_provider_calls: int = 3
     max_revisions: int = 1
     fail_on_schema_error: bool = True
     allow_degraded_completion: bool = True
+    max_llm_calls: int = field(default=10, repr=False)  # deprecated alias
 
     repository: RepositoryPolicy = field(default_factory=RepositoryPolicy)
     tokens: TokenPolicy = field(default_factory=TokenPolicy)
@@ -115,17 +117,24 @@ class ExecutionPolicy:
     def __post_init__(self) -> None:
         if self.max_wall_time_seconds <= 0:
             raise ValueError("max_wall_time_seconds must be positive")
-        _check_positive(self, "max_llm_calls")
+        _check_positive(self, "max_provider_call_attempts")
         _check_positive(self, "max_parallel_agents")
+        _check_positive(self, "max_parallel_provider_calls")
         if self.max_revisions < 0:
             raise ValueError("max_revisions must be non-negative")
+        _check_positive(self, "max_llm_calls")
+        # Deprecated alias: an explicitly provided max_llm_calls drives the
+        # provider-attempt budget so existing callers keep their meaning.
+        if self.max_llm_calls != 10 and self.max_provider_call_attempts == 10:
+            object.__setattr__(self, "max_provider_call_attempts", self.max_llm_calls)
 
     def policy_hash(self) -> str:
         data: dict[str, object] = {
             "policy_version": self.policy_version,
             "max_wall_time_seconds": self.max_wall_time_seconds,
-            "max_llm_calls": self.max_llm_calls,
+            "max_provider_call_attempts": self.max_provider_call_attempts,
             "max_parallel_agents": self.max_parallel_agents,
+            "max_parallel_provider_calls": self.max_parallel_provider_calls,
             "max_revisions": self.max_revisions,
             "fail_on_schema_error": self.fail_on_schema_error,
             "allow_degraded_completion": self.allow_degraded_completion,
