@@ -7,4 +7,6 @@
 - Distributed/multiprocess budget consistency and high availability.
 - True execution resume rather than interrupted-run classification.
 - Production authentication, authorization, deployment, and operations.
+- Re-specify HTTP API auth hardening as a committed task; the separate uncommitted
+  workspace changes are not eligible for integration or claims.
 - Incremental pyright adoption (46-error pre-Sol baseline; remeasure after runtime fixes).

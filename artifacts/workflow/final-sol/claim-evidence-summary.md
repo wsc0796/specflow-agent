@@ -21,4 +21,5 @@
 ## Blocked or Rejected
 
 Live validated, six-agent quality improvement, production-ready, high availability,
-distributed budgets, true resume, fair paid evaluation, and release-ready.
+distributed budgets, true resume, HTTP API authentication/authorization, fair paid
+evaluation, and release-ready.

@@ -35,7 +35,7 @@
 
 Runtime contract claims listed in the canonical ledger are supported at `06b1cf2`.
 Live validation, comparative quality, production readiness, true resume, distributed
-budget consistency, and release readiness remain prohibited.
+budget consistency, HTTP API authentication, and release readiness remain prohibited.
 
 ## 90-Day Premortem
 
@@ -53,5 +53,6 @@ budget consistency, and release readiness remain prohibited.
 
 Final Sol closed the reproduced code and claim MUST_FIX defects. Release remains
 blocked because no approved live run or paid fair evaluation exists, the formal
-protocol is still draft, and the final remediation branch has not been integrated
-or tagged. This verdict does not imply the mock-verified runtime is unusable.
+protocol is still draft, separate HTTP auth changes are uncommitted/unverified, and
+the final remediation branch has not been integrated or tagged. This verdict does
+not imply the mock-verified runtime is unusable.

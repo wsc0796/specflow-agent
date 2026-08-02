@@ -10,6 +10,7 @@
     {"task_id": "P6-RUN-001", "status": "MOCK_HARNESS_ONLY", "result": "06b1cf2"},
     {"task_id": "P7-DATASET-FREEZE-001", "status": "DRAFT", "result": "5158c51"},
     {"task_id": "P7-BATCH-RUN-001", "status": "HARD_BLOCKED", "result": null},
+    {"task_id": "FINAL-HTTP-AUTH-001", "status": "DEFER_UNVERIFIED", "result": null},
     {"task_id": "FINAL-AUDIT-001", "status": "NOT_READY", "result": "06b1cf2"}
   ]
 }

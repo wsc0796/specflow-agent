@@ -17,4 +17,5 @@
 ## Forbidden
 
 Production-ready, high availability, distributed budget, true resume, live validated,
-six-agent quality improvement, human-reviewed evaluation, or release-ready.
+HTTP API authentication/authorization, six-agent quality improvement, human-reviewed
+evaluation, or release-ready.

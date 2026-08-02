@@ -28,6 +28,7 @@
     "deterministic mock contract benchmark"
   ],
   "claims_blocked": [
+    "HTTP API authentication or authorization",
     "live validated",
     "quality improvement",
     "production-ready",

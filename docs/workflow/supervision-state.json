@@ -11,6 +11,7 @@
     "replace pilot scorer proxy names with accurately defined metrics"
   ],
   "deferred": [
+    "HTTP API auth hardening from an uncommitted separate workspace",
     "core pyright adoption",
     "distributed budgets",
     "true resume",

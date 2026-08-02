@@ -11,3 +11,6 @@
 
 Residual: MCP publication schemas do not encode every instance-specific runtime limit;
 runtime enforcement remains fail-closed and the Claim is qualified.
+
+The current HTTP API does not claim authentication or authorization. Separate
+uncommitted hardening changes were not integrated and require a fresh audited task.
