@@ -1,0 +1,6 @@
+artifacts/workflow/audit/security-claim-audit.md
+artifacts/workflow/audit/claim-evidence-update.md
+artifacts/workflow/audit/changed-files.txt
+artifacts/workflow/audit/test-results.txt
+artifacts/workflow/audit/handoff.json
+artifacts/workflow/audit/unresolved-issues.md

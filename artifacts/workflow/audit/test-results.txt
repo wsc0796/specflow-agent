@@ -1,0 +1,6 @@
+uv run pytest -q                    -> 777 passed, 2 skipped (29.5s)
+python scripts/check_secrets.py     -> passed
+uv run ruff check .                 -> passed
+uv run ruff format --check .        -> 204 files formatted
+Benchmark baseline SHA-256          -> BE9BB6F16ADA25638315EDEBDC3A70B654A321D521126B110E667A8386EE3E81 (unchanged)
+MCP adapter/server tests            -> 31 passed (verified at same commit by 5A window)

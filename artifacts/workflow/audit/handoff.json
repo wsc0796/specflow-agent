@@ -1,0 +1,26 @@
+{
+  "workflow": "specflow-hardening-v1",
+  "phase": "SECURITY_CLAIM_AUDIT",
+  "role": "read-only security and claim audit",
+  "base_commit": "bc76214",
+  "branch": "fix/security-claim-audit",
+  "status": "PASS",
+  "result_commit": "PENDING_FINALIZED_IN_COMMIT_B",
+  "deliverables": [
+    "artifacts/workflow/audit/security-claim-audit.md",
+    "artifacts/workflow/audit/claim-evidence-update.md",
+    "artifacts/workflow/audit/changed-files.txt",
+    "artifacts/workflow/audit/test-results.txt",
+    "artifacts/workflow/audit/handoff.json",
+    "artifacts/workflow/audit/unresolved-issues.md"
+  ],
+  "exit": "PASS",
+  "pending_decisions": [
+    "API authentication merge for public deployment",
+    "LICENSE choice",
+    "Dependency upgrade (httpx2/starlette)",
+    "DECISION_D1 (24/48) before live runs"
+  ],
+  "test_evidence": "777 passed, 2 skipped; secret scan passed; ruff passed; baseline SHA unchanged",
+  "notes": "Read-only audit; no fixes applied. Ledger update deferred to controller after Phase 4/5 merge."
+}
