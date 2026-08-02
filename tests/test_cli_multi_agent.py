@@ -144,7 +144,9 @@ class TestMultiAgentRunner:
         traces = json.loads((run_dir / "traces.json").read_text())
         assert len(outputs) == 6
         assert len(handoffs) == 7
-        assert len(traces) == 15  # 8 spans + 6 brief GENERATED + 1 REVIEW_FINDINGS_CREATED
+        # 8 spans + 6 brief GENERATED + 1 REVIEW_FINDINGS_CREATED
+        # + 6 synthetic MODEL_CALL_SUCCEEDED (mock enrichment is not a provider call)
+        assert len(traces) == 21
         root = next(trace for trace in traces if trace.get("kind") == "run")
         coordinator = next(trace for trace in traces if trace.get("kind") == "coordinator")
         agent_traces = [trace for trace in traces if "agent_version" in trace]
@@ -153,6 +155,11 @@ class TestMultiAgentRunner:
         review_events = [
             trace for trace in traces if trace.get("event_type") == "REVIEW_FINDINGS_CREATED"
         ]
+        synthetic_events = [
+            trace
+            for trace in traces
+            if trace.get("event_type") == "MODEL_CALL_SUCCEEDED" and trace.get("synthetic")
+        ]
         assert root["parent_span_id"] is None
         assert coordinator["parent_span_id"] == root["span_id"]
         assert len(agent_traces) == 6
@@ -160,6 +167,7 @@ class TestMultiAgentRunner:
         assert consumed == []
         assert len(review_events) == 1
         assert review_events[0]["status"] == "PASS"
+        assert len(synthetic_events) == 6
         assert {trace["parent_span_id"] for trace in agent_traces} == {coordinator["span_id"]}
 
         metrics = json.loads((run_dir / "metrics.json").read_text(encoding="utf-8"))
@@ -208,6 +216,7 @@ class TestMultiAgentRunner:
         (repo / "app.py").write_text("# searchable repository evidence")
         output = tmp_path / "output"
         client = ScriptedExecutionClient()
+        policy = ExecutionPolicy(max_provider_call_attempts=100)
 
         assert (
             run_multi_agent(
@@ -216,6 +225,7 @@ class TestMultiAgentRunner:
                 output=output,
                 provider="openai-compatible",
                 _llm_client_override=client,
+                policy=policy,
             )
             == 0
         )
@@ -274,6 +284,7 @@ class TestMultiAgentRunner:
         repo.mkdir()
         output = tmp_path / "output"
         client = ScriptedExecutionClient(fail_enrichment_for="design-agent-v1")
+        policy = ExecutionPolicy(max_provider_call_attempts=100)
 
         assert (
             run_multi_agent(
@@ -282,6 +293,7 @@ class TestMultiAgentRunner:
                 output=output,
                 provider="openai-compatible",
                 _llm_client_override=client,
+                policy=policy,
             )
             == 0
         )
@@ -473,14 +485,15 @@ class TestMultiAgentRunner:
     def test_llm_call_policy_stops_run_before_unbounded_execution(self, tmp_path: Path) -> None:
         repo = tmp_path / "test-repo"
         repo.mkdir()
-        policy = ExecutionPolicy(max_llm_calls=1)
+        policy = ExecutionPolicy(max_provider_call_attempts=1)
 
         assert (
             run_multi_agent(
                 repo=repo,
                 requirement="Policy budget",
                 output=tmp_path / "output",
-                mock=True,
+                provider="openai-compatible",
+                _llm_client_override=ScriptedExecutionClient(),
                 policy=policy,
             )
             == 3

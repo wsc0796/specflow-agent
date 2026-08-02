@@ -28,3 +28,15 @@ Mock-provider evidence is not live-provider validation or evidence of output-qua
 | Bounded revision ends in NEEDS_HUMAN_REVIEW after a second rejection | VERIFIED | `MultiAgentWorkflowState.NEEDS_HUMAN_REVIEW`, runner terminal state | `test_golden_needs_human_review_case`, state machine tests | Yes | Never marked as ordinary COMPLETED. |
 | Findings, revisions, and resolutions replay through artifact/trace/manifest | VERIFIED | `review-findings.json`, `revision-*.json`, `finding-resolutions.json`, manifest hashes | `test_manifest_records_revision_artifact_hashes`, trace assertions | Yes | Trace is metadata-only; prompt content is never persisted. |
 | Revision improves overall output quality | REJECTED | No comparative evidence | Mock contract tests only | No | Requires the separately approved Phase 6/7 evaluation. |
+
+## Phase 3 additions (unified invocation and budget)
+
+| Claim | Status | Code evidence | Test evidence | Allowed now | Notes |
+| --- | --- | --- | --- | --- | --- |
+| Multi-agent runtime provider calls use one controlled entry | VERIFIED | `specflow.invoker.GuardedModelInvoker`, enricher + AgentRunner wiring | `tests/test_runtime_budget.py::TestStaticGate`, trace event assertions | Yes | Static gate prevents new direct `.complete()` calls; legacy 3-worker is a frozen A/B baseline. |
+| Agent invocation and provider attempt are distinct metrics | VERIFIED | `RuntimeGuard` counters + `snapshot()` | `test_agent_invocation_and_provider_attempt_are_separate` | Yes | One invocation may contain multiple attempts (retries). |
+| Retry attempts are independently audited | VERIFIED | invoker retry loop, MODEL_CALL_RETRYING/FAILED/SUCCEEDED events | `TestRetryAccounting` | Yes | Failures are never overwritten by the final success. |
+| Tokens come from provider usage; missing usage is unknown, not 0 | VERIFIED | `LLMResponse.usage` optional, provider parse, guard token accounting | `TestTokenAccounting` | Yes | `token_usage_known=false`, `unknown_calls` increment. |
+| Budget failures fail closed with snapshots and partial traces | VERIFIED | reserve/release atomicity, failed manifests | `TestFailureArtifacts`, runner planning-failure snapshot | Yes | Active count restored on every path; never max+1. |
+| Default provider-attempt budget supports the live path | REJECTED | default `max_provider_call_attempts=10` < 12 normal live attempts | `budget-scenarios.md` | No | DECISION_REQUIRED; recommended 24 or 48. |
+| All LLM calls (including legacy 3-worker) use the unified invoker | REJECTED | legacy `workers/` + `runner.py` untouched | Static gate allowlist | No | Legacy pipeline is the frozen Phase 6 A/B baseline. |

@@ -186,12 +186,22 @@ def test_invalid_json_response_fails_safely() -> None:
         {"choices": []},
         {"choices": [{"message": {}}]},
         {"choices": [{"message": {"content": ""}, "finish_reason": "stop"}]},
-        {"choices": [{"message": {"content": "ok"}, "finish_reason": "stop"}], "usage": []},
     ],
 )
 def test_invalid_response_structure_fails(payload: object) -> None:
     with pytest.raises(LLMResponseError, match="invalid response structure"):
         _client(lambda _: httpx.Response(200, json=payload)).complete(_request())
+
+
+@pytest.mark.parametrize("usage_payload", [None, []])
+def test_missing_or_malformed_usage_is_unknown_not_failure(usage_payload: object) -> None:
+    """Phase 3: absent/malformed usage must not be fabricated as 0."""
+    payload = {
+        "choices": [{"message": {"content": "ok"}, "finish_reason": "stop"}],
+        "usage": usage_payload,
+    }
+    response = _client(lambda _: httpx.Response(200, json=payload)).complete(_request())
+    assert response.usage is None
 
 
 def test_api_key_does_not_enter_config_or_client_repr() -> None:
