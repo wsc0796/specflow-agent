@@ -1,9 +1,9 @@
 """Adapter between the Tool Framework and the MCP protocol.
 
-The MCP `tools/list` response requires a JSON Schema per tool, but the Tool
-Framework carries only an `input_model` *name* (e.g. "ListFilesInput"), not a
-schema.  This adapter supplies the missing schemas and maps MCP requests onto
-the existing `ToolCall`/`ToolResult` contract so no Tool logic is re-implemented.
+The Tool layer owns each tool's input JSON Schema (``Tool.input_schema``);
+this adapter only reads it, so `tools/list` can never drift from the real
+validation.  Requests are mapped onto the existing ``ToolCall``/``ToolResult``
+contract, so no Tool logic is re-implemented.
 """
 
 from __future__ import annotations
@@ -16,82 +16,6 @@ from specflow.mcp.exceptions import McpInvalidParamsError, McpSchemaMissingError
 from specflow.tools.exceptions import ToolValidationError
 from specflow.tools.models import ToolCall, ToolResult, ToolStatus
 from specflow.tools.registry import ToolRegistry
-
-# JSON Schema per Tool, keyed by stable Tool name. Constraints mirror the real
-# validations in tools/repository_tools.py and tools/repository_policy.py:
-#   - list_files: include/exclude are optional string arrays; max_results is an
-#     integer in [1, 1000] (RepositoryPolicyLimits.max_list_results).
-#   - search_code: query is REQUIRED and capped at 256 chars (repository_tools.py
-#     enforces len(query) > 256 -> RepositoryLimitError); include/exclude are
-#     optional string arrays; case_sensitive is an optional boolean.
-#   - read_file: path is REQUIRED.
-# additionalProperties MUST be False for every tool: the Tool layer rejects
-# unknown arguments (`_reject_unknown_arguments`), so the schema must say so too.
-_INPUT_SCHEMAS: dict[str, dict[str, Any]] = {
-    "list_files": {
-        "type": "object",
-        "properties": {
-            "include": {
-                "type": "array",
-                "items": {"type": "string"},
-                "description": "Optional glob patterns; only matching allowed files are listed.",
-            },
-            "exclude": {
-                "type": "array",
-                "items": {"type": "string"},
-                "description": "Optional glob patterns to exclude from the listing.",
-            },
-            "max_results": {
-                "type": "integer",
-                "minimum": 1,
-                "maximum": 1_000,
-                "description": (
-                    "Maximum number of files to list; defaults to the policy limit (1000)."
-                ),
-            },
-        },
-        "additionalProperties": False,
-    },
-    "search_code": {
-        "type": "object",
-        "properties": {
-            "query": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 256,
-                "description": "Literal search query; required and capped at 256 characters.",
-            },
-            "include": {
-                "type": "array",
-                "items": {"type": "string"},
-                "description": "Optional glob patterns; only matching allowed files are searched.",
-            },
-            "exclude": {
-                "type": "array",
-                "items": {"type": "string"},
-                "description": "Optional glob patterns to exclude from the search.",
-            },
-            "case_sensitive": {
-                "type": "boolean",
-                "description": "Whether matching is case-sensitive; defaults to False.",
-            },
-        },
-        "required": ["query"],
-        "additionalProperties": False,
-    },
-    "read_file": {
-        "type": "object",
-        "properties": {
-            "path": {
-                "type": "string",
-                "minLength": 1,
-                "description": "Repository-relative path of the file to read.",
-            },
-        },
-        "required": ["path"],
-        "additionalProperties": False,
-    },
-}
 
 
 @dataclass(frozen=True)
@@ -138,10 +62,10 @@ class McpToolCatalog:
         definitions: list[McpToolDefinition] = []
         for metadata in registry.metadata():
             try:
-                schema = _INPUT_SCHEMAS[metadata.name]
-            except KeyError as exc:
+                schema = registry.input_schema(metadata.name)
+            except Exception as exc:
                 raise McpSchemaMissingError(
-                    f"No MCP inputSchema registered for tool: {metadata.name}"
+                    f"Tool has no single-source input schema: {metadata.name}"
                 ) from exc
             definitions.append(
                 McpToolDefinition(
@@ -194,6 +118,10 @@ def tool_result_to_mcp(result: ToolResult) -> dict[str, Any]:
                     "text": result.error_message or result.error_type or "Tool execution failed",
                 }
             ],
+            "structuredContent": {
+                "error_type": result.error_type or "TOOL_EXECUTION_FAILED",
+                "requires_review": result.requires_review,
+            },
             "isError": True,
         }
     return {

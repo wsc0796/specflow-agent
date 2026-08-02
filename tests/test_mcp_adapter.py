@@ -2,7 +2,6 @@ import json
 
 import pytest
 
-from specflow.mcp import adapter
 from specflow.mcp.adapter import (
     McpToolCatalog,
     McpToolDefinition,
@@ -28,6 +27,8 @@ FAKE_SCHEMAS = {
 
 
 class FakeEchoTool:
+    input_schema: dict = FAKE_SCHEMAS["fake_echo"]
+
     def __init__(self, name: str = "fake_echo") -> None:
         self._metadata = ToolMetadata(
             name=name,
@@ -52,6 +53,8 @@ class FakeEchoTool:
 
 
 class FakeFailureTool(FakeEchoTool):
+    input_schema: dict = FAKE_SCHEMAS["fake_failure"]
+
     def __init__(self) -> None:
         super().__init__("fake_failure")
 
@@ -72,9 +75,11 @@ def registry() -> ToolRegistry:
     return registry
 
 
-@pytest.fixture
-def schemas(monkeypatch) -> None:
-    monkeypatch.setattr(adapter, "_INPUT_SCHEMAS", dict(FAKE_SCHEMAS))
+class FakeNoSchemaTool(FakeEchoTool):
+    input_schema = None
+
+    def __init__(self) -> None:
+        super().__init__("fake_no_schema")
 
 
 class TestMcpToolDefinition:
@@ -112,39 +117,48 @@ class TestMcpToolDefinition:
 
 
 class TestMcpToolCatalog:
-    def test_definitions_in_stable_name_order(self, registry, schemas) -> None:
+    def test_definitions_in_stable_name_order(self, registry) -> None:
         catalog = McpToolCatalog(registry)
         assert [entry["name"] for entry in catalog.as_dict()] == ["fake_echo", "fake_failure"]
 
-    def test_missing_schema_raises_at_construction(self, registry) -> None:
-        with pytest.raises(McpSchemaMissingError, match="fake_echo"):
+    def test_missing_schema_raises_at_construction(self) -> None:
+        registry = ToolRegistry()
+        registry.register(FakeNoSchemaTool())
+        with pytest.raises(McpSchemaMissingError, match="fake_no_schema"):
             McpToolCatalog(registry)
 
-    def test_has(self, registry, schemas) -> None:
+    def test_has(self, registry) -> None:
         catalog = McpToolCatalog(registry)
         assert catalog.has("fake_echo")
         assert not catalog.has("missing")
 
-    def test_len(self, registry, schemas) -> None:
+    def test_len(self, registry) -> None:
         assert len(McpToolCatalog(registry)) == 2
+
+    def test_catalog_schema_is_the_tool_owned_schema(self, registry) -> None:
+        """Single source: tools/list must return exactly the Tool-owned schema."""
+        catalog = McpToolCatalog(registry)
+        by_name = {entry["name"]: entry["inputSchema"] for entry in catalog.as_dict()}
+        assert by_name["fake_echo"] == FakeEchoTool.input_schema
+        assert by_name["fake_failure"] == FakeFailureTool.input_schema
 
 
 class TestToolCallFromRequest:
-    def test_builds_valid_call(self, schemas) -> None:
+    def test_builds_valid_call(self) -> None:
         call = tool_call_from_request(call_id="7", tool_name="fake_echo", arguments={"a": 1})
         assert call.call_id == "7"
         assert call.tool_name == "fake_echo"
         assert dict(call.arguments) == {"a": 1}
 
-    def test_defaults_arguments_to_empty(self, schemas) -> None:
+    def test_defaults_arguments_to_empty(self) -> None:
         call = tool_call_from_request(call_id="7", tool_name="fake_echo", arguments=None)
         assert dict(call.arguments) == {}
 
-    def test_rejects_invalid_tool_name(self, schemas) -> None:
+    def test_rejects_invalid_tool_name(self) -> None:
         with pytest.raises(McpInvalidParamsError):
             tool_call_from_request(call_id="7", tool_name="Bad Name", arguments=None)
 
-    def test_rejects_non_object_arguments(self, schemas) -> None:
+    def test_rejects_non_object_arguments(self) -> None:
         with pytest.raises(McpInvalidParamsError):
             tool_call_from_request(call_id="7", tool_name="fake_echo", arguments=["x"])
 
@@ -174,13 +188,22 @@ class TestToolResultToMcp:
 
 class TestRealToolSchemas:
     def test_repository_tool_set_schemas_registered(self, tmp_path) -> None:
-        """Every Tool exposed by the real RepositoryToolSet must have an inputSchema.
-
-        Fails until _INPUT_SCHEMAS in specflow/mcp/adapter.py covers the three
-        repository Tools (list_files, read_file, search_code).
-        """
+        """Every Tool exposed by the real RepositoryToolSet owns an inputSchema."""
         (tmp_path / "a.txt").write_text("hello", encoding="utf-8")
         tool_set = RepositoryToolSet(tmp_path)
         names = {tool.metadata.name for tool in tool_set.tools}
         assert names == {"list_files", "read_file", "search_code"}
-        assert names.issubset(adapter._INPUT_SCHEMAS)
+        for tool in tool_set.tools:
+            assert isinstance(tool.input_schema, dict)
+            assert tool.input_schema.get("type") == "object"
+            assert tool.input_schema.get("additionalProperties") is False
+
+    def test_real_catalog_schemas_match_tool_owned_schemas(self, tmp_path) -> None:
+        """The MCP catalog must mirror the Tool layer with zero hand-written copies."""
+        (tmp_path / "a.txt").write_text("hello", encoding="utf-8")
+        registry = ToolRegistry()
+        RepositoryToolSet(tmp_path).register_into(registry)
+        catalog = McpToolCatalog(registry)
+        by_name = {entry["name"]: entry["inputSchema"] for entry in catalog.as_dict()}
+        for metadata in registry.metadata():
+            assert by_name[metadata.name] == registry.input_schema(metadata.name)

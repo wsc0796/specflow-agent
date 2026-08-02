@@ -4,7 +4,6 @@ import sys
 
 import pytest
 
-from specflow.mcp import adapter
 from specflow.mcp.exceptions import (
     McpInvalidParamsError,
     McpInvalidRequestError,
@@ -42,6 +41,8 @@ _INITIALIZE_REQUEST = {
 
 
 class FakeEchoTool:
+    input_schema: dict = FAKE_SCHEMAS["fake_echo"]
+
     def __init__(self, name: str = "fake_echo") -> None:
         self._metadata = ToolMetadata(
             name=name,
@@ -66,6 +67,8 @@ class FakeEchoTool:
 
 
 class FakeFailureTool(FakeEchoTool):
+    input_schema: dict = FAKE_SCHEMAS["fake_failure"]
+
     def __init__(self) -> None:
         super().__init__("fake_failure")
 
@@ -87,12 +90,7 @@ def registry() -> ToolRegistry:
 
 
 @pytest.fixture
-def schemas(monkeypatch) -> None:
-    monkeypatch.setattr(adapter, "_INPUT_SCHEMAS", dict(FAKE_SCHEMAS))
-
-
-@pytest.fixture
-def server(registry, schemas) -> McpServer:
+def server(registry) -> McpServer:
     return McpServer(registry)
 
 
@@ -229,7 +227,7 @@ class TestProtocolErrors:
 
 
 class TestRunStdio:
-    def test_full_roundtrip(self, registry, schemas, monkeypatch) -> None:
+    def test_full_roundtrip(self, registry, monkeypatch) -> None:
         script = "\n".join(
             [
                 '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18"}}',

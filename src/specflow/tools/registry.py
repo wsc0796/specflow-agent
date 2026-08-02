@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from specflow.tools.base import Tool
 from specflow.tools.exceptions import DuplicateToolError, ToolNotFoundError
 from specflow.tools.models import ToolMetadata
@@ -34,3 +36,11 @@ class ToolRegistry:
     def metadata(self) -> tuple[ToolMetadata, ...]:
         """Return tool metadata in deterministic name order."""
         return tuple(self._tools[name].metadata for name in sorted(self._tools))
+
+    def input_schema(self, name: str) -> dict[str, Any]:
+        """Return the tool-owned input schema (single source of truth)."""
+        tool = self.get(name)
+        schema = tool.input_schema
+        if not isinstance(schema, dict):
+            raise ToolNotFoundError(f"Tool has no input schema: {name}")
+        return schema

@@ -46,6 +46,11 @@ class _RepositoryTool:
         self._policy = policy
         self._metadata = metadata
 
+    # The input JSON Schema is owned by the Tool layer and is the single source
+    # of truth for protocol adapters (e.g. MCP tools/list).  Constraints here
+    # must stay in sync with the validation logic in each execute().
+    input_schema: dict[str, Any] = {}
+
     @property
     def metadata(self) -> ToolMetadata:
         return self._metadata
@@ -53,6 +58,31 @@ class _RepositoryTool:
 
 class ListFilesTool(_RepositoryTool):
     """List allowed repository files without reading their contents."""
+
+    input_schema: dict[str, Any] = {
+        "type": "object",
+        "properties": {
+            "include": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "Optional glob patterns; only matching allowed files are listed.",
+            },
+            "exclude": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "Optional glob patterns to exclude from the listing.",
+            },
+            "max_results": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 1_000,
+                "description": (
+                    "Maximum number of files to list; defaults to the policy limit (1000)."
+                ),
+            },
+        },
+        "additionalProperties": False,
+    }
 
     def __init__(self, policy: RepositoryAccessPolicy) -> None:
         super().__init__(
@@ -93,6 +123,34 @@ class ListFilesTool(_RepositoryTool):
 
 class SearchCodeTool(_RepositoryTool):
     """Perform bounded plain-text search over allowed repository files."""
+
+    input_schema: dict[str, Any] = {
+        "type": "object",
+        "properties": {
+            "query": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256,
+                "description": "Literal search query; required and capped at 256 characters.",
+            },
+            "include": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "Optional glob patterns; only matching allowed files are searched.",
+            },
+            "exclude": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "Optional glob patterns to exclude from the search.",
+            },
+            "case_sensitive": {
+                "type": "boolean",
+                "description": "Whether matching is case-sensitive; defaults to False.",
+            },
+        },
+        "required": ["query"],
+        "additionalProperties": False,
+    }
 
     def __init__(self, policy: RepositoryAccessPolicy) -> None:
         super().__init__(
@@ -178,6 +236,19 @@ class SearchCodeTool(_RepositoryTool):
 
 class ReadFileTool(_RepositoryTool):
     """Read one bounded, allowed UTF-8 repository file."""
+
+    input_schema: dict[str, Any] = {
+        "type": "object",
+        "properties": {
+            "path": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Repository-relative path of the file to read.",
+            },
+        },
+        "required": ["path"],
+        "additionalProperties": False,
+    }
 
     def __init__(self, policy: RepositoryAccessPolicy) -> None:
         super().__init__(
