@@ -1,6 +1,9 @@
 import io
 import json
+import os
+import subprocess
 import sys
+from pathlib import Path
 
 import pytest
 
@@ -253,6 +256,50 @@ class TestRunStdio:
             "echo": {"message": "hi"}
         }
         assert responses[3]["error"]["code"] == -32700
+
+    def test_stdio_subprocess_smoke(self, tmp_path) -> None:
+        """Real-process stdio smoke: initialize -> list -> call -> unknown tool."""
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        (repo / "a.txt").write_text("hello from smoke", encoding="utf-8")
+        script_dir = Path(sys.executable).parent
+        executable = script_dir / ("specflow.exe" if os.name == "nt" else "specflow")
+        assert executable.exists(), f"CLI entry point not found: {executable}"
+        process = subprocess.Popen(
+            [str(executable), "mcp", "--root", str(repo)],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        try:
+            script = "\n".join(
+                [
+                    '{"jsonrpc":"2.0","id":1,"method":"initialize",'
+                    '"params":{"protocolVersion":"2025-06-18"}}',
+                    '{"jsonrpc":"2.0","method":"notifications/initialized"}',
+                    '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}',
+                    (
+                        '{"jsonrpc":"2.0","id":3,"method":"tools/call",'
+                        '"params":{"name":"read_file","arguments":{"path":"a.txt"}}}'
+                    ),
+                    (
+                        '{"jsonrpc":"2.0","id":4,"method":"tools/call",'
+                        '"params":{"name":"unknown_tool","arguments":{}}}'
+                    ),
+                ]
+            )
+            output, _ = process.communicate(script + "\n", timeout=60)
+        finally:
+            if process.poll() is None:
+                process.kill()
+        responses = [json.loads(line) for line in output.strip().splitlines()]
+        assert responses[0]["result"]["protocolVersion"] == "2025-06-18"
+        tool_names = [tool["name"] for tool in responses[1]["result"]["tools"]]
+        assert tool_names == ["list_files", "read_file", "search_code"]
+        assert responses[2]["result"]["isError"] is False
+        assert "hello from smoke" in responses[2]["result"]["content"][0]["text"]
+        assert responses[3]["result"]["isError"] is True
 
 
 def _initialize(server: McpServer) -> None:

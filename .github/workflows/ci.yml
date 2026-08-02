@@ -19,6 +19,7 @@ jobs:
       - run: uv run pytest -q
       - run: uv run ruff check .
       - run: uv run ruff format --check .
+      - run: uv run pytest -q tests/test_mcp_server.py tests/test_mcp_adapter.py
       - run: uv build
       - run: uv run specflow --version
       - run: uv run specflow run --help
