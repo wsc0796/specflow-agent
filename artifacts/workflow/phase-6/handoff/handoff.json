@@ -5,7 +5,7 @@
   "base_commit": "bc76214",
   "branch": "fix/phase-6a-pilot-design",
   "status": "PASS",
-  "result_commit": "PENDING_FINALIZED_IN_COMMIT_B",
+  "result_commit": "6f86c27",
   "deliverables": [
     "artifacts/workflow/phase-6/pilot-task-set.md",
     "artifacts/workflow/phase-6/pilot-cases/case-01..05 (.json + .md)",
