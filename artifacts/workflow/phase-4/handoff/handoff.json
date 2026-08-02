@@ -1,0 +1,29 @@
+{
+  "workflow": "specflow-hardening-v1",
+  "phase": "4A",
+  "role": "live-case-readonly-prep",
+  "base_commit": "bc76214",
+  "branch": "fix/phase-4a-live-case-prep",
+  "status": "PASS",
+  "result_commit": "PENDING_FINALIZED_IN_COMMIT_B",
+  "deliverables": [
+    "artifacts/workflow/phase-4/phase4a-report.md",
+    "artifacts/workflow/phase-4/handoff/changed-files.txt",
+    "artifacts/workflow/phase-4/handoff/test-results.txt",
+    "artifacts/workflow/phase-4/handoff/handoff.json",
+    "artifacts/workflow/phase-4/handoff/unresolved-issues.md",
+    "artifacts/live/case-001/README.md",
+    "artifacts/live/case-001/metadata.json",
+    "artifacts/live/case-001/request.json",
+    "artifacts/live/case-001/frozen-config.json",
+    "artifacts/live/case-001/evidence-index.json",
+    "artifacts/live/case-001/rerun.md"
+  ],
+  "exit": "PASS",
+  "next_gate": "Phase 4B requires user approval: SPECFLOW_LLM_API_KEY, base URL, model, max cost, max token, max wall-clock, DECISION_D1 (24 or 48)",
+  "pending_decisions": [
+    "DECISION_D1: default provider-attempt budget calibration (24 or 48)",
+    "DECISION_D3: Phase 4B live run approval"
+  ],
+  "notes": "Docs-only window. No source/test/benchmark changes. frozen-config.json remains DRAFT until approval."
+}

@@ -1,0 +1,3 @@
+Phase 4A is docs-only preparation. No source or test files changed; no tests executed.
+Baseline at bc76214 (Phase 3 independent audit): full pytest 777 passed, 2 skipped;
+Ruff lint/format passed; benchmark 12/12 with baseline SHA BE9BB6F16ADA25638315EDEBDC3A70B654A321D521126B110E667A8386EE3E81 unchanged.

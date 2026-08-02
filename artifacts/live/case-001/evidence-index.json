@@ -1,0 +1,7 @@
+{
+  "schema_version": "evidence-index/v1",
+  "case_id": "case-001",
+  "status": "DRAFT",
+  "description": "Filled after the live run by Phase 4C audit: one entry per claim/artifact with path, hash, and trace/manifest references.",
+  "entries": []
+}

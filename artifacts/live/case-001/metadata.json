@@ -1,0 +1,28 @@
+{
+  "case_id": "case-001",
+  "stage": "prep",
+  "status": "DRAFT",
+  "base_commit": "bc76214",
+  "integration_branch": "integration/specflow-hardening",
+  "prepared_by_window": "phase_4a_live_prep",
+  "prepared_at": "2026-08-02",
+  "task_title": "Run 级 Token 预算配置",
+  "requires_approval_before_run": true,
+  "approval_items": [
+    "SPECFLOW_LLM_API_KEY",
+    "SPECFLOW_LLM_BASE_URL",
+    "SPECFLOW_LLM_MODEL",
+    "max cost ceiling",
+    "max run total tokens",
+    "max wall-clock",
+    "provider-attempt budget (DECISION_D1)"
+  ],
+  "files": [
+    "README.md",
+    "metadata.json",
+    "request.json",
+    "frozen-config.json",
+    "evidence-index.json",
+    "rerun.md"
+  ]
+}

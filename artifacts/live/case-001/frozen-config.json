@@ -1,0 +1,61 @@
+{
+  "schema_version": "live_case_frozen_config/v1",
+  "case_id": "case-001",
+  "status": "DRAFT_PENDING_USER_APPROVAL",
+  "repository": {
+    "commit": "bc76214",
+    "branch": "integration/specflow-hardening"
+  },
+  "provider": {
+    "type": "openai-compatible",
+    "base_url": "PENDING_USER_APPROVAL (SPECFLOW_LLM_BASE_URL)",
+    "model": "PENDING_USER_APPROVAL (SPECFLOW_LLM_MODEL)",
+    "api_key": "PENDING_USER_APPROVAL (SPECFLOW_LLM_API_KEY)",
+    "timeout_seconds": {
+      "value": 60,
+      "allowed_range": "1-600",
+      "status": "DRAFT"
+    }
+  },
+  "parameters": {
+    "execution_mode": "multi-agent",
+    "max_parallel_agents": 3,
+    "max_parallel_provider_calls": 3,
+    "status": "DRAFT"
+  },
+  "tool_permissions": "read-only repository tools only; no write/execute",
+  "call_budget": {
+    "max_provider_call_attempts": {
+      "current_default": 10,
+      "required_for_live_path": "24 or 48",
+      "status": "PENDING_DECISION_D1"
+    }
+  },
+  "token_budget": {
+    "max_run_input_tokens": 50000,
+    "max_run_output_tokens": 12000,
+    "max_run_total_tokens": 62000,
+    "max_agent_input_tokens": 10000,
+    "max_agent_output_tokens": 3000,
+    "reserved_retry_tokens": 6000,
+    "status": "DRAFT"
+  },
+  "wall_clock": {
+    "max_wall_time_seconds": 300,
+    "status": "DRAFT"
+  },
+  "revision_policy": {
+    "max_revisions": 1,
+    "status": "DRAFT"
+  },
+  "output_schema": "strict versioned artifacts: task_brief_artifact/v1, review_findings, revision/resolution, final plan output models; schema versions frozen at run start",
+  "failure_rules": {
+    "fail_closed": true,
+    "second_rejection": "NEEDS_HUMAN_REVIEW (exit 5)",
+    "budget_failure": "FAILED manifest with budget snapshot and partial trace"
+  },
+  "notes": [
+    "All values above are DRAFT recommendations; final freeze happens only after Phase 4B user approval.",
+    "No cost accounting exists; max cost ceiling must be approved separately as token/wall-clock proxy."
+  ]
+}

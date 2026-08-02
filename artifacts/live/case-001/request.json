@@ -1,0 +1,19 @@
+{
+  "case_id": "case-001",
+  "phase": "4B (pending user approval)",
+  "task_text": "为 SpecFlow 增加 Run 级 Token 预算配置，涉及配置 Schema、RuntimeGuard、manifest、API、CLI、测试和文档。",
+  "acceptance_criteria_draft": [
+    "配置 Schema:Run 级 token 预算(输入/输出/总、agent 级、retry 预留)有严格校验的配置模型",
+    "RuntimeGuard:fail-closed 强制;预算超限产生明确错误码并写 FAILED manifest",
+    "manifest:记录配置值与 budget snapshot",
+    "API:RunCreate 支持可选 token 预算覆盖并经 PolicyValidator 校验",
+    "CLI:specflow run 支持对应参数或环境变量",
+    "测试:新增 policy/guard/API/CLI/manifest 测试;全量 pytest 通过;benchmark baseline 不变",
+    "文档:README 配置说明 + Live guide 更新"
+  ],
+  "constraints": [
+    "不得改变默认预算值(DECISION_D1 未决)",
+    "不得修改 benchmark baseline",
+    "不得声称 production-ready 或质量提升"
+  ]
+}
