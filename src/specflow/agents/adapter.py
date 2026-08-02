@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import time
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 from uuid import uuid4
@@ -12,7 +11,6 @@ from specflow.agents.models import AgentIdentity
 from specflow.llm.client import LLMClient
 from specflow.llm.models import LLMMessage, LLMRequest
 from specflow.policy.errors import ErrorCode
-from specflow.policy.errors import is_retryable as _is_retryable_error
 
 if TYPE_CHECKING:
     from specflow.schema.models import AgentExecutionInput
@@ -44,6 +42,7 @@ class AgentRunner:
         max_retries: int = 0,
         task_brief_event_sink: Callable[[TaskBriefTraceEvent], None] | None = None,
         revision_event_sink: Callable[[RevisionTraceEvent], None] | None = None,
+        budget: Any | None = None,
     ) -> None:
         self._identity = identity
         self._llm = llm_client
@@ -55,6 +54,40 @@ class AgentRunner:
         self._max_retries = max_retries
         self._task_brief_event_sink = task_brief_event_sink
         self._revision_event_sink = revision_event_sink
+        from specflow.invoker import GuardedModelInvoker
+        from specflow.policy.models import (
+            ArtifactPolicy,
+            ExecutionPolicy,
+            RepositoryPolicy,
+            RetryPolicy,
+            TokenPolicy,
+        )
+        from specflow.policy.runtime_guard import RuntimeGuard
+
+        if budget is None:
+            budget = RuntimeGuard(
+                ExecutionPolicy(
+                    max_provider_call_attempts=1_000_000,
+                    max_wall_time_seconds=86_400,
+                    max_parallel_provider_calls=1_000,
+                    tokens=TokenPolicy(
+                        max_run_input_tokens=1_000_000_000,
+                        max_run_output_tokens=1_000_000_000,
+                        max_run_total_tokens=2_000_000_000,
+                        max_agent_input_tokens=1_000_000_000,
+                        max_agent_output_tokens=1_000_000_000,
+                    ),
+                    repository=RepositoryPolicy(),
+                    retry=RetryPolicy(),
+                    artifacts=ArtifactPolicy(),
+                )
+            )
+        self._budget = budget
+        self._invoker = GuardedModelInvoker(
+            llm_client,
+            budget,
+            max_provider_retries=max_retries,
+        )
 
     @property
     def agent_id(self) -> str:
@@ -116,23 +149,21 @@ class AgentRunner:
             max_tokens=self._max_tokens,
             response_format="json",
         )
-        consumed_recorded = False
-        for attempt in range(self._max_retries + 1):
-            try:
-                if not consumed_recorded:
-                    self._record_consumed(validated_input)
-                    if revision_context is not None:
-                        self._record_revision_submitted(validated_input)
-                    consumed_recorded = True
-                response = self._llm.complete(request)
-                break  # success
-            except Exception as exc:
-                error_code = _error_to_code(exc)
-                retryable = _is_retryable_error(error_code)
-                if not retryable or attempt >= self._max_retries:
-                    return _failed_result(self._identity, error_code.value)
-                backoff = min(0.5 * (2**attempt), 5.0)  # 0.5s, 1s, 2s, 4s, 5s cap
-                time.sleep(backoff)
+        self._record_consumed(validated_input)
+        if revision_context is not None:
+            self._record_revision_submitted(validated_input)
+        try:
+            response = self._invoker.invoke(
+                request,
+                call_type="revision" if revision_context is not None else "worker",
+                agent_id=self.agent_id,
+                revision_id=(
+                    revision_context.revision_id if revision_context is not None else None
+                ),
+            )
+        except Exception as exc:
+            error_code = _error_to_code(exc)
+            return _failed_result(self._identity, error_code.value)
 
         try:
             data = json.loads(response.content)
@@ -142,8 +173,7 @@ class AgentRunner:
                     data=data,
                     execution_input=validated_input,
                     output_model=output_model,
-                    input_tokens=response.usage.input_tokens,
-                    output_tokens=response.usage.output_tokens,
+                    usage=getattr(response, "usage", None),
                 )
 
             try:
@@ -160,8 +190,17 @@ class AgentRunner:
                 "model": self._model,
                 "schema_validated": True,
                 "usage": {
-                    "input_tokens": getattr(response, "input_tokens", 0),
-                    "output_tokens": getattr(response, "output_tokens", 0),
+                    "input_tokens": (
+                        response.usage.input_tokens
+                        if getattr(response, "usage", None) is not None
+                        else None
+                    ),
+                    "output_tokens": (
+                        response.usage.output_tokens
+                        if getattr(response, "usage", None) is not None
+                        else None
+                    ),
+                    "token_usage_known": getattr(response, "usage", None) is not None,
                 },
             }
         except json.JSONDecodeError:
@@ -212,8 +251,7 @@ class AgentRunner:
         data: Any,
         execution_input: AgentExecutionInput,
         output_model: Any,
-        input_tokens: int,
-        output_tokens: int,
+        usage: Any,
     ) -> dict[str, Any]:
         """Validate a composite revision response and return the revision envelope."""
         from specflow.revision.models import (
@@ -261,8 +299,9 @@ class AgentRunner:
             "schema_validated": True,
             "revision_result": result.model_dump(mode="json"),
             "usage": {
-                "input_tokens": input_tokens,
-                "output_tokens": output_tokens,
+                "input_tokens": usage.input_tokens if usage is not None else None,
+                "output_tokens": usage.output_tokens if usage is not None else None,
+                "token_usage_known": usage is not None,
             },
         }
 

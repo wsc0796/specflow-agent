@@ -33,14 +33,24 @@ class SemanticPlanEnricher:
     rest of the enrichment proceeds normally.
     """
 
-    def __init__(self, llm_client: Any, model: str, provider: str) -> None:
+    def __init__(
+        self,
+        llm_client: Any,
+        model: str,
+        provider: str,
+        *,
+        guard: Any | None = None,
+        max_provider_retries: int = 0,
+    ) -> None:
         """Store references.  Does **not** call the LLM.
 
         Parameters
         ----------
         llm_client:
-            An object implementing the ``LLMClient`` protocol (i.e. a
-            ``.complete(request: LLMRequest) -> LLMResponse`` method).
+            An object implementing the ``LLMClient`` protocol.
+        guard:
+            Optional run-scoped ``RuntimeGuard``.  When provided, every
+            enrichment call is routed through :class:`GuardedModelInvoker`.
         model:
             Model identifier passed through to each ``LLMRequest``.
         provider:
@@ -49,6 +59,15 @@ class SemanticPlanEnricher:
         self._llm = llm_client
         self._model = model
         self._provider = provider
+        self._invoker: Any | None = None
+        if guard is not None:
+            from specflow.invoker import GuardedModelInvoker
+
+            self._invoker = GuardedModelInvoker(
+                llm_client,
+                guard,
+                max_provider_retries=max_provider_retries,
+            )
 
     # ------------------------------------------------------------------
     # Public API
@@ -96,8 +115,15 @@ class SemanticPlanEnricher:
             response_format="json",
         )
         try:
-            response = self._llm.complete(request)
-        except Exception:
+            if self._invoker is not None:
+                response = self._invoker.invoke(request, call_type="enrichment")
+            else:
+                response = self._llm.complete(request)
+        except Exception as error:
+            from specflow.policy.models import SpecFlowError
+
+            if isinstance(error, SpecFlowError):
+                raise
             return self._degraded_brief(enrichment_input, "provider_error")
 
         try:

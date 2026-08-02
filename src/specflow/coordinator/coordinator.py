@@ -49,12 +49,16 @@ class Coordinator:
         model: str = "unknown",
         provider: str = "unknown",
         schema_registry: Any = None,
+        guard: Any | None = None,
+        retry_policy: Any | None = None,
     ) -> None:
         self._registry = agent_registry
         self._llm_client = llm_client
         self._model = model
         self._provider = provider
         self._schema_registry = schema_registry
+        self._guard = guard
+        self._retry_policy = retry_policy
         self._engine = MultiAgentWorkflowEngine()
         self._revision_controller: RevisionController | None = None
 
@@ -109,6 +113,10 @@ class Coordinator:
             llm_client=self._llm_client,
             model=self._model,
             provider=self._provider,
+            guard=self._guard,
+            max_provider_retries=(
+                self._retry_policy.max_provider_retries if self._retry_policy else 0
+            ),
         )
         if self._schema_registry is None:
             raise ValueError("Coordinator requires a SchemaRegistry for task brief enrichment")
