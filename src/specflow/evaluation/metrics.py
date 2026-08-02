@@ -13,8 +13,8 @@ class AgentMetrics:
     role: str
     stage: int
     duration_ms: int = 0
-    input_tokens: int = 0
-    output_tokens: int = 0
+    input_tokens: int | None = None
+    output_tokens: int | None = None
     llm_call_success: bool = True
     fallback_used: bool = False
     degraded: bool = False
@@ -48,9 +48,9 @@ class RunMetrics:
     completed_at: str = ""
     wall_time_ms: int = 0
 
-    input_tokens: int = 0
-    output_tokens: int = 0
-    total_tokens: int = 0
+    input_tokens: int | None = None
+    output_tokens: int | None = None
+    total_tokens: int | None = None
 
     llm_call_count: int = 0
     fallback_count: int = 0

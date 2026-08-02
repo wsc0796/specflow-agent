@@ -101,13 +101,13 @@ class ExecutionPolicy:
 
     policy_version: str = "1.0.0"
     max_wall_time_seconds: int = 300
-    max_provider_call_attempts: int = 24
+    max_provider_call_attempts: int | None = None
     max_parallel_agents: int = 3
     max_parallel_provider_calls: int = 3
     max_revisions: int = 1
     fail_on_schema_error: bool = True
     allow_degraded_completion: bool = True
-    max_llm_calls: int = field(default=10, repr=False)  # deprecated alias
+    max_llm_calls: int | None = field(default=None, repr=False)  # deprecated alias
 
     repository: RepositoryPolicy = field(default_factory=RepositoryPolicy)
     tokens: TokenPolicy = field(default_factory=TokenPolicy)
@@ -115,6 +115,23 @@ class ExecutionPolicy:
     artifacts: ArtifactPolicy = field(default_factory=ArtifactPolicy)
 
     def __post_init__(self) -> None:
+        provider_limit = self.max_provider_call_attempts
+        legacy_limit = self.max_llm_calls
+        if provider_limit is None and legacy_limit is None:
+            effective_limit = 24
+        elif provider_limit is None:
+            effective_limit = legacy_limit
+        elif legacy_limit is None:
+            effective_limit = provider_limit
+        elif provider_limit != legacy_limit:
+            raise ValueError(
+                "max_llm_calls is deprecated and conflicts with max_provider_call_attempts"
+            )
+        else:
+            effective_limit = provider_limit
+        object.__setattr__(self, "max_provider_call_attempts", effective_limit)
+        object.__setattr__(self, "max_llm_calls", effective_limit)
+
         if self.max_wall_time_seconds <= 0:
             raise ValueError("max_wall_time_seconds must be positive")
         _check_positive(self, "max_provider_call_attempts")
@@ -123,18 +140,6 @@ class ExecutionPolicy:
         if self.max_revisions < 0:
             raise ValueError("max_revisions must be non-negative")
         _check_positive(self, "max_llm_calls")
-        # Deprecated alias rules (documented, deterministic):
-        # - max_llm_calls left at its default (10) is a no-op;
-        # - an explicit max_llm_calls with the default max_provider_call_attempts
-        #   drives the effective provider-attempt budget (backward compat);
-        # - explicit values for BOTH fields must agree, otherwise reject.
-        if self.max_llm_calls != 10:
-            if self.max_provider_call_attempts == 24:
-                object.__setattr__(self, "max_provider_call_attempts", self.max_llm_calls)
-            elif self.max_provider_call_attempts != self.max_llm_calls:
-                raise ValueError(
-                    "max_llm_calls is deprecated and conflicts with max_provider_call_attempts"
-                )
 
     def policy_hash(self) -> str:
         data: dict[str, object] = {

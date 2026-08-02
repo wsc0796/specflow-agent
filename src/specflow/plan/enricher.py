@@ -59,15 +59,24 @@ class SemanticPlanEnricher:
         self._llm = llm_client
         self._model = model
         self._provider = provider
-        self._invoker: Any | None = None
-        if guard is not None:
-            from specflow.invoker import GuardedModelInvoker
+        from specflow.invoker import GuardedModelInvoker
+        from specflow.policy.models import ExecutionPolicy
+        from specflow.policy.runtime_guard import RuntimeGuard
 
-            self._invoker = GuardedModelInvoker(
-                llm_client,
-                guard,
-                max_provider_retries=max_provider_retries,
+        if guard is None:
+            guard = RuntimeGuard(
+                ExecutionPolicy(
+                    max_provider_call_attempts=1_000_000,
+                    max_parallel_provider_calls=1_000,
+                    max_wall_time_seconds=86_400,
+                )
             )
+            guard.set_run_context(f"standalone-enricher-{uuid.uuid4().hex}", execution_mode="live")
+        self._invoker = GuardedModelInvoker(
+            llm_client,
+            guard,
+            max_provider_retries=max_provider_retries,
+        )
 
     # ------------------------------------------------------------------
     # Public API
@@ -115,10 +124,7 @@ class SemanticPlanEnricher:
             response_format="json",
         )
         try:
-            if self._invoker is not None:
-                response = self._invoker.invoke(request, call_type="enrichment")
-            else:
-                response = self._llm.complete(request)
+            response = self._invoker.invoke(request, call_type="enrichment")
         except Exception as error:
             from specflow.policy.models import SpecFlowError
 

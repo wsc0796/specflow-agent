@@ -70,6 +70,16 @@ class ScriptedExecutionClient:
         return Response()
 
 
+class FailingFirstWorkerClient(ScriptedExecutionClient):
+    """Succeeds during six enrichments, then fails the first worker request."""
+
+    def complete(self, request):
+        if len(self.requests) >= 6:
+            self.requests.append(request)
+            raise RuntimeError("worker failure probe")
+        return super().complete(request)
+
+
 class TestMultiAgentRunner:
     def test_receiver_input_schema_is_executed_before_scheduling(self) -> None:
         registry = _build_registry()
@@ -115,6 +125,62 @@ class TestMultiAgentRunner:
         )
         assert exit_code == 0
         assert len(list(output.glob("run-multi-*"))) == 1
+
+    def test_provider_mock_is_accounted_as_synthetic_without_mock_flag(
+        self, tmp_path: Path
+    ) -> None:
+        repo = tmp_path / "test-repo"
+        repo.mkdir()
+        (repo / "README.md").write_text("# Test Repo")
+        output = tmp_path / "output"
+
+        assert (
+            run_multi_agent(
+                repo=repo,
+                requirement="Inspect repository",
+                output=output,
+                provider="mock",
+                mock=False,
+            )
+            == 0
+        )
+        manifest = json.loads(
+            (next(output.glob("run-multi-*")) / "manifest.json").read_text(encoding="utf-8")
+        )
+        snapshot = manifest["budget_snapshot"]
+        assert snapshot["execution_mode"] == "mock"
+        assert snapshot["provider_calls"]["attempts"] == 0
+        assert snapshot["synthetic_model_calls"] == 6
+
+    def test_failed_manifest_uses_terminal_agent_snapshot(self, tmp_path: Path) -> None:
+        repo = tmp_path / "test-repo"
+        repo.mkdir()
+        (repo / "README.md").write_text("# Test Repo")
+        output = tmp_path / "output"
+
+        assert (
+            run_multi_agent(
+                repo=repo,
+                requirement="Inspect repository",
+                output=output,
+                provider="openai-compatible",
+                model="test-model",
+                _llm_client_override=FailingFirstWorkerClient(),
+            )
+            == 3
+        )
+        manifest = json.loads(
+            (next(output.glob("run-multi-*")) / "manifest.json").read_text(encoding="utf-8")
+        )
+        invocations = manifest["budget_snapshot"]["agent_invocations"]
+        assert invocations == {
+            "scheduled": 1,
+            "started": 1,
+            "completed": 0,
+            "failed": 1,
+            "active": 0,
+        }
+        assert manifest["triggering_budget_snapshot"]["provider_calls"]["failed"] == 1
 
     def test_manifest_contains_three_hashes(self, tmp_path: Path) -> None:
         repo = tmp_path / "test-repo"

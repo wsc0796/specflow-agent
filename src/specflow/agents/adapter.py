@@ -82,6 +82,7 @@ class AgentRunner:
                     artifacts=ArtifactPolicy(),
                 )
             )
+            budget.set_run_context(f"standalone-agent-{uuid4().hex}", execution_mode="live")
         self._budget = budget
         self._invoker = GuardedModelInvoker(
             llm_client,

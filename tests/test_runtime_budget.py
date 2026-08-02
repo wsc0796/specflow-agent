@@ -221,8 +221,28 @@ class TestTokenAccounting:
         tokens = guard.snapshot()["tokens"]
         assert tokens["usage_known"] is False
         assert tokens["unknown_calls"] == 1
-        assert tokens["input_tokens"] == 0
-        assert tokens["output_tokens"] == 0
+        assert tokens["input_tokens"] is None
+        assert tokens["output_tokens"] is None
+        assert tokens["total_tokens"] is None
+        assert tokens["known_input_tokens"] == 0
+        assert tokens["known_output_tokens"] == 0
+
+    def test_mixed_usage_keeps_aggregate_unknown(self) -> None:
+        guard = _guard()
+        GuardedModelInvoker(ScriptedClient(usage=None), guard).invoke(
+            _request(), call_type="worker"
+        )
+        GuardedModelInvoker(ScriptedClient(usage=(10, 5)), guard).invoke(
+            _request(), call_type="worker"
+        )
+        tokens = guard.snapshot()["tokens"]
+        assert tokens["usage_known"] is False
+        assert tokens["unknown_calls"] == 1
+        assert tokens["input_tokens"] is None
+        assert tokens["output_tokens"] is None
+        assert tokens["total_tokens"] is None
+        assert tokens["known_input_tokens"] == 10
+        assert tokens["known_output_tokens"] == 5
 
     def test_token_budget_fail_closed(self) -> None:
         guard = _guard(max_input=50, max_total=100, reserved_retry_tokens=0)
@@ -231,6 +251,45 @@ class TestTokenAccounting:
             invoker.invoke(_request(), call_type="worker")
         # Active count must be restored even when the token check raises.
         assert guard.snapshot()["provider_calls"]["active"] == 0
+
+    def test_normal_calls_cannot_consume_retry_reserve(self) -> None:
+        guard = _guard(
+            max_input=1_000,
+            max_output=1_000,
+            max_total=250,
+            max_agent_input=1_000,
+            max_agent_output=1_000,
+            reserved_retry_tokens=50,
+        )
+        invoker = GuardedModelInvoker(ScriptedClient(usage=(80, 0)), guard)
+        invoker.invoke(_request(), call_type="worker")
+        invoker.invoke(_request(), call_type="worker")
+        with pytest.raises(SpecFlowError, match="budget exceeded"):
+            invoker.invoke(_request(), call_type="worker")
+        assert guard.snapshot()["tokens"]["known_input_tokens"] == 160
+
+    def test_successful_retry_may_use_retry_reserve(self) -> None:
+        guard = _guard(
+            max_input=1_000,
+            max_output=1_000,
+            max_total=250,
+            max_agent_input=1_000,
+            max_agent_output=1_000,
+            reserved_retry_tokens=50,
+        )
+        normal = GuardedModelInvoker(ScriptedClient(usage=(80, 0)), guard)
+        normal.invoke(_request(), call_type="worker")
+        normal.invoke(_request(), call_type="worker")
+        retrying = GuardedModelInvoker(
+            ScriptedClient(failures=1, usage=(80, 0)),
+            guard,
+            max_provider_retries=1,
+            base_backoff_seconds=0,
+        )
+        retrying.invoke(_request(), call_type="worker")
+        snapshot = guard.snapshot()
+        assert snapshot["tokens"]["known_input_tokens"] == 240
+        assert snapshot["tokens"]["usage_known"] is False
 
 
 class TestConcurrency:
@@ -396,7 +455,6 @@ class TestStaticGate:
         root = Path(__file__).resolve().parents[1] / "src" / "specflow"
         allowlist = {
             "invoker.py",
-            "plan/enricher.py",  # test-only fallback when no guard is provided
             "trace/recorder.py",  # legacy trace recorder (baseline)
             "runner.py",  # legacy 3-worker baseline (frozen for Phase 6 A/B)
         }

@@ -37,6 +37,7 @@ class ProviderAttempt:
     agent_id: str | None
     revision_id: str | None
     started_monotonic: float
+    is_retry: bool = False
 
 
 class RuntimeGuard:
@@ -78,7 +79,6 @@ class RuntimeGuard:
         # Token accounting (known usage only; unknown is tracked separately)
         self._total_input_tokens = 0
         self._total_output_tokens = 0
-        self._token_usage_known = False
         self._token_usage_unknown_calls = 0
 
         # Revision accounting
@@ -215,6 +215,7 @@ class RuntimeGuard:
         call_type: str,
         agent_id: str | None = None,
         revision_id: str | None = None,
+        is_retry: bool = False,
     ) -> ProviderAttempt:
         """Atomically validate and reserve one real provider attempt.
 
@@ -259,6 +260,7 @@ class RuntimeGuard:
                 agent_id=agent_id,
                 revision_id=revision_id,
                 started_monotonic=self._time(),
+                is_retry=is_retry,
             )
             self._record_budget_snapshot_locked("MODEL_CALL_STARTED", attempt)
             return attempt
@@ -281,13 +283,22 @@ class RuntimeGuard:
             else:
                 self._provider_failed += 1
             self._provider_latency_ms += max(0, latency_ms)
-            if input_tokens is None or output_tokens is None:
-                self._token_usage_unknown_calls += 1
-                self._record_budget_snapshot_locked("TOKEN_USAGE_UNAVAILABLE", attempt)
-            else:
-                self._consume_tokens_locked(input_tokens, output_tokens)
-                self._token_usage_known = True
-                self._record_budget_snapshot_locked("TOKEN_USAGE_RECORDED", attempt)
+            try:
+                if input_tokens is None or output_tokens is None:
+                    self._token_usage_unknown_calls += 1
+                    self._record_budget_snapshot_locked("TOKEN_USAGE_UNAVAILABLE", attempt)
+                else:
+                    self._consume_tokens_locked(
+                        input_tokens,
+                        output_tokens,
+                        is_retry=attempt.is_retry,
+                    )
+                    self._record_budget_snapshot_locked("TOKEN_USAGE_RECORDED", attempt)
+            except SpecFlowError as error:
+                self._record_budget_snapshot_locked(
+                    "TOKEN_BUDGET_EXCEEDED", attempt, error_code=error.code
+                )
+                raise
             if success:
                 self._record_budget_snapshot_locked("MODEL_CALL_SUCCEEDED", attempt)
             else:
@@ -313,8 +324,22 @@ class RuntimeGuard:
                 }
             )
 
-    def _consume_tokens_locked(self, input_tokens: int, output_tokens: int) -> None:
+    def _consume_tokens_locked(
+        self, input_tokens: int, output_tokens: int, *, is_retry: bool
+    ) -> None:
         token_policy = self._policy.tokens
+        if not isinstance(input_tokens, int) or not isinstance(output_tokens, int):
+            raise SpecFlowError(
+                code="TOKEN_BUDGET_EXCEEDED",
+                safe_message="Token usage must be integer values",
+                retryable=False,
+            )
+        if input_tokens < 0 or output_tokens < 0:
+            raise SpecFlowError(
+                code="TOKEN_BUDGET_EXCEEDED",
+                safe_message="Token usage cannot be negative",
+                retryable=False,
+            )
         if input_tokens > token_policy.max_agent_input_tokens:
             raise SpecFlowError(
                 code="TOKEN_BUDGET_EXCEEDED",
@@ -350,10 +375,13 @@ class RuntimeGuard:
                 ),
                 retryable=False,
             )
-        if total > token_policy.max_run_total_tokens:
+        total_limit = token_policy.max_run_total_tokens
+        if not is_retry:
+            total_limit -= token_policy.reserved_retry_tokens
+        if total > total_limit:
             raise SpecFlowError(
                 code="TOKEN_BUDGET_EXCEEDED",
-                safe_message=(f"Run token budget exceeded ({token_policy.max_run_total_tokens})"),
+                safe_message=(f"Run token budget exceeded ({total_limit})"),
                 retryable=False,
             )
         self._total_input_tokens = next_input
@@ -420,6 +448,7 @@ class RuntimeGuard:
             self._model_call_events.append({**event, "run_id": self._run_id})
 
     def _snapshot_locked(self) -> dict[str, object]:
+        usage_known = self._provider_attempts > 0 and self._token_usage_unknown_calls == 0
         return {
             "execution_mode": self._execution_mode,
             "configured_role_count": self._configured_role_count,
@@ -454,10 +483,15 @@ class RuntimeGuard:
                 "re_review_invocations": self._re_review_invocations,
             },
             "tokens": {
-                "input_tokens": self._total_input_tokens,
-                "output_tokens": self._total_output_tokens,
-                "total_tokens": self._total_input_tokens + self._total_output_tokens,
-                "usage_known": self._token_usage_known,
+                "input_tokens": self._total_input_tokens if usage_known else None,
+                "output_tokens": self._total_output_tokens if usage_known else None,
+                "total_tokens": (
+                    self._total_input_tokens + self._total_output_tokens if usage_known else None
+                ),
+                "known_input_tokens": self._total_input_tokens,
+                "known_output_tokens": self._total_output_tokens,
+                "known_total_tokens": self._total_input_tokens + self._total_output_tokens,
+                "usage_known": usage_known,
                 "unknown_calls": self._token_usage_unknown_calls,
             },
             "timing": {

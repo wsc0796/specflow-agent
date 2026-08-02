@@ -77,19 +77,26 @@ class GuardedModelInvoker:
                 call_type=call_type,
                 agent_id=agent_id,
                 revision_id=revision_id,
+                is_retry=attempt > 1,
             )
             started = time.perf_counter()
             try:
                 response = self._client.complete(request)
-            except Exception as error:
+            except BaseException as error:
                 latency_ms = max(0, int((time.perf_counter() - started) * 1000))
-                error_code = classify_provider_error(error)
+                error_code = (
+                    classify_provider_error(error)
+                    if isinstance(error, Exception)
+                    else ErrorCode.INTERNAL_UNEXPECTED
+                )
                 self._guard.release_provider_attempt(
                     reservation,
                     success=False,
                     error_code=error_code.value,
                     latency_ms=latency_ms,
                 )
+                if not isinstance(error, Exception):
+                    raise
                 retryable = is_retryable(error_code)
                 if not retryable or attempt > self._max_provider_retries:
                     raise

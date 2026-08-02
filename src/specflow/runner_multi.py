@@ -170,6 +170,7 @@ def run_multi_agent(
 
     PolicyValidator().validate(policy)
     guard = RuntimeGuard(policy)
+    use_mock = mock or provider == "mock"
 
     if not repo.is_dir() or not requirement.strip():
         return 2
@@ -177,7 +178,7 @@ def run_multi_agent(
     run_id = f"run-multi-{sha256(f'{repo.resolve()}|{requirement}'.encode()).hexdigest()[:12]}"
     if (output / run_id).exists():
         return 3
-    guard.set_run_context(run_id, execution_mode="mock" if mock else "live")
+    guard.set_run_context(run_id, execution_mode="mock" if use_mock else "live")
 
     # Collect repository evidence (same pipeline as legacy runner)
     evidence_text = ""
@@ -224,7 +225,7 @@ def run_multi_agent(
     llm_client: object
     if _llm_client_override is not None:
         llm_client = _llm_client_override
-    elif mock or provider == "mock":
+    elif use_mock:
         llm_client = _make_mock_llm_client()
     else:
         try:
@@ -289,7 +290,7 @@ def run_multi_agent(
     executors: dict[str, AgentExecutor] = {}
     for identity in registry.list_agents():
         agent = registry.get(identity.agent_id)
-        if mock or provider == "mock":
+        if use_mock:
             executors[identity.agent_id] = agent.execute
         else:
             runner = AgentRunner(
@@ -778,6 +779,7 @@ def run_multi_agent(
         "execution_policy": {
             "policy_version": policy.policy_version,
             "max_wall_time_seconds": policy.max_wall_time_seconds,
+            "max_provider_call_attempts": policy.max_provider_call_attempts,
             "max_llm_calls": policy.max_llm_calls,
             "max_revisions": policy.max_revisions,
         },
@@ -957,7 +959,7 @@ def _budgeted_executor(
         started = _time.perf_counter()
         try:
             result = executor({**context, "validated_input": validated_input})
-            guard.complete_agent_invocation()
+            guard.complete_agent_invocation(failed=result.get("success") is False)
             guard.record_agent_latency(max(0, int((_time.perf_counter() - started) * 1000)))
             return result
         except Exception:
@@ -1426,7 +1428,8 @@ def _persist_planning_failure(
             "error": error,
             "failure_stage": "planning",
             "stages_completed": 0,
-            "budget_snapshot": guard.last_budget_snapshot or guard.snapshot(),
+            "budget_snapshot": guard.snapshot(),
+            "triggering_budget_snapshot": guard.last_budget_snapshot,
             "artifacts": {},
         }
         _safe_write(run_dir, "manifest.json", failed_manifest, guard)
@@ -1505,7 +1508,8 @@ def _persist_failed_run(
             "stages_completed": len(stages),
             "discovered_files": discovered_files,
             "failure_code": error,
-            "budget_snapshot": guard.last_budget_snapshot or guard.snapshot(),
+            "budget_snapshot": guard.snapshot(),
+            "triggering_budget_snapshot": guard.last_budget_snapshot,
             "artifacts": {"task_briefs": "task-briefs.json"},
             "task_briefs": {
                 "schema_version": task_brief_artifact.schema_version,
@@ -1557,8 +1561,6 @@ def _build_multi_agent_metrics(
 ) -> RunMetrics:
     """Build unified RunMetrics from multi-agent execution data."""
     agent_metrics: list[AgentMetrics] = []
-    total_in = 0
-    total_out = 0
     fallback_count = 0
     degraded_count = 0
     schema_ok = 0
@@ -1567,10 +1569,8 @@ def _build_multi_agent_metrics(
     for stage in stages:
         for agent_id, result in stage.agent_results.items():
             usage = result.get("usage", {})
-            tokens_in = usage.get("input_tokens") or 0
-            tokens_out = usage.get("output_tokens") or 0
-            total_in += tokens_in
-            total_out += tokens_out
+            tokens_in = usage.get("input_tokens")
+            tokens_out = usage.get("output_tokens")
 
             degraded = result.get("degraded", False)
             if degraded:
@@ -1639,9 +1639,9 @@ def _build_multi_agent_metrics(
         started_at=started_at,
         completed_at=datetime.now(UTC).isoformat(),
         wall_time_ms=wall_ms,
-        input_tokens=total_in,
-        output_tokens=total_out,
-        total_tokens=total_in + total_out,
+        input_tokens=snapshot["tokens"]["input_tokens"],
+        output_tokens=snapshot["tokens"]["output_tokens"],
+        total_tokens=snapshot["tokens"]["total_tokens"],
         llm_call_count=len(agent_metrics),
         fallback_count=fallback_count,
         degraded_count=degraded_count,
