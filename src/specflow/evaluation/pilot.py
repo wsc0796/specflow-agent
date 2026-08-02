@@ -83,9 +83,7 @@ def rule_score(
     affected = set(candidate.affected_files)
     evidence_refs = set(candidate.evidence_refs)
     referenced_existing = {
-        ref
-        for ref in candidate.evidence_refs
-        if ref.startswith("app/") or ref.startswith("tests/")
+        ref for ref in candidate.evidence_refs if ref.startswith("app/") or ref.startswith("tests/")
     }
     existing_paths = {
         str(path.relative_to(repo)).replace("\\", "/")
@@ -94,20 +92,23 @@ def rule_score(
     }
     referenced_exists = len(referenced_existing) > 0 and referenced_existing <= existing_paths
     expected_recall = (
-        len(set(case.expected_file_patterns) & affected)
-        / len(case.expected_file_patterns)
+        len(set(case.expected_file_patterns) & affected) / len(case.expected_file_patterns)
         if case.expected_file_patterns
         else 0.0
     )
-    forbidden = [claim for claim in case.forbidden_claims if claim in " ".join(candidate.proposed_changes)]
+    forbidden = [
+        claim for claim in case.forbidden_claims if claim in " ".join(candidate.proposed_changes)
+    ]
     claim_text = " ".join(candidate.proposed_changes).lower()
-    unsupported_claims = 1 if any(
-        word in claim_text for word in ("guarantee", "always", "never fails", "production")
-    ) else 0
-    risk_coverage = len(set(case.expected_risks) & set(candidate.risks)) / len(
-        case.expected_risks
+    unsupported_claims = (
+        1
+        if any(word in claim_text for word in ("guarantee", "always", "never fails", "production"))
+        else 0
     )
-    uncertainty_calibrated = bool(candidate.uncertainties) if case.case_id.endswith("vague") else True
+    risk_coverage = len(set(case.expected_risks) & set(candidate.risks)) / len(case.expected_risks)
+    uncertainty_calibrated = (
+        bool(candidate.uncertainties) if case.case_id.endswith("vague") else True
+    )
     return {
         "schema_valid": True,
         "evidence_ref_valid": len(candidate.evidence_refs) == len(evidence_refs),
@@ -220,9 +221,7 @@ def run_pilot_mock_smoke(
     return tuple(results)
 
 
-def _run_single_mock(
-    case: EvaluationCase, run_dir: Path
-) -> tuple[int, dict[str, Any] | None]:
+def _run_single_mock(case: EvaluationCase, run_dir: Path) -> tuple[int, dict[str, Any] | None]:
     """Deterministic mock single-agent pipeline (harness validation only)."""
     manifest = {
         "case_id": case.case_id,
@@ -285,9 +284,7 @@ def _derive_candidate(
                 else [output.get("summary", "")]
             )
             affected.extend(
-                item
-                for item in output.get("affected_components", [])
-                if isinstance(item, str)
+                item for item in output.get("affected_components", []) if isinstance(item, str)
             )
             risks.extend(item for item in output.get("risks", []) if isinstance(item, str))
             test_plan.extend(
@@ -345,6 +342,4 @@ def write_csv(path: Path, rows: list[dict[str, object]]) -> None:
     with path.open("w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(handle, fieldnames=fieldnames)
         writer.writeheader()
-        writer.writerows(
-            {field: row.get(field, "") for field in fieldnames} for row in rows
-        )
+        writer.writerows({field: row.get(field, "") for field in fieldnames} for row in rows)
