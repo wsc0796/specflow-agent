@@ -11,7 +11,7 @@ from specflow.policy.models import (
 DEFAULT_POLICY = ExecutionPolicy(
     policy_version="1.0.0",
     max_wall_time_seconds=300,
-    max_llm_calls=10,
+    max_provider_call_attempts=24,
     max_parallel_agents=3,
     max_revisions=1,
     fail_on_schema_error=True,

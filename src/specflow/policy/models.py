@@ -101,7 +101,7 @@ class ExecutionPolicy:
 
     policy_version: str = "1.0.0"
     max_wall_time_seconds: int = 300
-    max_provider_call_attempts: int = 10
+    max_provider_call_attempts: int = 24
     max_parallel_agents: int = 3
     max_parallel_provider_calls: int = 3
     max_revisions: int = 1
@@ -123,10 +123,18 @@ class ExecutionPolicy:
         if self.max_revisions < 0:
             raise ValueError("max_revisions must be non-negative")
         _check_positive(self, "max_llm_calls")
-        # Deprecated alias: an explicitly provided max_llm_calls drives the
-        # provider-attempt budget so existing callers keep their meaning.
-        if self.max_llm_calls != 10 and self.max_provider_call_attempts == 10:
-            object.__setattr__(self, "max_provider_call_attempts", self.max_llm_calls)
+        # Deprecated alias rules (documented, deterministic):
+        # - max_llm_calls left at its default (10) is a no-op;
+        # - an explicit max_llm_calls with the default max_provider_call_attempts
+        #   drives the effective provider-attempt budget (backward compat);
+        # - explicit values for BOTH fields must agree, otherwise reject.
+        if self.max_llm_calls != 10:
+            if self.max_provider_call_attempts == 24:
+                object.__setattr__(self, "max_provider_call_attempts", self.max_llm_calls)
+            elif self.max_provider_call_attempts != self.max_llm_calls:
+                raise ValueError(
+                    "max_llm_calls is deprecated and conflicts with max_provider_call_attempts"
+                )
 
     def policy_hash(self) -> str:
         data: dict[str, object] = {
