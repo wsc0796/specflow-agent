@@ -5,7 +5,7 @@
   "base_commit": "bc76214",
   "branch": "fix/phase-5a-mcp-inventory",
   "status": "PASS",
-  "result_commit": "PENDING_FINALIZED_IN_COMMIT_B",
+  "result_commit": "0ae35fc",
   "deliverables": [
     "artifacts/workflow/phase-5/mcp-tool-inventory.md",
     "artifacts/workflow/phase-5/single-source-plan.md",
