@@ -1,3 +1,5 @@
+# ruff: noqa: E501  (the task table below is data, not code)
+
 """Build the Phase 7 30-case dataset from an authored spec table.
 
 All tasks are authored against the real files of
