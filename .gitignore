@@ -14,3 +14,8 @@ data/
 artifacts/
 artifacts-multi/
 evaluation/results/mock/artifacts/
+
+evaluation/pilot/outputs/
+evaluation/pilot/rule-scores.csv
+evaluation/pilot/cost-metrics.csv
+evaluation/pilot/blind-review-pack.json
