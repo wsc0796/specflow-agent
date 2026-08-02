@@ -1,0 +1,30 @@
+{
+  "workflow": "specflow-hardening-v1",
+  "phase": "5A",
+  "role": "mcp-schema-single-source-inventory",
+  "base_commit": "bc76214",
+  "branch": "fix/phase-5a-mcp-inventory",
+  "status": "PASS",
+  "result_commit": "PENDING_FINALIZED_IN_COMMIT_B",
+  "deliverables": [
+    "artifacts/workflow/phase-5/mcp-tool-inventory.md",
+    "artifacts/workflow/phase-5/single-source-plan.md",
+    "artifacts/workflow/phase-5/protocol-smoke-checklist.md",
+    "artifacts/workflow/phase-5/typecheck-scope.md",
+    "artifacts/workflow/phase-5/release-doc-checklist.md",
+    "artifacts/workflow/phase-5/handoff/changed-files.txt",
+    "artifacts/workflow/phase-5/handoff/test-results.txt",
+    "artifacts/workflow/phase-5/handoff/handoff.json",
+    "artifacts/workflow/phase-5/handoff/unresolved-issues.md"
+  ],
+  "exit": "PASS",
+  "pending_decisions": [
+    "MCP schema single-source plan A/B/C",
+    "Type-check introduction (mypy strict core vs none)",
+    "Tool error codes over MCP",
+    "stdio timeout policy",
+    "LICENSE choice"
+  ],
+  "test_evidence": "31 passed (MCP adapter/server); stdio smoke passed",
+  "notes": "Docs-only window executed by phase_4a_live_prep due to sub-agent delivery failure."
+}

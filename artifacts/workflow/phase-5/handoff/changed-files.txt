@@ -1,0 +1,9 @@
+artifacts/workflow/phase-5/mcp-tool-inventory.md
+artifacts/workflow/phase-5/single-source-plan.md
+artifacts/workflow/phase-5/protocol-smoke-checklist.md
+artifacts/workflow/phase-5/typecheck-scope.md
+artifacts/workflow/phase-5/release-doc-checklist.md
+artifacts/workflow/phase-5/handoff/changed-files.txt
+artifacts/workflow/phase-5/handoff/test-results.txt
+artifacts/workflow/phase-5/handoff/handoff.json
+artifacts/workflow/phase-5/handoff/unresolved-issues.md
