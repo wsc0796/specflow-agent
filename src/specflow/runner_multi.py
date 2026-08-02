@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import re
 import time
 from collections.abc import Callable, Mapping
@@ -35,6 +36,7 @@ from specflow.plan.hash_utils import canonical_json_bytes
 from specflow.plan.models import (
     AgentTask,
     ControlledEvidenceSummary,
+    EffectiveDelegationPlan,
     EvidenceReference,
     TaskBriefArtifact,
 )
@@ -45,12 +47,25 @@ from specflow.policy import (
     RuntimeGuard,
     SpecFlowError,
 )
+from specflow.revision.models import (
+    FindingResolution,
+    RevisionContext,
+    RevisionInput,
+    RevisionResult,
+    ValidatedAgentOutput,
+)
+from specflow.schema.agent_payloads import ReviewPayload
 from specflow.schema.models import AgentExecutionInput
 from specflow.tools import ToolExecutor, ToolRegistry
 from specflow.tools.repository_tools import RepositoryToolSet
-from specflow.trace.models import AgentTraceSpan, TaskBriefTraceEvent
+from specflow.trace.models import (
+    AgentTraceSpan,
+    RevisionTraceEvent,
+    TaskBriefTraceEvent,
+)
 
 AgentExecutor = Callable[[dict[str, Any]], dict[str, Any]]
+logger = logging.getLogger(__name__)
 
 
 class _TaskBriefEventRecorder:
@@ -74,6 +89,33 @@ class _TaskBriefEventRecorder:
                         order[event.event_type],
                         event.stage,
                         event.agent_id,
+                        event.trace_id,
+                    ),
+                )
+            )
+
+
+class _RevisionEventRecorder:
+    """Thread-safe in-memory collector for revision lifecycle trace events."""
+
+    def __init__(self) -> None:
+        self._events: list[RevisionTraceEvent] = []
+        self._lock = Lock()
+
+    def record(self, event: RevisionTraceEvent) -> None:
+        with self._lock:
+            self._events.append(event)
+
+    def snapshot(self) -> tuple[RevisionTraceEvent, ...]:
+        with self._lock:
+            return tuple(
+                sorted(
+                    self._events,
+                    key=lambda event: (
+                        event.round,
+                        event.revision_id or "",
+                        event.agent_id or "",
+                        event.event_type.value,
                         event.trace_id,
                     ),
                 )
@@ -264,6 +306,7 @@ def run_multi_agent(
     stages: list[StageExecutionResult] = []
     runtime_handoffs: list[AgentHandoff] = []
     revision_exhausted = False
+    revision_events = _RevisionEventRecorder()
 
     try:
         coordinator.engine.transition(MultiAgentWorkflowState.PLANNING, "plan compiled")
@@ -333,24 +376,131 @@ def run_multi_agent(
             guard,
         )
 
-        decision = _review_decision(prior_outputs, plan.stages[3][0])
-        if decision == "REJECT":
-            guard.consume_revision()
-            controller = coordinator.revision_controller
-            if controller is None:
-                raise RuntimeError("Coordinator did not initialize RevisionController")
-            target_id = _revision_target(prior_outputs, plan.stages[3][0])
-            target = registry.get(target_id)
-            revision_task = controller.create_revision_task(
-                target_id,
-                target.role,
-                "Review rejected the initial synthesis.",
-                "Revise the output to address the recorded review finding.",
+        controller = coordinator.revision_controller
+        if controller is None:
+            raise RuntimeError("Coordinator did not initialize RevisionController")
+        review_records: list[dict[str, Any]] = []
+        revision_inputs: list[RevisionInput] = []
+        revision_results: list[RevisionResult] = []
+        revision_stage_by_agent: dict[str, int] = {}
+        next_stage = 4
+
+        def record_review(review_id: str, round_label: int) -> ReviewPayload:
+            payload = _review_payload(prior_outputs, review_id)
+            review_records.append(payload.model_dump(mode="json"))
+            revision_events.record(
+                RevisionTraceEvent(
+                    event_type="REVIEW_FINDINGS_CREATED",
+                    run_id=run_id,
+                    round=round_label,
+                    agent_id=review_id,
+                    status=payload.decision,
+                    trace_id=str(uuid4()),
+                )
             )
-            if revision_task is None:
-                revision_exhausted = True
-            else:
-                coordinator.engine.transition(MultiAgentWorkflowState.REVISING, "review rejected")
+            return payload
+
+        decision = _review_decision(prior_outputs, plan.stages[3][0])
+        review_payload = record_review(plan.stages[3][0], 0)
+        _validate_review_findings(review_payload, plan=plan, evidence_summary=evidence_summary)
+        terminal_state: str | None = None
+
+        while decision == "REJECT":
+            round_number = controller.begin_round()
+            if round_number is None:
+                terminal_state = "needs_human_review"
+                break
+            guard.consume_revision()
+            coordinator.engine.transition(MultiAgentWorkflowState.REVISING, "review rejected")
+            targets = _revision_targets(review_payload, plan)
+            if not targets:
+                raise ValueError("REJECT requires at least one finding target")
+            review_artifact_hash = sha256(
+                canonical_json_bytes(review_payload.model_dump(mode="json"))
+            ).hexdigest()
+
+            for target_id in targets:
+                target = registry.get(target_id)
+                task = next(task for task in plan.tasks if task.agent_id == target_id)
+                findings = tuple(
+                    finding
+                    for finding in review_payload.findings
+                    if finding.target_agent_id == target_id
+                )
+                if not findings:
+                    raise ValueError(f"No findings target {target_id}")
+                prior_envelope = prior_outputs.get(target_id)
+                if prior_envelope is None:
+                    raise ValueError(f"Missing prior output for revision target {target_id}")
+                prior_payload = prior_envelope.get("output", {})
+                if not isinstance(prior_payload, dict):
+                    raise ValueError(f"Prior output for {target_id} is not a dict")
+                prior_output_hash = sha256(canonical_json_bytes(prior_payload)).hexdigest()
+                validated_prior = ValidatedAgentOutput(
+                    agent_id=target_id,
+                    schema_id=target.identity.output_schema_id,
+                    payload=prior_payload,
+                )
+                revision_task = controller.create_revision_task(
+                    run_id=run_id,
+                    round_number=round_number,
+                    target_agent_id=target_id,
+                    target_role=target.role,
+                    finding_ids=tuple(finding.finding_id for finding in findings),
+                    prior_output_hash=prior_output_hash,
+                )
+                if revision_task is None:
+                    raise ValueError(f"Revision task could not be created for {target_id}")
+                revision_id = revision_task.revision_id
+                revision_input = RevisionInput.build(
+                    run_id=run_id,
+                    revision_id=revision_id,
+                    revision_round=round_number,
+                    max_revision_rounds=controller.policy.max_total_rounds,
+                    target_agent_id=target_id,
+                    role=target.role,
+                    original_requirement=requirement,
+                    verified_evidence=evidence_summary,
+                    task_brief=task.task_brief,
+                    prior_output=validated_prior,
+                    findings=findings,
+                    output_schema_id=target.identity.output_schema_id,
+                )
+                revision_inputs.append(revision_input)
+                revision_context = RevisionContext(
+                    revision_id=revision_id,
+                    revision_round=round_number,
+                    max_revision_rounds=revision_input.max_revision_rounds,
+                    target_agent_id=target_id,
+                    prior_output=validated_prior,
+                    prior_output_hash=revision_input.prior_output_hash,
+                    findings=findings,
+                    parent_artifact="sources.json",
+                    review_artifact_hash=review_artifact_hash,
+                )
+                controller.mark_running(revision_id)
+                revision_events.record(
+                    RevisionTraceEvent(
+                        event_type="REVISION_SCHEDULED",
+                        run_id=run_id,
+                        revision_id=revision_id,
+                        round=round_number,
+                        agent_id=target_id,
+                        status="scheduled",
+                        trace_id=str(uuid4()),
+                    )
+                )
+                revision_events.record(
+                    RevisionTraceEvent(
+                        event_type="REVISION_STARTED",
+                        run_id=run_id,
+                        revision_id=revision_id,
+                        round=round_number,
+                        agent_id=target_id,
+                        status="running",
+                        trace_id=str(uuid4()),
+                    )
+                )
                 runtime_handoffs.append(
                     _revision_handoff(
                         review_id=plan.stages[3][0],
@@ -364,73 +514,144 @@ def run_multi_agent(
                     stages,
                     scheduler,
                     (target_id,),
-                    4,
+                    next_stage,
                     executors,
-                    {**base_context, "revision_task": revision_task.__dict__},
+                    {**base_context, "revision_context": revision_context},
                     prior_outputs,
                     plan.tasks,
                     registry,
                     schema_registry,
                     guard,
                 )
-                coordinator.engine.transition(
-                    MultiAgentWorkflowState.SYNTHESIZING, "revision complete"
+                revision_stage_by_agent[target_id] = next_stage
+                next_stage += 1
+                revision_result = _parse_revision_result(prior_outputs, target_id, revision_input)
+                revision_results.append(revision_result)
+                controller.mark_completed(
+                    revision_id,
+                    result_artifact="revision-results.json",
                 )
-                runtime_handoffs.extend(
-                    _validate_stage_inputs(
-                        plan.tasks,
-                        plan.stages[2],
-                        registry,
-                        prior_outputs,
-                        requirement,
-                        sender_stage_overrides={target_id: 4},
+                revision_events.record(
+                    RevisionTraceEvent(
+                        event_type="REVISION_COMPLETED",
+                        run_id=run_id,
+                        revision_id=revision_id,
+                        round=round_number,
+                        agent_id=target_id,
+                        status="completed",
+                        trace_id=str(uuid4()),
                     )
                 )
-                _run_and_accumulate(
-                    stages,
-                    scheduler,
-                    plan.stages[2],
-                    5,
-                    executors,
-                    base_context,
-                    prior_outputs,
-                    plan.tasks,
-                    registry,
-                    schema_registry,
-                    guard,
-                )
-                coordinator.engine.transition(MultiAgentWorkflowState.REVIEWING, "re-review")
-                runtime_handoffs.extend(
-                    _validate_stage_inputs(
-                        plan.tasks,
-                        plan.stages[3],
-                        registry,
-                        prior_outputs,
-                        requirement,
-                        sender_stage_overrides={"synthesis-agent-v1": 5},
+                for resolution in revision_result.resolutions:
+                    revision_events.record(
+                        RevisionTraceEvent(
+                            event_type=(
+                                "FINDING_RESOLVED"
+                                if resolution.status == "resolved"
+                                else "FINDING_UNRESOLVED"
+                            ),
+                            run_id=run_id,
+                            revision_id=revision_id,
+                            round=round_number,
+                            agent_id=target_id,
+                            finding_id=resolution.finding_id,
+                            status=resolution.status,
+                            trace_id=str(uuid4()),
+                        )
                     )
-                )
-                _run_and_accumulate(
-                    stages,
-                    scheduler,
-                    plan.stages[3],
-                    6,
-                    executors,
-                    base_context,
-                    prior_outputs,
-                    plan.tasks,
-                    registry,
-                    schema_registry,
-                    guard,
-                )
-                decision = _review_decision(prior_outputs, plan.stages[3][0])
-                revision_exhausted = decision == "REJECT" and controller.exhausted
 
-        coordinator.engine.transition(
-            MultiAgentWorkflowState.COMPLETED,
-            "review passed" if decision == "PASS" else "revision limit reached",
-        )
+            # Re-synthesize with the revised outputs, then re-review.
+            coordinator.engine.transition(MultiAgentWorkflowState.SYNTHESIZING, "revision complete")
+            runtime_handoffs.extend(
+                _validate_stage_inputs(
+                    plan.tasks,
+                    plan.stages[2],
+                    registry,
+                    prior_outputs,
+                    requirement,
+                    sender_stage_overrides=revision_stage_by_agent,
+                )
+            )
+            _run_and_accumulate(
+                stages,
+                scheduler,
+                plan.stages[2],
+                next_stage,
+                executors,
+                base_context,
+                prior_outputs,
+                plan.tasks,
+                registry,
+                schema_registry,
+                guard,
+            )
+            next_stage += 1
+            coordinator.engine.transition(MultiAgentWorkflowState.RE_REVIEWING, "re-review")
+            runtime_handoffs.extend(
+                _validate_stage_inputs(
+                    plan.tasks,
+                    plan.stages[3],
+                    registry,
+                    prior_outputs,
+                    requirement,
+                    sender_stage_overrides={"synthesis-agent-v1": next_stage - 1},
+                )
+            )
+            _run_and_accumulate(
+                stages,
+                scheduler,
+                plan.stages[3],
+                next_stage,
+                executors,
+                base_context,
+                prior_outputs,
+                plan.tasks,
+                registry,
+                schema_registry,
+                guard,
+            )
+            next_stage += 1
+            revision_events.record(
+                RevisionTraceEvent(
+                    event_type="REVIEW_RECHECKED",
+                    run_id=run_id,
+                    round=round_number,
+                    agent_id=plan.stages[3][0],
+                    status="rechecked",
+                    trace_id=str(uuid4()),
+                )
+            )
+            decision = _review_decision(prior_outputs, plan.stages[3][0])
+            review_payload = record_review(plan.stages[3][0], round_number)
+            _validate_review_findings(review_payload, plan=plan, evidence_summary=evidence_summary)
+            if decision == "REJECT" and controller.exhausted:
+                terminal_state = "needs_human_review"
+                break
+
+        if terminal_state == "needs_human_review":
+            coordinator.engine.transition(
+                MultiAgentWorkflowState.NEEDS_HUMAN_REVIEW,
+                "revision limit reached with rejection",
+            )
+            revision_events.record(
+                RevisionTraceEvent(
+                    event_type="HUMAN_REVIEW_REQUIRED",
+                    run_id=run_id,
+                    round=controller.current_round,
+                    agent_id=plan.stages[3][0],
+                    status="needs_human_review",
+                    trace_id=str(uuid4()),
+                )
+            )
+        else:
+            coordinator.engine.transition(MultiAgentWorkflowState.COMPLETED, "review passed")
+        revision_exhausted = terminal_state == "needs_human_review"
     except Exception:
+        logger.exception(
+            "run %s failed with an unexpected error in phase %s",
+            run_id,
+            coordinator.engine.state.value,
+        )
         _persist_failed_run(
             output=output,
             run_id=run_id,
@@ -444,6 +665,7 @@ def run_multi_agent(
             error="MULTI_AGENT_RUN_FAILED",
             task_brief_artifact=task_brief_artifact,
             task_brief_events=task_brief_events.snapshot(),
+            revision_events=revision_events.snapshot(),
         )
         return 3
 
@@ -464,6 +686,7 @@ def run_multi_agent(
         model,
         coordinator.engine.state.value,
         task_brief_events.snapshot(),
+        revision_events.snapshot(),
     )
     policy_hash = policy.policy_hash()
     idempotency_key = sha256(
@@ -488,6 +711,28 @@ def run_multi_agent(
         "workflow_history": list(coordinator.engine.history),
         "revision_count": coordinator.engine.revision_count,
         "revision_exhausted": revision_exhausted,
+        "terminal_state": coordinator.engine.state.value,
+        "review": {
+            "decision": decision,
+            "review_count": len(review_records),
+            "finding_count": sum(len(record.get("findings", [])) for record in review_records),
+            "finding_ids": sorted(
+                {
+                    finding["finding_id"]
+                    for record in review_records
+                    for finding in record.get("findings", [])
+                }
+            ),
+        },
+        "revision": {
+            "task_count": len(controller.tasks),
+            "revision_rounds": controller.current_round,
+            "target_agents": sorted(revision_stage_by_agent),
+            "unresolved_finding_count": sum(
+                len(result.unresolved_finding_ids) for result in revision_results
+            ),
+            "final_review_decision": decision,
+        },
         "stage_results": [
             {"stage": result.stage_index, "agents": sorted(result.agent_results)}
             for result in stages
@@ -499,6 +744,11 @@ def run_multi_agent(
             "sources": "sources.json",
             "metrics": "metrics.json",
             "task_briefs": "task-briefs.json",
+            "review_findings": "review-findings.json",
+            "revision_tasks": "revision-tasks.json",
+            "revision_inputs": "revision-inputs.json",
+            "revision_results": "revision-results.json",
+            "finding_resolutions": "finding-resolutions.json",
         },
         "task_briefs": {
             "schema_version": task_brief_artifact.schema_version,
@@ -542,6 +792,50 @@ def run_multi_agent(
             guard,
             sort_keys=True,
         )
+        _safe_write(run_dir, "review-findings.json", review_records, guard, sort_keys=True)
+        _safe_write(
+            run_dir,
+            "revision-tasks.json",
+            [task.as_dict() for task in controller.tasks],
+            guard,
+            sort_keys=True,
+        )
+        _safe_write(
+            run_dir,
+            "revision-inputs.json",
+            [revision_input.model_dump(mode="json") for revision_input in revision_inputs],
+            guard,
+            sort_keys=True,
+        )
+        _safe_write(
+            run_dir,
+            "revision-results.json",
+            [revision_result.model_dump(mode="json") for revision_result in revision_results],
+            guard,
+            sort_keys=True,
+        )
+        _safe_write(
+            run_dir,
+            "finding-resolutions.json",
+            [
+                resolution.model_dump(mode="json")
+                for revision_result in revision_results
+                for resolution in revision_result.resolutions
+            ],
+            guard,
+            sort_keys=True,
+        )
+        revision_artifact_names = (
+            "review-findings.json",
+            "revision-tasks.json",
+            "revision-inputs.json",
+            "revision-results.json",
+            "finding-resolutions.json",
+        )
+        manifest["revision_artifacts"] = {
+            name: sha256((run_dir / name).read_bytes()).hexdigest()
+            for name in revision_artifact_names
+        }
         _safe_write(run_dir, "manifest.json", manifest, guard)
         _safe_write(run_dir, "agent-outputs.json", agent_outputs, guard, sort_keys=True)
         _safe_write(run_dir, "handoffs.json", [handoff.__dict__ for handoff in handoffs], guard)
@@ -575,7 +869,7 @@ def run_multi_agent(
         _safe_write(run_dir, "metrics.json", metrics.as_dict(), guard)
     except SpecFlowError:
         return 3
-    return 0
+    return 5 if terminal_state == "needs_human_review" else 0
 
 
 def _build_registry() -> AgentRegistry:
@@ -617,7 +911,11 @@ def _run_and_accumulate(
         prior_outputs,
     )
     guarded_executors = {
-        agent_id: _budgeted_executor(executors[agent_id], validated_inputs[agent_id], guard)
+        agent_id: _budgeted_executor(
+            _maybe_wrap_mock_revision_executor(executors[agent_id], validated_inputs[agent_id]),
+            validated_inputs[agent_id],
+            guard,
+        )
         for agent_id in agent_ids
     }
     result = scheduler.execute(
@@ -663,6 +961,7 @@ def _validated_inputs(
     )
     run_id = str(context.get("run_id", ""))
     task_by_id = {task.agent_id: task for task in tasks}
+    revision_context = context.get("revision_context")
     inputs: dict[str, AgentExecutionInput] = {}
     for agent_id in agent_ids:
         try:
@@ -713,7 +1012,7 @@ def _validated_inputs(
             repository_analysis=role_payload.get("repository_analysis"),
             task_brief=task.task_brief,
             prior_outputs=dependency_outputs,
-            revision_context=None,
+            revision_context=revision_context,
             output_schema_id=identity.output_schema_id,
         )
     return inputs
@@ -771,10 +1070,156 @@ def _review_decision(outputs: Mapping[str, dict[str, Any]], review_id: str) -> s
     raise ValueError("Review agent output must contain explicit PASS or REJECT decision")
 
 
-def _revision_target(outputs: Mapping[str, dict[str, Any]], review_id: str) -> str:
+def _review_payload(outputs: Mapping[str, dict[str, Any]], review_id: str) -> ReviewPayload:
+    """Return the schema-validated review payload (structured findings)."""
     output = outputs.get(review_id, {}).get("output", {})
-    target = output.get("target_agent_id") if isinstance(output, dict) else None
-    return target if isinstance(target, str) and target.strip() else "design-agent-v1"
+    if not isinstance(output, dict):
+        raise ValueError("Review agent output must be a dict")
+    return ReviewPayload.model_validate(output)
+
+
+def _revision_targets(payload: ReviewPayload, plan: EffectiveDelegationPlan) -> tuple[str, ...]:
+    """Return revision targets in deterministic topology order.
+
+    Targets are sorted by their original plan stage, then by agent_id, so
+    multi-target rounds are reproducible and auditable.
+    """
+    stage_by_agent = {task.agent_id: task.stage for task in plan.tasks}
+    targets = sorted(
+        {finding.target_agent_id for finding in payload.findings},
+        key=lambda agent_id: (stage_by_agent.get(agent_id, 99), agent_id),
+    )
+    return tuple(targets)
+
+
+KNOWN_REVIEW_ARTIFACTS = frozenset(
+    {
+        "agent-outputs.json",
+        "checkpoints.json",
+        "finding-resolutions.json",
+        "handoffs.json",
+        "manifest.json",
+        "metrics.json",
+        "review-findings.json",
+        "revision-inputs.json",
+        "revision-results.json",
+        "revision-tasks.json",
+        "sources.json",
+        "task-briefs.json",
+        "traces.json",
+    }
+)
+
+
+def _validate_review_findings(
+    payload: ReviewPayload,
+    *,
+    plan: EffectiveDelegationPlan,
+    evidence_summary: ControlledEvidenceSummary,
+) -> None:
+    """Fail closed on unknown targets, evidence refs, or artifacts in findings."""
+    known_agents = {task.agent_id for task in plan.tasks}
+    known_evidence = evidence_summary.reference_ids
+    for finding in payload.findings:
+        if finding.target_agent_id not in known_agents:
+            raise ValueError(
+                f"Finding {finding.finding_id} targets unknown agent {finding.target_agent_id}"
+            )
+        unknown_evidence = set(finding.evidence_refs) - known_evidence
+        if unknown_evidence:
+            raise ValueError(
+                f"Finding {finding.finding_id} references unknown evidence: "
+                f"{sorted(unknown_evidence)!r}"
+            )
+        if (
+            finding.affected_artifact is not None
+            and finding.affected_artifact not in KNOWN_REVIEW_ARTIFACTS
+        ):
+            raise ValueError(
+                f"Finding {finding.finding_id} references unknown artifact "
+                f"{finding.affected_artifact}"
+            )
+
+
+def _parse_revision_result(
+    prior_outputs: Mapping[str, dict[str, Any]],
+    target_id: str,
+    revision_input: RevisionInput,
+) -> RevisionResult:
+    """Extract and validate the revision envelope produced by the target agent."""
+    envelope = prior_outputs.get(target_id, {})
+    raw_result = envelope.get("revision_result")
+    if not isinstance(raw_result, dict):
+        raise ValueError(f"Revision execution for {target_id} did not return a revision_result")
+    result = RevisionResult.model_validate(raw_result)
+    if result.revision_id != revision_input.revision_id:
+        raise ValueError("Revision result revision_id does not match the scheduled task")
+    if result.parent_output_hash != revision_input.prior_output_hash:
+        raise ValueError("Revision result parent output hash does not match the input")
+    return result
+
+
+def _maybe_wrap_mock_revision_executor(
+    executor: AgentExecutor,
+    validated_input: AgentExecutionInput,
+) -> AgentExecutor:
+    """Wrap non-``AgentRunner`` executors during revision stages.
+
+    Real ``AgentRunner`` executors already produce a validated
+    ``revision_result``.  Mock/override executors need a deterministic
+    revision envelope so mock runs stay complete and auditable.
+    """
+    from specflow.agents.adapter import AgentRunner
+
+    if validated_input.revision_context is None:
+        return executor
+    if isinstance(getattr(executor, "__self__", None), AgentRunner):
+        return executor
+    return _mock_revision_executor(executor, validated_input)
+
+
+def _mock_revision_executor(
+    executor: AgentExecutor,
+    validated_input: AgentExecutionInput,
+) -> AgentExecutor:
+    """Wrap a plain executor with a deterministic, honest revision envelope."""
+    from specflow.revision.models import ResolutionStatus
+
+    def run(context: dict[str, Any]) -> dict[str, Any]:
+        result = executor({**context, "validated_input": validated_input})
+        if isinstance(result.get("revision_result"), dict):
+            return result
+        revision_context = validated_input.revision_context
+        assert revision_context is not None
+        output = result.get("output")
+        if not isinstance(output, dict):
+            return result
+        resolutions = tuple(
+            FindingResolution(
+                finding_id=finding.finding_id,
+                status=ResolutionStatus.UNRESOLVED,
+                explanation=(
+                    "Deterministic mock revision did not change the output; "
+                    "the finding remains unresolved."
+                ),
+            )
+            for finding in revision_context.findings
+        )
+        result["revision_result"] = RevisionResult.build(
+            revision_id=revision_context.revision_id,
+            revision_round=revision_context.revision_round,
+            parent_output_hash=revision_context.prior_output_hash,
+            revised_output=ValidatedAgentOutput(
+                agent_id=validated_input.agent_id,
+                schema_id=validated_input.output_schema_id,
+                payload=output,
+            ),
+            input_finding_ids=tuple(finding.finding_id for finding in revision_context.findings),
+            resolutions=resolutions,
+        ).model_dump(mode="json")
+        return result
+
+    return run
 
 
 def _validate_stage_inputs(
@@ -855,6 +1300,7 @@ def _build_trace_tree(
     model: str,
     status: str,
     task_brief_events: tuple[TaskBriefTraceEvent, ...] = (),
+    revision_events: tuple[RevisionTraceEvent, ...] = (),
 ) -> list[dict[str, object]]:
     root_id = f"run-{uuid4().hex}"
     coordinator_id = f"coordinator-{uuid4().hex}"
@@ -888,6 +1334,7 @@ def _build_trace_tree(
             }
         )
     traces.extend(event.as_dict() for event in task_brief_events)
+    traces.extend(event.as_dict() for event in revision_events)
     for stage in stages:
         for agent_id in sorted(stage.agent_results):
             timing = stage.agent_timings[agent_id]
@@ -960,6 +1407,7 @@ def _persist_failed_run(
     error: str,
     task_brief_artifact: TaskBriefArtifact,
     task_brief_events: tuple[TaskBriefTraceEvent, ...],
+    revision_events: tuple[RevisionTraceEvent, ...] = (),
 ) -> None:
     """Persist FAILED manifest, state history, and partial traces for audit."""
     try:
@@ -988,6 +1436,7 @@ def _persist_failed_run(
             model,
             "failed",
             task_brief_events,
+            revision_events,
         )
         failed_manifest = {
             "run_id": run_id,
