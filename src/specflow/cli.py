@@ -34,6 +34,15 @@ def main(argv: list[str] | None = None) -> None:
             print(f"Benchmark error: {exc}", file=sys.stderr)
             raise SystemExit(2) from exc
         raise SystemExit(0 if report["status"] == "passed" else 3)
+    if args.command == "mcp":
+        from specflow.mcp.server import run_stdio
+        from specflow.tools.registry import ToolRegistry
+        from specflow.tools.repository_tools import RepositoryToolSet
+
+        registry = ToolRegistry()
+        RepositoryToolSet(Path(args.root)).register_into(registry)
+        run_stdio(registry)
+        raise SystemExit(0)
     if args.mode == "multi-agent":
         from specflow.runner_multi import run_multi_agent
 
@@ -97,6 +106,8 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
         default="",
         help="Optional path for normalized, commit-safe mock baseline JSON",
     )
+    mcp_parser = subparsers.add_parser("mcp", help="Serve repository Tools over MCP (stdio)")
+    mcp_parser.add_argument("--root", required=True, help="Path to the repository root to expose")
     run_parser.add_argument(
         "--provider",
         default="mock",
