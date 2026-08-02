@@ -12,6 +12,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from specflow.revision.models import ReviewFinding
+
 
 class StrictAgentPayload(BaseModel):
     """Base contract for agent business payloads.
@@ -81,23 +83,39 @@ class SynthesisPayload(StrictAgentPayload):
 
 
 class ReviewPayload(StrictAgentPayload):
-    """Output of the Review agent — MUST contain a PASS/REJECT decision."""
+    """Output of the Review agent — MUST contain a PASS/REJECT decision.
+
+    ``findings`` are structured ``ReviewFinding`` objects (never plain
+    strings).  A rejection is only actionable with non-empty findings that
+    name their targets, and ``requires_revision`` must agree with the
+    decision.  Legacy string findings fail validation and can never be
+    silently promoted into executable revision input.
+    """
+
+    schema_version: Literal["review_payload/v2"] = "review_payload/v2"
 
     decision: Literal["PASS", "REJECT"] = Field(
         ..., description="Final review decision — no default, must be explicit"
     )
     summary: str = Field(..., min_length=1, description="Review summary")
-    findings: list[str] = Field(default_factory=list, description="Issues found")
+    findings: list[ReviewFinding] = Field(
+        default_factory=list, description="Structured issues found"
+    )
     severity: str = Field(default="info", description="info/warning/error/critical")
     requires_revision: bool = Field(default=False)
-    target_agent_id: str = Field(
-        default="",
-        description="Agent that must revise (required when decision=REJECT)",
-    )
 
     @model_validator(mode="after")
-    def reject_requires_target(self) -> ReviewPayload:
-        """A rejection is actionable only with an explicit revision target."""
-        if self.decision == "REJECT" and not self.target_agent_id.strip():
-            raise ValueError("target_agent_id is required when decision=REJECT")
+    def decision_constraints(self) -> ReviewPayload:
+        """Enforce the frozen PASS/REJECT consistency contract."""
+        if self.decision == "REJECT":
+            if not self.findings:
+                raise ValueError("REJECT requires non-empty structured findings")
+            if not self.requires_revision:
+                raise ValueError("REJECT requires requires_revision=True")
+        else:
+            if self.requires_revision:
+                raise ValueError("PASS cannot require revision")
+        finding_ids = [finding.finding_id for finding in self.findings]
+        if len(finding_ids) != len(set(finding_ids)):
+            raise ValueError("Finding IDs must be unique within a review payload")
         return self

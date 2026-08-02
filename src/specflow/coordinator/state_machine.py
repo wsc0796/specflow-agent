@@ -18,6 +18,8 @@ class MultiAgentWorkflowState(StrEnum):
     SYNTHESIZING = "synthesizing"
     REVIEWING = "reviewing"
     REVISING = "revising"
+    RE_REVIEWING = "re_reviewing"
+    NEEDS_HUMAN_REVIEW = "needs_human_review"
     COMPLETED = "completed"
     FAILED = "failed"
 
@@ -36,18 +38,35 @@ _LEGAL_TRANSITIONS: dict[MultiAgentWorkflowState, frozenset[MultiAgentWorkflowSt
         {MultiAgentWorkflowState.SYNTHESIZING, MultiAgentWorkflowState.FAILED}
     ),
     MultiAgentWorkflowState.SYNTHESIZING: frozenset(
-        {MultiAgentWorkflowState.REVIEWING, MultiAgentWorkflowState.FAILED}
+        {
+            MultiAgentWorkflowState.REVIEWING,
+            MultiAgentWorkflowState.RE_REVIEWING,
+            MultiAgentWorkflowState.FAILED,
+        }
     ),
     MultiAgentWorkflowState.REVIEWING: frozenset(
         {
             MultiAgentWorkflowState.COMPLETED,
             MultiAgentWorkflowState.REVISING,
+            MultiAgentWorkflowState.NEEDS_HUMAN_REVIEW,
             MultiAgentWorkflowState.FAILED,
         }
     ),
     MultiAgentWorkflowState.REVISING: frozenset(
-        {MultiAgentWorkflowState.SYNTHESIZING, MultiAgentWorkflowState.FAILED}
+        {
+            MultiAgentWorkflowState.SYNTHESIZING,
+            MultiAgentWorkflowState.FAILED,
+        }
     ),
+    MultiAgentWorkflowState.RE_REVIEWING: frozenset(
+        {
+            MultiAgentWorkflowState.COMPLETED,
+            MultiAgentWorkflowState.NEEDS_HUMAN_REVIEW,
+            MultiAgentWorkflowState.REVISING,
+            MultiAgentWorkflowState.FAILED,
+        }
+    ),
+    MultiAgentWorkflowState.NEEDS_HUMAN_REVIEW: frozenset(),
     MultiAgentWorkflowState.COMPLETED: frozenset(),
     MultiAgentWorkflowState.FAILED: frozenset(),
 }

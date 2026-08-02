@@ -14,6 +14,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from specflow.agents.models import AgentRole
 from specflow.plan.models import ControlledEvidenceSummary, SemanticTaskBrief
+from specflow.revision.models import RevisionContext
 
 
 class StrictAgentInput(BaseModel):
@@ -35,7 +36,7 @@ class AgentExecutionInput(BaseModel):
     repository_analysis: dict[str, Any] | None = None
     task_brief: SemanticTaskBrief
     prior_outputs: dict[str, dict[str, Any]] = Field(default_factory=dict)
-    revision_context: None = None
+    revision_context: RevisionContext | None = None
     output_schema_id: str = Field(min_length=1)
 
     @model_validator(mode="after")
@@ -52,6 +53,11 @@ class AgentExecutionInput(BaseModel):
         } - self.evidence_summary.reference_ids
         if unknown_refs:
             raise ValueError("Task brief contains unknown evidence references")
+        if (
+            self.revision_context is not None
+            and self.revision_context.target_agent_id != self.agent_id
+        ):
+            raise ValueError("Revision context target does not match execution agent")
         return self
 
 

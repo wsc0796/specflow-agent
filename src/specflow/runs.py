@@ -235,6 +235,12 @@ def _outcome_from_exit_code(exit_code: int) -> tuple[str, str, str | None]:
         return RunStatus.COMPLETED_DEGRADED, RunStatus.COMPLETED_DEGRADED, None
     if exit_code == 2:
         return RunStatus.FAILED_SECURITY, RunStatus.FAILED_SECURITY, "REPOSITORY_UNAVAILABLE"
+    if exit_code == 5:
+        return (
+            RunStatus.NEEDS_HUMAN_REVIEW,
+            RunStatus.NEEDS_HUMAN_REVIEW,
+            "REVIEW_REJECTED_AFTER_REVISION_LIMIT",
+        )
     return RunStatus.FAILED_RUNTIME, RunStatus.FAILED_RUNTIME, "RUNNER_FAILED"
 
 

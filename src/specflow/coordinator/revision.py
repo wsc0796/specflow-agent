@@ -3,56 +3,50 @@
 from __future__ import annotations
 
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field, replace
+from datetime import UTC, datetime
 
 from specflow.agents.models import AgentRole, RevisionPolicy
 
 
 @dataclass(frozen=True)
 class RevisionTask:
-    """A single unit of revision work targeting one agent.
+    """A persisted unit of revision work targeting exactly one agent.
 
-    Attributes
-    ----------
-    revision_id:
-        Unique identifier for this revision task.
-    target_agent_id:
-        The agent whose output should be revised.
-    target_role:
-        The role of the target agent (used for policy checks).
-    review_finding:
-        A human-readable description of the issue found during review.
-    instruction:
-        Specific instructions on how the agent should revise its output.
-    round_number:
-        Which revision round this task belongs to (1-based).
+    One revision round can contain multiple tasks (one per target agent).
+    ``revision_id`` identifies the task; ``finding_ids`` reference the
+    structured review findings that drive it.  The two ID spaces never mix.
     """
 
     revision_id: str
+    run_id: str
     target_agent_id: str
     target_role: AgentRole
-    review_finding: str
-    instruction: str
     round_number: int
+    finding_ids: tuple[str, ...]
+    prior_output_hash: str
+    status: str = "scheduled"  # scheduled | running | completed | failed
+    created_at: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
+    completed_at: str | None = None
+    result_artifact: str | None = None
+    failure_reason: str | None = None
 
-
-@dataclass(frozen=True)
-class RevisionResult:
-    """The outcome of executing a single revision task.
-
-    Attributes
-    ----------
-    task:
-        The :class:`RevisionTask` that was executed.
-    output:
-        The revised output produced by the agent.
-    success:
-        Whether the revision completed without error.
-    """
-
-    task: RevisionTask
-    output: dict[str, object]
-    success: bool
+    def as_dict(self) -> dict[str, object]:
+        """Return a JSON-serializable snapshot for revision-tasks.json."""
+        return {
+            "revision_id": self.revision_id,
+            "run_id": self.run_id,
+            "target_agent_id": self.target_agent_id,
+            "target_role": self.target_role.value,
+            "round_number": self.round_number,
+            "finding_ids": list(self.finding_ids),
+            "prior_output_hash": self.prior_output_hash,
+            "status": self.status,
+            "created_at": self.created_at,
+            "completed_at": self.completed_at,
+            "result_artifact": self.result_artifact,
+            "failure_reason": self.failure_reason,
+        }
 
 
 class RevisionController:
@@ -97,29 +91,91 @@ class RevisionController:
 
     def create_revision_task(
         self,
+        *,
+        run_id: str,
+        round_number: int,
         target_agent_id: str,
         target_role: AgentRole,
-        finding: str,
-        instruction: str,
+        finding_ids: tuple[str, ...],
+        prior_output_hash: str,
     ) -> RevisionTask | None:
-        """Create and record a new revision task.
-
-        Returns ``None`` (without creating a task) when revisions are
-        exhausted or the target role is not revisable.
-        """
-        if self.exhausted:
-            return None
+        """Create and record a revision task within an already-open round."""
+        if self._round < 1:
+            raise ValueError("begin_round() must be called before creating tasks")
+        if not finding_ids:
+            raise ValueError("Revision task requires at least one finding")
+        if not prior_output_hash:
+            raise ValueError("Revision task requires a prior output hash")
         if not self.is_revisable(target_role):
             return None
 
-        self._round += 1
         task = RevisionTask(
-            revision_id=str(uuid.uuid4()),
+            revision_id=f"revision-{round_number}-{target_agent_id}-{uuid.uuid4().hex[:8]}",
+            run_id=run_id,
             target_agent_id=target_agent_id,
             target_role=target_role,
-            review_finding=finding,
-            instruction=instruction,
-            round_number=self._round,
+            round_number=round_number,
+            finding_ids=finding_ids,
+            prior_output_hash=prior_output_hash,
         )
         self._tasks.append(task)
         return task
+
+    def begin_round(self) -> int | None:
+        """Open the next revision round when budget remains.
+
+        Returns the new 1-based round number, or ``None`` when the revision
+        budget is already exhausted (caller must move to a terminal state).
+        """
+        if self.exhausted:
+            return None
+        self._round += 1
+        return self._round
+
+    def mark_running(self, revision_id: str) -> None:
+        """Mark one task as running (immutable snapshot is replaced)."""
+        self._replace_task(
+            revision_id,
+            lambda task: replace(task, status="running"),
+        )
+
+    def mark_completed(
+        self,
+        revision_id: str,
+        *,
+        result_artifact: str,
+    ) -> None:
+        """Mark one task as completed with its result artifact."""
+        self._replace_task(
+            revision_id,
+            lambda task: replace(
+                task,
+                status="completed",
+                completed_at=datetime.now(UTC).isoformat(),
+                result_artifact=result_artifact,
+            ),
+        )
+
+    def mark_failed(self, revision_id: str, *, reason: str) -> None:
+        """Mark one task as failed with a safe failure reason."""
+        self._replace_task(
+            revision_id,
+            lambda task: replace(
+                task,
+                status="failed",
+                completed_at=datetime.now(UTC).isoformat(),
+                failure_reason=reason,
+            ),
+        )
+
+    def _replace_task(self, revision_id: str, transform) -> None:
+        for index, task in enumerate(self._tasks):
+            if task.revision_id == revision_id:
+                self._tasks[index] = transform(task)
+                return
+        raise ValueError(f"Unknown revision task: {revision_id}")
+
+
+# Re-export the strict, schema-validated revision result contract.  The old
+# local dataclass was replaced by ``specflow.revision.models.RevisionResult``.
+from specflow.revision.models import RevisionResult  # noqa: E402,F401

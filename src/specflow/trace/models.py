@@ -35,6 +35,38 @@ class TaskBriefTraceEvent(BaseModel):
         return self.model_dump(mode="json")
 
 
+class RevisionEventType(StrEnum):
+    REVIEW_FINDINGS_CREATED = "REVIEW_FINDINGS_CREATED"
+    REVISION_SCHEDULED = "REVISION_SCHEDULED"
+    REVISION_STARTED = "REVISION_STARTED"
+    REVISION_REQUEST_SUBMITTED = "REVISION_REQUEST_SUBMITTED"
+    REVISION_COMPLETED = "REVISION_COMPLETED"
+    FINDING_RESOLVED = "FINDING_RESOLVED"
+    FINDING_UNRESOLVED = "FINDING_UNRESOLVED"
+    REVIEW_RECHECKED = "REVIEW_RECHECKED"
+    HUMAN_REVIEW_REQUIRED = "HUMAN_REVIEW_REQUIRED"
+
+
+class RevisionTraceEvent(BaseModel):
+    """Metadata-only audit event for the finding-driven revision lifecycle."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    event_type: RevisionEventType
+    run_id: str = Field(min_length=1)
+    revision_id: str | None = None
+    round: int = Field(default=0, ge=0)
+    agent_id: str | None = None
+    finding_id: str | None = None
+    artifact_hash: str | None = None
+    status: str | None = None
+    trace_id: str = Field(min_length=1)
+    error_code: str | None = None
+
+    def as_dict(self) -> dict[str, object]:
+        return self.model_dump(mode="json")
+
+
 @dataclass(frozen=True)
 class LLMTrace:
     """Metadata-only record for one LLM execution."""

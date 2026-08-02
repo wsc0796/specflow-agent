@@ -17,6 +17,7 @@ class RunStatus:
     COMPLETED = "completed"
     COMPLETED_DEGRADED = "completed_degraded"
     REJECTED = "rejected"
+    NEEDS_HUMAN_REVIEW = "needs_human_review"
     FAILED_RUNTIME = "failed_runtime"
     FAILED_SECURITY = "failed_security"
     BUDGET_EXCEEDED = "budget_exceeded"
