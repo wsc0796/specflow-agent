@@ -1,10 +1,13 @@
 # SpecFlow Agent
 
 **Current release candidate: v1.1.0 (unreleased).** The latest published release
-remains **v1.0.1** at `a4fc16c` (metadata and CI reconciliation following the
-merged v1.0.0 portfolio release). The v1.1.0 candidate adds release-truth
-verification and a mock-only, human-in-the-loop change-review decision slice.
-See [CHANGELOG.md](CHANGELOG.md) and [current resume evidence](docs/resume/current-resume-evidence.md).
+remains **v1.0.1** at `a4fc16c`. The v1.1.0 candidate adds strict, role-scoped
+Task Briefs that reach the real worker request, structured finding-driven
+revision with a bounded `NEEDS_HUMAN_REVIEW` terminal state, a unified
+`GuardedModelInvoker` for provider-call/token/retry accounting, MCP with a
+single-source Tool schema, and a calibrated default provider-attempt budget.
+See [CHANGELOG.md](CHANGELOG.md) and
+[current resume evidence](docs/resume/current-resume-evidence.md).
 
 A controlled multi-agent repository-analysis system for local Python projects.
 It turns a requirement plus read-only repository evidence into structured
@@ -15,11 +18,18 @@ The orchestration is built from scratch without LangGraph or agent frameworks.
 
 - **6-agent fixed topology** with Coordinator-driven deterministic orchestration
 - **Parallel specialist execution** — Design, Test Strategy, and Risk Review run concurrently
-- **Bounded Revision loop** — max 1 round, business rejection ≠ infrastructure failure
+- **Finding-driven Revision** — structured findings, prior output, Task Brief
+  and revision round enter the real revision request; a second rejection at the
+  bound ends in `NEEDS_HUMAN_REVIEW`, never a plain `COMPLETED`
 - **Repository evidence pipeline** — read-only tools → evidence → agent prompts → traceable references
 - **Structured Agent Handoff** — schema-validated, canonical-JSON-hashed payloads between agents
 - **Fail-closed production boundaries** — required-agent failure stops the run; input and output contracts are validated
-- **Execution policy** — bounded LLM calls, revisions, wall time, evidence/tool limits, and classified retry behavior
+- **Unified model invocation** — every multi-agent provider call goes through
+  `GuardedModelInvoker` with per-attempt retry accounting, concurrency limits,
+  wall-clock enforcement, token usage from the real response (missing usage is
+  `unknown`, never fabricated as 0), and budget snapshots on failure
+- **MCP single-source schema** — MCP `tools/list` reads the Tool-owned input
+  schema; no hand-maintained protocol copy
 - **Agent-level trace topology** — stage timing, parent/child spans, submission/completion timestamps
 - **Dual pipeline** — legacy linear (Analyze→Generate→Review) preserved as A/B baseline
 - **Historical M6 live-provider validation** — a separately documented DeepSeek
@@ -70,7 +80,7 @@ copy is in `docs/resume/specflow-resume-v0.md`.
 **M8 independent-review remediation — CLOSED and released to `main` in v1.0.0.** The follow-up T-040
 and T-041 work adds RuntimeGuard budget enforcement and strict inter-agent
 payload schemas. T-061 adds a separately bounded, mock-only reviewer-decision
-record to the Run API. The current v1.1.0 candidate baseline is **674 passed, 2 skipped,
+record to the Run API. The current v1.1.0 candidate baseline is **784 passed, 2 skipped,
 3 known warnings**; the published tag remains v1.0.1 at `a4fc16c`.
 M8 is local mock acceptance and does not claim a new live-provider run. See `docs/reports/T-040-completion-report.md`,
 `docs/reports/T-041-completion-report.md`, and
@@ -294,6 +304,19 @@ uv run pytest -v
 uv run ruff check .
 uv run ruff format --check .
 ```
+
+## Known limitations (v1.1.0 candidate)
+
+- Budgets are single-process; there is no distributed or multi-process budget.
+- Token accuracy depends on the provider returning usage; missing usage is
+  recorded as `unknown`, never fabricated as 0.
+- The multi-agent runtime is mock-verified; there is no live-provider
+  validation claim in v1.1.0 and no claim that any pipeline improves output
+  quality (that requires the separately planned comparative evaluation).
+- Interrupted runs are classified as failed on restart; this is not resume.
+- The legacy 3-worker pipeline is a frozen A/B baseline, not part of the
+  unified invocation claim.
+- Not production-ready, not high-availability, no distributed consistency.
 
 ## Development process
 

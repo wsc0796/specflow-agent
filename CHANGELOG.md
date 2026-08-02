@@ -2,6 +2,21 @@
 
 ## v1.1.0 (Unreleased)
 
+- Hardening phases 1-3: strict role-scoped Task Briefs that observably change
+  the target worker request; structured, stable-ID review findings that drive
+  the real revision request (prior output, Task Brief, evidence and round
+  included); bounded revision ending in `NEEDS_HUMAN_REVIEW`; unified
+  `GuardedModelInvoker` covering enrichment, workers, reviewer, revision and
+  re-review with per-attempt retry accounting, concurrency and wall-clock
+  budgets, token usage read from the real provider response (missing usage is
+  `unknown`, never 0), and budget snapshots in FAILED manifests.
+- Calibrated the default provider-attempt budget to 24 (`max_llm_calls`
+  remains a deprecated deterministic alias; 48 is allowed only as an explicit
+  Live/Evaluation/experiment override).
+- MCP: `tools/list` now reads the Tool-owned input schema as the single
+  source; added a real subprocess stdio smoke test and an explicit CI MCP step;
+  tool execution failures expose a machine-readable `error_type` via
+  `structuredContent`.
 - Added a release-truth gate: package metadata now drives the OpenAPI version
   and `specflow --version` CLI output.
 - Added deterministic tests and CI smoke coverage that keep package, runtime,
