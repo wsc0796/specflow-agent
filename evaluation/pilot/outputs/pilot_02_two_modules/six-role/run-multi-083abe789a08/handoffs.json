@@ -1,0 +1,72 @@
+[
+  {
+    "handoff_id": "handoff-b5e61297f08240709ce82725da94741c",
+    "from_agent_id": "repository-analyst-agent-v1",
+    "to_agent_id": "design-agent-v1",
+    "source_output_schema_id": "agent/repository-analyst/v1/output",
+    "target_input_schema_id": "agent/design/v1/input",
+    "payload_ref": "agent-outputs.json#stage-0/repository-analyst-agent-v1",
+    "input_hash": "3a7d0c92955209b521a432ada240799349d91abe0793f9cad49c6ab78fe11fe3",
+    "output_hash": "8786531fac4c5cb19705b2251cd87cdd5030d57de94f6493c70046e9233f9849"
+  },
+  {
+    "handoff_id": "handoff-c641052f601d45e6904da49cc5b89638",
+    "from_agent_id": "repository-analyst-agent-v1",
+    "to_agent_id": "risk-review-agent-v1",
+    "source_output_schema_id": "agent/repository-analyst/v1/output",
+    "target_input_schema_id": "agent/risk-review/v1/input",
+    "payload_ref": "agent-outputs.json#stage-0/repository-analyst-agent-v1",
+    "input_hash": "3a7d0c92955209b521a432ada240799349d91abe0793f9cad49c6ab78fe11fe3",
+    "output_hash": "8786531fac4c5cb19705b2251cd87cdd5030d57de94f6493c70046e9233f9849"
+  },
+  {
+    "handoff_id": "handoff-0b3209efa9af4145b7f8a7aa218365d7",
+    "from_agent_id": "repository-analyst-agent-v1",
+    "to_agent_id": "test-strategy-agent-v1",
+    "source_output_schema_id": "agent/repository-analyst/v1/output",
+    "target_input_schema_id": "agent/test-strategy/v1/input",
+    "payload_ref": "agent-outputs.json#stage-0/repository-analyst-agent-v1",
+    "input_hash": "3a7d0c92955209b521a432ada240799349d91abe0793f9cad49c6ab78fe11fe3",
+    "output_hash": "8786531fac4c5cb19705b2251cd87cdd5030d57de94f6493c70046e9233f9849"
+  },
+  {
+    "handoff_id": "handoff-de00c9f9dd5642808d0cb975fb430d7e",
+    "from_agent_id": "design-agent-v1",
+    "to_agent_id": "synthesis-agent-v1",
+    "source_output_schema_id": "agent/design/v1/output",
+    "target_input_schema_id": "agent/synthesis/v1/input",
+    "payload_ref": "agent-outputs.json#stage-1/design-agent-v1",
+    "input_hash": "3a7d0c92955209b521a432ada240799349d91abe0793f9cad49c6ab78fe11fe3",
+    "output_hash": "216ceb925893b1272f4d2d63d4cc641c8a0186472e9db80c56f4205746e0235d"
+  },
+  {
+    "handoff_id": "handoff-f635b2ca6343400481427d2517ad9d16",
+    "from_agent_id": "risk-review-agent-v1",
+    "to_agent_id": "synthesis-agent-v1",
+    "source_output_schema_id": "agent/risk-review/v1/output",
+    "target_input_schema_id": "agent/synthesis/v1/input",
+    "payload_ref": "agent-outputs.json#stage-1/risk-review-agent-v1",
+    "input_hash": "3a7d0c92955209b521a432ada240799349d91abe0793f9cad49c6ab78fe11fe3",
+    "output_hash": "40a68620b433383d554937b178ae7da777535ac988fd33e3c8469c7d4c2044dd"
+  },
+  {
+    "handoff_id": "handoff-ca1804d717eb4296a3016031c4c65043",
+    "from_agent_id": "test-strategy-agent-v1",
+    "to_agent_id": "synthesis-agent-v1",
+    "source_output_schema_id": "agent/test-strategy/v1/output",
+    "target_input_schema_id": "agent/synthesis/v1/input",
+    "payload_ref": "agent-outputs.json#stage-1/test-strategy-agent-v1",
+    "input_hash": "3a7d0c92955209b521a432ada240799349d91abe0793f9cad49c6ab78fe11fe3",
+    "output_hash": "d6c9dc86e671ba544b48e2e9b3faeaa2ba811ddf65d8a3db635e5a97bd24a21c"
+  },
+  {
+    "handoff_id": "handoff-f60c24803a9b466097f7e19e7ac3411d",
+    "from_agent_id": "synthesis-agent-v1",
+    "to_agent_id": "review-agent-v1",
+    "source_output_schema_id": "agent/synthesis/v1/output",
+    "target_input_schema_id": "agent/review/v1/input",
+    "payload_ref": "agent-outputs.json#stage-2/synthesis-agent-v1",
+    "input_hash": "3a7d0c92955209b521a432ada240799349d91abe0793f9cad49c6ab78fe11fe3",
+    "output_hash": "a9bef4b295dc2710a68b9cdb79d95337d7b9a88c93d7cfc9bd499175a4b55642"
+  }
+]

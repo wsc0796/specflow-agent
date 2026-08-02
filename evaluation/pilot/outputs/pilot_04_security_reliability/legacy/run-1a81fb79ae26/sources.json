@@ -1,0 +1,254 @@
+{
+  "run_id": "run-1a81fb79ae26",
+  "requirement": "对订单提交链路做安全与可靠性评审:认证/授权边界(app/auth.py)、错误信息是否泄露内部细节、订单提交的幂等与竞态、限流与超时,输出风险清单、证据引用与修复优先级。",
+  "repository_root": "D:\\Documents\\spec agent\\specflow-eval\\benchmarks\\fixtures\\portfolio-python",
+  "project_summary": "Python project with pyproject.toml at portfolio-python",
+  "technology_stack": [],
+  "searched_terms": [
+    "idempot",
+    "order",
+    "timeout",
+    "复优先级",
+    "对订单提交链",
+    "授权边界",
+    "泄露内部细节",
+    "等与竞态",
+    "订单提交的幂",
+    "认证"
+  ],
+  "discovered_file_count": 8,
+  "matched_files": [
+    "app/main.py",
+    "app/orders.py",
+    "tests/test_orders.py"
+  ],
+  "selected_files": [
+    "app/orders.py",
+    "app/main.py",
+    "tests/test_orders.py"
+  ],
+  "excerpts": [
+    {
+      "relative_path": "app/orders.py",
+      "line_number": 4,
+      "excerpt": "def create_order(user_id: str, item_id: str) -> dict[str, str]:",
+      "match_count": 1
+    },
+    {
+      "relative_path": "app/orders.py",
+      "line_number": 8,
+      "excerpt": "def cancel_expired_order(order: dict[str, str]) -> dict[str, str]:",
+      "match_count": 2
+    },
+    {
+      "relative_path": "app/orders.py",
+      "line_number": 9,
+      "excerpt": "order[\"status\"] = \"cancelled\"",
+      "match_count": 1
+    },
+    {
+      "relative_path": "app/orders.py",
+      "line_number": 10,
+      "excerpt": "order[\"cancelled_at\"] = datetime.now(UTC).isoformat()",
+      "match_count": 1
+    },
+    {
+      "relative_path": "app/orders.py",
+      "line_number": 11,
+      "excerpt": "return order",
+      "match_count": 1
+    },
+    {
+      "relative_path": "app/main.py",
+      "line_number": 2,
+      "excerpt": "from app.orders import create_order",
+      "match_count": 2
+    },
+    {
+      "relative_path": "app/main.py",
+      "line_number": 13,
+      "excerpt": "@app.post(\"/orders\")",
+      "match_count": 1
+    },
+    {
+      "relative_path": "app/main.py",
+      "line_number": 14,
+      "excerpt": "def submit_order(user_id: str, item_id: str) -> dict[str, str]:",
+      "match_count": 1
+    },
+    {
+      "relative_path": "app/main.py",
+      "line_number": 16,
+      "excerpt": "return create_order(user_id, item_id)",
+      "match_count": 1
+    },
+    {
+      "relative_path": "tests/test_orders.py",
+      "line_number": 1,
+      "excerpt": "from app.orders import create_order",
+      "match_count": 2
+    },
+    {
+      "relative_path": "tests/test_orders.py",
+      "line_number": 4,
+      "excerpt": "def test_create_order_is_pending() -> None:",
+      "match_count": 1
+    },
+    {
+      "relative_path": "tests/test_orders.py",
+      "line_number": 5,
+      "excerpt": "assert create_order(\"u-1\", \"coffee\")[\"status\"] == \"pending\"",
+      "match_count": 1
+    }
+  ],
+  "source_hashes": {
+    "app/orders.py": "04ddb4e59abf88ae88ccb18410e7c225fc2867f907f6606b451fad3db0f15074",
+    "app/main.py": "951974b8da4a3e2a65a24150557616b8821b132e297397491dc30c7b8a998d9b",
+    "tests/test_orders.py": "eec9452aec7344751c45b3f23b25c58f05edfc101587480bf98840c6f5750045"
+  },
+  "tool_call_records": [
+    {
+      "call_id": "evidence-001",
+      "tool_name": "list_files",
+      "status": "success",
+      "arguments_summary": "include=['*.py', '*.md', '*.yaml', '*.yml', '*.toml', '*.cfg']",
+      "output_summary": "ok, 179 chars",
+      "duration_ms": 1,
+      "truncated": false,
+      "error_type": null
+    },
+    {
+      "call_id": "evidence-002",
+      "tool_name": "search_code",
+      "status": "success",
+      "arguments_summary": "case_sensitive=False, include=['*.py'], query=idempot",
+      "output_summary": "ok, 74 chars",
+      "duration_ms": 4,
+      "truncated": false,
+      "error_type": null
+    },
+    {
+      "call_id": "evidence-003",
+      "tool_name": "search_code",
+      "status": "success",
+      "arguments_summary": "case_sensitive=False, include=['*.py'], query=order",
+      "output_summary": "ok, 1650 chars",
+      "duration_ms": 5,
+      "truncated": false,
+      "error_type": null
+    },
+    {
+      "call_id": "evidence-004",
+      "tool_name": "search_code",
+      "status": "success",
+      "arguments_summary": "case_sensitive=False, include=['*.py'], query=timeout",
+      "output_summary": "ok, 74 chars",
+      "duration_ms": 5,
+      "truncated": false,
+      "error_type": null
+    },
+    {
+      "call_id": "evidence-005",
+      "tool_name": "search_code",
+      "status": "success",
+      "arguments_summary": "case_sensitive=False, include=['*.py'], query=复优先级",
+      "output_summary": "ok, 74 chars",
+      "duration_ms": 5,
+      "truncated": false,
+      "error_type": null
+    },
+    {
+      "call_id": "evidence-006",
+      "tool_name": "search_code",
+      "status": "success",
+      "arguments_summary": "case_sensitive=False, include=['*.py'], query=对订单提交链",
+      "output_summary": "ok, 74 chars",
+      "duration_ms": 5,
+      "truncated": false,
+      "error_type": null
+    },
+    {
+      "call_id": "evidence-007",
+      "tool_name": "search_code",
+      "status": "success",
+      "arguments_summary": "case_sensitive=False, include=['*.py'], query=授权边界",
+      "output_summary": "ok, 74 chars",
+      "duration_ms": 5,
+      "truncated": false,
+      "error_type": null
+    },
+    {
+      "call_id": "evidence-008",
+      "tool_name": "search_code",
+      "status": "success",
+      "arguments_summary": "case_sensitive=False, include=['*.py'], query=泄露内部细节",
+      "output_summary": "ok, 74 chars",
+      "duration_ms": 4,
+      "truncated": false,
+      "error_type": null
+    },
+    {
+      "call_id": "evidence-009",
+      "tool_name": "search_code",
+      "status": "success",
+      "arguments_summary": "case_sensitive=False, include=['*.py'], query=等与竞态",
+      "output_summary": "ok, 74 chars",
+      "duration_ms": 4,
+      "truncated": false,
+      "error_type": null
+    },
+    {
+      "call_id": "evidence-010",
+      "tool_name": "search_code",
+      "status": "success",
+      "arguments_summary": "case_sensitive=False, include=['*.py'], query=订单提交的幂",
+      "output_summary": "ok, 74 chars",
+      "duration_ms": 6,
+      "truncated": false,
+      "error_type": null
+    },
+    {
+      "call_id": "evidence-011",
+      "tool_name": "search_code",
+      "status": "success",
+      "arguments_summary": "case_sensitive=False, include=['*.py'], query=认证",
+      "output_summary": "ok, 74 chars",
+      "duration_ms": 4,
+      "truncated": false,
+      "error_type": null
+    },
+    {
+      "call_id": "evidence-012",
+      "tool_name": "read_file",
+      "status": "success",
+      "arguments_summary": "path=app/orders.py",
+      "output_summary": "ok, 559 chars",
+      "duration_ms": 0,
+      "truncated": false,
+      "error_type": null
+    },
+    {
+      "call_id": "evidence-013",
+      "tool_name": "read_file",
+      "status": "success",
+      "arguments_summary": "path=app/main.py",
+      "output_summary": "ok, 572 chars",
+      "duration_ms": 0,
+      "truncated": false,
+      "error_type": null
+    },
+    {
+      "call_id": "evidence-014",
+      "tool_name": "read_file",
+      "status": "success",
+      "arguments_summary": "path=tests/test_orders.py",
+      "output_summary": "ok, 342 chars",
+      "duration_ms": 0,
+      "truncated": false,
+      "error_type": null
+    }
+  ],
+  "truncated": false,
+  "warnings": [],
+  "evidence_hash": "2293f77d48a743d5a5d819bb4cfed9c9ce296989603ed99b9c89ad3b3a578468"
+}

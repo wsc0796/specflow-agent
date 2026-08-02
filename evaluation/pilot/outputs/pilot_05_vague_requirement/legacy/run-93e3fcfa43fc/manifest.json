@@ -1,0 +1,21 @@
+{
+  "schema_version": "1.0.0",
+  "run_id": "run-93e3fcfa43fc",
+  "started_at": "2026-08-02T13:47:15.413298+00:00",
+  "completed_at": "2026-08-02T13:47:15.446694+00:00",
+  "status": "completed",
+  "provider_type": "mock",
+  "model": "mock-model",
+  "repository_root": "D:\\Documents\\spec agent\\specflow-eval\\benchmarks\\fixtures\\portfolio-python",
+  "requirement": "改进这个商城后端,让它更好。",
+  "requirement_hash": "53539dbf901dcbad98733d9c86168653880f0d8cc9f90012adb76d386467b28f",
+  "evidence_hash": "9973a18918d7271f94a4bfe813bb5732dd3b39f1a2d1a6d2ff5e72daae298a2c",
+  "analysis_hash": "25318986ef05076b88123b8a9f2cdb6b285ef10100242960c843bbed7ccaf16d",
+  "generation_hash": "b61c47efdb405f46f4e932bf20f285deb46515eedd5b15fbd6c7d9a79cebc0d5",
+  "review_hash": "dd06f711a83f3f139269ca14e03bfbde9a2b5157857d2fb405dc0bd0f71a0019",
+  "review_decision": "PASS",
+  "degraded": false,
+  "requires_review": false,
+  "tool_call_count": 4,
+  "warnings": []
+}

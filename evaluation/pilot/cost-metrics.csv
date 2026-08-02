@@ -1,0 +1,16 @@
+case_id,failed_provider_calls,input_tokens,missing,output_tokens,pipeline,provider_call_attempts,revision_rounds,successful_provider_calls,total_tokens,unknown_usage_calls,wall_clock_ms
+pilot_01_single_file,,,True,,single,,,,,,
+pilot_01_single_file,,,True,,legacy,,,,,,
+pilot_01_single_file,0,0,,0,six-role,0,0,0,0,0,93
+pilot_02_two_modules,,,True,,single,,,,,,
+pilot_02_two_modules,,,True,,legacy,,,,,,
+pilot_02_two_modules,0,0,,0,six-role,0,0,0,0,0,78
+pilot_03_api_config_tests,,,True,,single,,,,,,
+pilot_03_api_config_tests,,,True,,legacy,,,,,,
+pilot_03_api_config_tests,0,0,,0,six-role,0,0,0,0,0,77
+pilot_04_security_reliability,,,True,,single,,,,,,
+pilot_04_security_reliability,,,True,,legacy,,,,,,
+pilot_04_security_reliability,0,0,,0,six-role,0,0,0,0,0,77
+pilot_05_vague_requirement,,,True,,single,,,,,,
+pilot_05_vague_requirement,,,True,,legacy,,,,,,
+pilot_05_vague_requirement,0,0,,0,six-role,0,0,0,0,0,46

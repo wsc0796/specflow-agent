@@ -1,0 +1,80 @@
+{
+  "stage-0/repository-analyst-agent-v1": {
+    "agent_id": "repository-analyst-agent-v1",
+    "output": {
+      "affected_components": [],
+      "evidence_count": 0,
+      "key_files": [],
+      "summary": "Deterministic mock repository analysis.",
+      "technology_notes": ""
+    },
+    "role": "repository_analyst",
+    "schema_validated": true
+  },
+  "stage-1/design-agent-v1": {
+    "agent_id": "design-agent-v1",
+    "output": {
+      "api_changes": [],
+      "architecture_changes": [],
+      "data_model_changes": [],
+      "dependencies": [],
+      "evidence_refs": [],
+      "implementation_steps": [],
+      "summary": "Deterministic mock design."
+    },
+    "role": "design",
+    "schema_validated": true
+  },
+  "stage-1/risk-review-agent-v1": {
+    "agent_id": "risk-review-agent-v1",
+    "output": {
+      "evidence_refs": [],
+      "migration_concerns": [],
+      "risks": [],
+      "rollback_plan": "",
+      "severity": "medium",
+      "summary": "Deterministic mock risk review."
+    },
+    "role": "risk_review",
+    "schema_validated": true
+  },
+  "stage-1/test-strategy-agent-v1": {
+    "agent_id": "test-strategy-agent-v1",
+    "output": {
+      "coverage_gaps": [],
+      "edge_cases": [],
+      "evidence_refs": [],
+      "regression_concerns": [],
+      "summary": "Deterministic mock test strategy.",
+      "test_scenarios": []
+    },
+    "role": "test_strategy",
+    "schema_validated": true
+  },
+  "stage-2/synthesis-agent-v1": {
+    "agent_id": "synthesis-agent-v1",
+    "output": {
+      "conflicts_resolved": [],
+      "consolidated_design": "",
+      "consolidated_risks": [],
+      "consolidated_tests": [],
+      "open_questions": [],
+      "summary": "Deterministic mock synthesis."
+    },
+    "role": "synthesis",
+    "schema_validated": true
+  },
+  "stage-3/review-agent-v1": {
+    "agent_id": "review-agent-v1",
+    "output": {
+      "decision": "PASS",
+      "findings": [],
+      "requires_revision": false,
+      "schema_version": "review_payload/v2",
+      "severity": "info",
+      "summary": "Deterministic mock review accepted the synthesis."
+    },
+    "role": "review",
+    "schema_validated": true
+  }
+}

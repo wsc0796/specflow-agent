@@ -1,0 +1,12 @@
+{
+  "case_id": "pilot_04_security_reliability",
+  "title": "Order flow security & reliability review",
+  "requirement": "对订单提交链路做安全与可靠性评审:认证/授权边界(app/auth.py)、错误信息是否泄露内部细节、订单提交的幂等与竞态、限流与超时,输出风险清单、证据引用与修复优先级。",
+  "repository_type": "small_fastapi_fixture",
+  "expected_domains": ["security", "reliability", "auth", "orders"],
+  "expected_file_patterns": ["app/auth.py", "app/orders.py", "app/main.py"],
+  "expected_risks": ["认证绕过", "错误信息泄露内部细节", "提交竞态/重复提交", "缺少限流与超时"],
+  "expected_acceptance_topics": ["认证边界", "错误契约", "幂等设计", "限流与超时", "修复优先级"],
+  "forbidden_claims": ["production-ready", "high availability"],
+  "human_review_notes": "重点看每一条风险是否有代码证据引用、优先级是否合理、是否避免过度承诺。"
+}

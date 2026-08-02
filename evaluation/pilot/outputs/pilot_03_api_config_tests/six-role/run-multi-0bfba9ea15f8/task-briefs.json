@@ -1,0 +1,169 @@
+{
+  "brief_hashes": {
+    "design-agent-v1": "75e030fb793d617831295aee7b347d39e1deec2b0459fe5e00e1829012ba5ea1",
+    "repository-analyst-agent-v1": "fd78b81226137e0e49be9f47d79aa230a292b96bc946828ea38e506e5c285f04",
+    "review-agent-v1": "0d51e8469b0965bcb7819bedee202613004c00e1f5da619ab7cc3f2ffad9a97d",
+    "risk-review-agent-v1": "aa0916552dfae31e0924a1af486b0107d7bc3730c92df4581059919e231918aa",
+    "synthesis-agent-v1": "4fe6edc1cd6aeed5158ab101a1eabce64b0b3bca37f46056bf6249fb7201bca2",
+    "test-strategy-agent-v1": "60442b34af2838ab2069bc3c5b0c5fe44906afde452e7769d054ecc59a079cfb"
+  },
+  "briefs": [
+    {
+      "agent_id": "repository-analyst-agent-v1",
+      "analysis_focus": [],
+      "evaluation_hints": [],
+      "evidence_refs": [],
+      "output_schema_id": "agent/repository-analyst/v1/output",
+      "provenance": {
+        "evidence_summary_hash": "7be2fc9dde7270748d3564a1cd5ddfacb111ff10229a6fea4dae1f775b8f4ca2",
+        "failure_type": null,
+        "generated_at": "2026-08-02T13:47:15.224193+00:00",
+        "model": "mock-model",
+        "outcome": "enriched",
+        "prompt_id": "enrichment/repository_analyst/v1",
+        "prompt_version": "1.0.0",
+        "provider": "mock",
+        "requirement_hash": "d1d4cafdd6c520ab48e436cf1688ab4e9432c23b650098c23f5b2b62b4e059f6",
+        "trace_id": "15a50f84-8673-4c03-adaf-a08e44a6b458"
+      },
+      "repository_scope_hint": "",
+      "role": "repository_analyst",
+      "schema_version": "task_brief/v1",
+      "status": "enriched",
+      "task_description": "mock"
+    },
+    {
+      "agent_id": "design-agent-v1",
+      "analysis_focus": [],
+      "evaluation_hints": [],
+      "evidence_refs": [],
+      "output_schema_id": "agent/design/v1/output",
+      "provenance": {
+        "evidence_summary_hash": "7be2fc9dde7270748d3564a1cd5ddfacb111ff10229a6fea4dae1f775b8f4ca2",
+        "failure_type": null,
+        "generated_at": "2026-08-02T13:47:15.225706+00:00",
+        "model": "mock-model",
+        "outcome": "enriched",
+        "prompt_id": "enrichment/design/v1",
+        "prompt_version": "1.0.0",
+        "provider": "mock",
+        "requirement_hash": "d1d4cafdd6c520ab48e436cf1688ab4e9432c23b650098c23f5b2b62b4e059f6",
+        "trace_id": "570206b2-37fd-4557-a80a-e55fe91ca01b"
+      },
+      "repository_scope_hint": "",
+      "role": "design",
+      "schema_version": "task_brief/v1",
+      "status": "enriched",
+      "task_description": "mock"
+    },
+    {
+      "agent_id": "test-strategy-agent-v1",
+      "analysis_focus": [],
+      "evaluation_hints": [],
+      "evidence_refs": [],
+      "output_schema_id": "agent/test-strategy/v1/output",
+      "provenance": {
+        "evidence_summary_hash": "7be2fc9dde7270748d3564a1cd5ddfacb111ff10229a6fea4dae1f775b8f4ca2",
+        "failure_type": null,
+        "generated_at": "2026-08-02T13:47:15.226137+00:00",
+        "model": "mock-model",
+        "outcome": "enriched",
+        "prompt_id": "enrichment/test_strategy/v1",
+        "prompt_version": "1.0.0",
+        "provider": "mock",
+        "requirement_hash": "d1d4cafdd6c520ab48e436cf1688ab4e9432c23b650098c23f5b2b62b4e059f6",
+        "trace_id": "d1f62915-b9a2-4e97-9dee-950ce96b882c"
+      },
+      "repository_scope_hint": "",
+      "role": "test_strategy",
+      "schema_version": "task_brief/v1",
+      "status": "enriched",
+      "task_description": "mock"
+    },
+    {
+      "agent_id": "risk-review-agent-v1",
+      "analysis_focus": [],
+      "evaluation_hints": [],
+      "evidence_refs": [],
+      "output_schema_id": "agent/risk-review/v1/output",
+      "provenance": {
+        "evidence_summary_hash": "7be2fc9dde7270748d3564a1cd5ddfacb111ff10229a6fea4dae1f775b8f4ca2",
+        "failure_type": null,
+        "generated_at": "2026-08-02T13:47:15.226137+00:00",
+        "model": "mock-model",
+        "outcome": "enriched",
+        "prompt_id": "enrichment/risk_review/v1",
+        "prompt_version": "1.0.0",
+        "provider": "mock",
+        "requirement_hash": "d1d4cafdd6c520ab48e436cf1688ab4e9432c23b650098c23f5b2b62b4e059f6",
+        "trace_id": "1eba1b1c-2405-4ad8-b008-23f368b1b365"
+      },
+      "repository_scope_hint": "",
+      "role": "risk_review",
+      "schema_version": "task_brief/v1",
+      "status": "enriched",
+      "task_description": "mock"
+    },
+    {
+      "agent_id": "synthesis-agent-v1",
+      "analysis_focus": [],
+      "evaluation_hints": [],
+      "evidence_refs": [],
+      "output_schema_id": "agent/synthesis/v1/output",
+      "provenance": {
+        "evidence_summary_hash": "7be2fc9dde7270748d3564a1cd5ddfacb111ff10229a6fea4dae1f775b8f4ca2",
+        "failure_type": null,
+        "generated_at": "2026-08-02T13:47:15.227146+00:00",
+        "model": "mock-model",
+        "outcome": "enriched",
+        "prompt_id": "enrichment/synthesis/v1",
+        "prompt_version": "1.0.0",
+        "provider": "mock",
+        "requirement_hash": "d1d4cafdd6c520ab48e436cf1688ab4e9432c23b650098c23f5b2b62b4e059f6",
+        "trace_id": "9042d268-b8fb-4bab-ad27-cfd240fa942b"
+      },
+      "repository_scope_hint": "",
+      "role": "synthesis",
+      "schema_version": "task_brief/v1",
+      "status": "enriched",
+      "task_description": "mock"
+    },
+    {
+      "agent_id": "review-agent-v1",
+      "analysis_focus": [],
+      "evaluation_hints": [],
+      "evidence_refs": [],
+      "output_schema_id": "agent/review/v1/output",
+      "provenance": {
+        "evidence_summary_hash": "7be2fc9dde7270748d3564a1cd5ddfacb111ff10229a6fea4dae1f775b8f4ca2",
+        "failure_type": null,
+        "generated_at": "2026-08-02T13:47:15.228161+00:00",
+        "model": "mock-model",
+        "outcome": "enriched",
+        "prompt_id": "enrichment/review/v1",
+        "prompt_version": "1.0.0",
+        "provider": "mock",
+        "requirement_hash": "d1d4cafdd6c520ab48e436cf1688ab4e9432c23b650098c23f5b2b62b4e059f6",
+        "trace_id": "a93e7953-c0c3-4dbd-b390-2cb87e55105b"
+      },
+      "repository_scope_hint": "",
+      "role": "review",
+      "schema_version": "task_brief/v1",
+      "status": "enriched",
+      "task_description": "mock"
+    }
+  ],
+  "canonical_hash": "c7412caa984cb2ec9644b60a338527e9f84c871ad4ef6f6e28df14c781d3540e",
+  "degraded_agents": [],
+  "enriched_agents": [
+    "repository-analyst-agent-v1",
+    "design-agent-v1",
+    "test-strategy-agent-v1",
+    "risk-review-agent-v1",
+    "synthesis-agent-v1",
+    "review-agent-v1"
+  ],
+  "generated_count": 6,
+  "run_id": "run-multi-0bfba9ea15f8",
+  "schema_version": "task_brief_artifact/v1"
+}

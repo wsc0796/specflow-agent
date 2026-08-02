@@ -1,0 +1,20 @@
+{
+  "context_hash": "fdc841afd58b24b78a100086a1f8f631b30d7f2914e0fe269b65c7bad7ed4115",
+  "error_type": null,
+  "fallback_level": "none",
+  "input_tokens": 291,
+  "latency_ms": 0,
+  "metadata": {
+    "worker_name": "analyze-worker",
+    "worker_role": "analyze",
+    "worker_version": "1.0.0"
+  },
+  "model": "mock-model",
+  "output_tokens": 147,
+  "prompt_hash": "6e1a197771738dd575d245e2b22aa2f85b863036844a6abf23862cd4610f3d52",
+  "prompt_name": "analyze_requirement",
+  "prompt_version": "1.0.0",
+  "retry_count": 0,
+  "run_id": "run-61782b213f65-analyze",
+  "status": "success"
+}

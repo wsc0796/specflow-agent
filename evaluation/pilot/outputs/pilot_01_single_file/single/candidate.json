@@ -1,0 +1,1 @@
+{"affected_files": ["app/orders.py"], "evidence_refs": ["app/orders.py"], "implementation_steps": ["step-1", "step-2"], "proposed_changes": ["Plan generated for: Order cancellation plan (single file)"], "risks": ["非法状态流转", "取消与提交的竞态"], "rollback": "restore previous commit", "test_plan": ["test-case-1"], "uncertainties": ["mock single-agent has no evidence collection"]}

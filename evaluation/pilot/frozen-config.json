@@ -1,0 +1,32 @@
+{
+  "schema_version": "evaluation_frozen_config/v1",
+  "status": "DRAFT_PENDING_USER_APPROVAL",
+  "repository": {
+    "commit": "86014cb",
+    "path": "benchmarks/fixtures/portfolio-python"
+  },
+  "pipelines": ["single", "legacy", "six-role"],
+  "provider": "PENDING_USER_APPROVAL (SPECFLOW_LLM_BASE_URL/API_KEY/MODEL)",
+  "max_provider_call_attempts": {
+    "default": 24,
+    "evaluation_override_allowed": 48,
+    "note": "48 only as explicit evaluation config; never a global default"
+  },
+  "token_budget": {
+    "max_run_input_tokens": 50000,
+    "max_run_output_tokens": 12000,
+    "max_run_total_tokens": 62000
+  },
+  "wall_clock": {"max_wall_time_seconds": 300},
+  "revision_policy": {"max_revisions": 1},
+  "output_schema": "unified EvaluationCandidate (pilot.py)",
+  "fairness": [
+    "same commit/model/parameters/tools/evidence/token budget/wall-clock/output schema/failure rules",
+    "attempt counts may differ but are public and included in cost comparison"
+  ],
+  "forbidden": [
+    "no protocol changes after seeing results",
+    "no extra runs for any pipeline",
+    "no quality conclusion from pilot"
+  ]
+}

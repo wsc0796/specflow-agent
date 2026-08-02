@@ -1,0 +1,10 @@
+[
+  {
+    "decision": "PASS",
+    "findings": [],
+    "requires_revision": false,
+    "schema_version": "review_payload/v2",
+    "severity": "info",
+    "summary": "Deterministic mock review accepted the synthesis."
+  }
+]

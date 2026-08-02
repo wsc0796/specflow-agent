@@ -1,0 +1,16 @@
+budget_violation,case_id,claim_evidence_coverage,evidence_ref_valid,expected_module_recall,forbidden_claim_count,missing,pipeline,referenced_path_exists,risk_coverage,run_success,schema_valid,test_plan_coverage,uncertainty_calibration,unsupported_claim_rate
+False,pilot_01_single_file,1.0,True,1.0,0,True,single,True,0.5,True,True,1.0,True,0
+False,pilot_01_single_file,0.0,True,0.0,0,True,legacy,False,0.0,True,True,0.0,True,0
+False,pilot_01_single_file,0.0,True,0.0,0,True,six-role,False,0.0,True,True,0.0,True,0
+False,pilot_02_two_modules,1.0,True,1.0,0,True,single,True,0.5,True,True,1.0,True,0
+False,pilot_02_two_modules,0.0,True,0.0,0,True,legacy,False,0.0,True,True,0.0,True,0
+False,pilot_02_two_modules,0.0,True,0.0,0,True,six-role,False,0.0,True,True,0.0,True,0
+False,pilot_03_api_config_tests,0.75,True,1.0,0,True,single,True,0.5,True,True,1.0,True,0
+False,pilot_03_api_config_tests,0.0,True,0.0,0,True,legacy,False,0.0,True,True,0.0,True,0
+False,pilot_03_api_config_tests,0.0,True,0.0,0,True,six-role,False,0.0,True,True,0.0,True,0
+False,pilot_04_security_reliability,1.0,True,1.0,0,True,single,True,0.5,True,True,1.0,True,0
+False,pilot_04_security_reliability,0.0,True,0.0,0,True,legacy,False,0.0,True,True,0.0,True,0
+False,pilot_04_security_reliability,0.0,True,0.0,0,True,six-role,False,0.0,True,True,0.0,True,0
+False,pilot_05_vague_requirement,1.0,True,1.0,0,True,single,True,0.5,True,True,1.0,True,0
+False,pilot_05_vague_requirement,0.0,True,0.0,0,True,legacy,False,0.0,True,True,0.0,True,0
+False,pilot_05_vague_requirement,0.0,True,0.0,0,True,six-role,False,0.0,True,True,0.0,True,0

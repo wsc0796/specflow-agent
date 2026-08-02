@@ -1,0 +1,206 @@
+{
+  "run_id": "run-multi-0bfba9ea15f8",
+  "idempotency_key": "951510dd298ac2f43225782952a808322647c21f07be9327fbb6210328b9b2bb",
+  "plan_id": "plan-v1",
+  "structure_hash": "7715d957e762aef2c04e4bc6f23620d1cbded7438037a866f58edd866aec9652",
+  "semantic_brief_hash": "d226e6cc545f8c92097998ec5f9a05bbaad8598cd16845c321eab6fee762666d",
+  "effective_plan_hash": "1527d1da9a60b038e46ae6ab83fc067a3fac1243f8d731aead707cc5de2dd0e7",
+  "stages": [
+    [
+      "repository-analyst-agent-v1"
+    ],
+    [
+      "design-agent-v1",
+      "risk-review-agent-v1",
+      "test-strategy-agent-v1"
+    ],
+    [
+      "synthesis-agent-v1"
+    ],
+    [
+      "review-agent-v1"
+    ]
+  ],
+  "enriched": true,
+  "degraded_agents": [],
+  "workflow_state": "completed",
+  "workflow_history": [
+    [
+      "created",
+      "planning",
+      "plan compiled",
+      "2026-08-02T13:47:15.228161+00:00"
+    ],
+    [
+      "planning",
+      "analyzing",
+      "repository analysis",
+      "2026-08-02T13:47:15.228161+00:00"
+    ],
+    [
+      "analyzing",
+      "executing_specialists",
+      "specialists",
+      "2026-08-02T13:47:15.229507+00:00"
+    ],
+    [
+      "executing_specialists",
+      "synthesizing",
+      "synthesis",
+      "2026-08-02T13:47:15.230514+00:00"
+    ],
+    [
+      "synthesizing",
+      "reviewing",
+      "review",
+      "2026-08-02T13:47:15.230514+00:00"
+    ],
+    [
+      "reviewing",
+      "completed",
+      "review passed",
+      "2026-08-02T13:47:15.231515+00:00"
+    ]
+  ],
+  "revision_count": 0,
+  "revision_exhausted": false,
+  "terminal_state": "completed",
+  "review": {
+    "decision": "PASS",
+    "review_count": 1,
+    "finding_count": 0,
+    "finding_ids": []
+  },
+  "revision": {
+    "task_count": 0,
+    "revision_rounds": 0,
+    "target_agents": [],
+    "unresolved_finding_count": 0,
+    "final_review_decision": "PASS"
+  },
+  "stage_results": [
+    {
+      "stage": 0,
+      "agents": [
+        "repository-analyst-agent-v1"
+      ]
+    },
+    {
+      "stage": 1,
+      "agents": [
+        "design-agent-v1",
+        "risk-review-agent-v1",
+        "test-strategy-agent-v1"
+      ]
+    },
+    {
+      "stage": 2,
+      "agents": [
+        "synthesis-agent-v1"
+      ]
+    },
+    {
+      "stage": 3,
+      "agents": [
+        "review-agent-v1"
+      ]
+    }
+  ],
+  "artifacts": {
+    "agent_outputs": "agent-outputs.json",
+    "handoffs": "handoffs.json",
+    "traces": "traces.json",
+    "sources": "sources.json",
+    "metrics": "metrics.json",
+    "task_briefs": "task-briefs.json",
+    "review_findings": "review-findings.json",
+    "revision_tasks": "revision-tasks.json",
+    "revision_inputs": "revision-inputs.json",
+    "revision_results": "revision-results.json",
+    "finding_resolutions": "finding-resolutions.json"
+  },
+  "task_briefs": {
+    "schema_version": "task_brief_artifact/v1",
+    "canonical_hash": "c7412caa984cb2ec9644b60a338527e9f84c871ad4ef6f6e28df14c781d3540e",
+    "generated_count": 6,
+    "enriched_agents": [
+      "repository-analyst-agent-v1",
+      "design-agent-v1",
+      "test-strategy-agent-v1",
+      "risk-review-agent-v1",
+      "synthesis-agent-v1",
+      "review-agent-v1"
+    ],
+    "degraded_agents": []
+  },
+  "discovered_files": 8,
+  "tool_call_count": 14,
+  "execution_policy": {
+    "policy_version": "1.0.0",
+    "max_wall_time_seconds": 300,
+    "max_llm_calls": 10,
+    "max_revisions": 1
+  },
+  "execution_policy_hash": "8b1b752b738ab14d090b45c181a7f18760a277b59b54715a5ec7490c97ee0dff",
+  "budget_usage": {
+    "llm_calls": 0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "revision_count": 0
+  },
+  "budget_snapshot": {
+    "execution_mode": "mock",
+    "configured_role_count": 6,
+    "limits": {
+      "max_provider_call_attempts": 24,
+      "max_parallel_provider_calls": 3,
+      "max_wall_time_seconds": 300,
+      "max_revisions": 1,
+      "max_run_input_tokens": 50000,
+      "max_run_output_tokens": 12000,
+      "max_run_total_tokens": 62000,
+      "max_artifact_bytes": 5242880
+    },
+    "agent_invocations": {
+      "scheduled": 6,
+      "started": 6,
+      "completed": 6,
+      "failed": 0,
+      "active": 0
+    },
+    "provider_calls": {
+      "attempts": 0,
+      "successful": 0,
+      "failed": 0,
+      "active": 0,
+      "peak_active": 0
+    },
+    "synthetic_model_calls": 6,
+    "revision": {
+      "rounds": 0,
+      "agent_invocations": 0,
+      "re_review_invocations": 0
+    },
+    "tokens": {
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "total_tokens": 0,
+      "usage_known": false,
+      "unknown_calls": 0
+    },
+    "timing": {
+      "wall_clock_elapsed_ms": 77,
+      "provider_latency_ms": 0,
+      "agent_latency_ms": 0
+    },
+    "artifact_bytes_written": 0,
+    "snapshot_id": "5eb9630b571e4c7da9966f5e6b05b20f"
+  },
+  "revision_artifacts": {
+    "review-findings.json": "f23bd5fa4a06b3259439401954381f08f2c427a38c8288d7ab9dabed8b2eff4a",
+    "revision-tasks.json": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+    "revision-inputs.json": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+    "revision-results.json": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+    "finding-resolutions.json": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  }
+}

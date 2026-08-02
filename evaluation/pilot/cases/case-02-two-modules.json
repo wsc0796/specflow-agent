@@ -1,0 +1,12 @@
+{
+  "case_id": "pilot_02_two_modules",
+  "title": "Catalog cache ownership plan (two modules)",
+  "requirement": "为商品搜索功能设计缓存方案,涉及 app/cache.py 与 app/catalog.py 两个模块:缓存键设计、TTL 与失效策略、缓存与数据源的归属边界,以及并发一致性风险与测试计划。",
+  "repository_type": "small_fastapi_fixture",
+  "expected_domains": ["catalog", "cache", "concurrency"],
+  "expected_file_patterns": ["app/cache.py", "app/catalog.py"],
+  "expected_risks": ["缓存失效不完整", "缓存穿透", "并发写入竞态", "缓存与数据源不一致"],
+  "expected_acceptance_topics": ["缓存键设计", "TTL 与失效策略", "模块归属边界", "一致性风险", "测试用例计划"],
+  "forbidden_claims": ["production-ready"],
+  "human_review_notes": "重点看跨模块数据流是否说清、失效归属是否明确、是否识别并发风险。"
+}

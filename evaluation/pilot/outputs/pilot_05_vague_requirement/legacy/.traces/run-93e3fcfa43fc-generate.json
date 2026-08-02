@@ -1,0 +1,20 @@
+{
+  "context_hash": "e2676bdd9fe40bed9acb0a0f4904b8a3f6bb6accd42bd4d8c062b94e2f830c96",
+  "error_type": null,
+  "fallback_level": "none",
+  "input_tokens": 439,
+  "latency_ms": 0,
+  "metadata": {
+    "worker_name": "generate-worker",
+    "worker_role": "generate",
+    "worker_version": "1.0.0"
+  },
+  "model": "mock-model",
+  "output_tokens": 213,
+  "prompt_hash": "37fd4ef0ed41008d4ddb5e9f9bf9dedf55341ea29ed840d3a1023bd5f932d668",
+  "prompt_name": "generate_spec",
+  "prompt_version": "1.0.0",
+  "retry_count": 0,
+  "run_id": "run-93e3fcfa43fc-generate",
+  "status": "success"
+}

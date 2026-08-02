@@ -1,0 +1,12 @@
+{
+  "case_id": "pilot_01_single_file",
+  "title": "Order cancellation plan (single file)",
+  "requirement": "为 app/orders.py 设计订单取消功能的实施计划:包括取消接口的行为、订单状态流转、输入校验、错误契约,以及需要新增或修改的测试。只关注该单文件模块。",
+  "repository_type": "small_fastapi_fixture",
+  "expected_domains": ["orders", "api", "validation", "state_machine"],
+  "expected_file_patterns": ["app/orders.py"],
+  "expected_risks": ["非法状态流转", "取消与提交的竞态", "校验不完整", "错误契约不一致"],
+  "expected_acceptance_topics": ["取消接口行为", "订单状态机", "输入校验规则", "错误响应契约", "测试用例计划"],
+  "forbidden_claims": ["production-ready", "high availability"],
+  "human_review_notes": "重点看计划是否局限于单文件、状态机是否完备、是否给出可执行的测试计划。"
+}
