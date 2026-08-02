@@ -177,6 +177,7 @@ def run_multi_agent(
     run_id = f"run-multi-{sha256(f'{repo.resolve()}|{requirement}'.encode()).hexdigest()[:12]}"
     if (output / run_id).exists():
         return 3
+    guard.set_run_context(run_id, execution_mode="mock" if mock else "live")
 
     # Collect repository evidence (same pipeline as legacy runner)
     evidence_text = ""
@@ -217,6 +218,7 @@ def run_multi_agent(
         return 3
 
     registry = _build_registry()
+    guard.set_configured_role_count(len(registry.list_agents()))
 
     # Create LLM client: real provider or mock
     llm_client: object
@@ -244,6 +246,8 @@ def run_multi_agent(
         model=model,
         provider=provider,
         schema_registry=schema_registry,
+        guard=guard,
+        retry_policy=policy.retry,
     )
     try:
         plan = coordinator.plan(
@@ -255,7 +259,14 @@ def run_multi_agent(
             run_id,
             tuple(task.task_brief for task in plan.tasks),
         )
-    except Exception:
+    except Exception as error:
+        logger.error("run %s failed during planning: %s", run_id, type(error).__name__)
+        _persist_planning_failure(
+            output=output,
+            run_id=run_id,
+            guard=guard,
+            error="PLANNING_FAILED",
+        )
         return 3
     task_brief_events = _TaskBriefEventRecorder()
     for task in plan.tasks:
@@ -292,6 +303,8 @@ def run_multi_agent(
                 temperature=0.0,
                 max_tokens=policy.tokens.max_agent_output_tokens,
                 task_brief_event_sink=task_brief_events.record,
+                budget=guard,
+                max_retries=policy.retry.max_provider_retries,
             )
             executors[identity.agent_id] = runner.execute
     executors.update(_executor_overrides or {})
@@ -410,7 +423,7 @@ def run_multi_agent(
             if round_number is None:
                 terminal_state = "needs_human_review"
                 break
-            guard.consume_revision()
+            guard.record_revision_round()
             coordinator.engine.transition(MultiAgentWorkflowState.REVISING, "review rejected")
             targets = _revision_targets(review_payload, plan)
             if not targets:
@@ -510,6 +523,7 @@ def run_multi_agent(
                         requirement=requirement,
                     )
                 )
+                guard.record_revision_agent_invocation()
                 _run_and_accumulate(
                     stages,
                     scheduler,
@@ -587,6 +601,7 @@ def run_multi_agent(
             )
             next_stage += 1
             coordinator.engine.transition(MultiAgentWorkflowState.RE_REVIEWING, "re-review")
+            guard.record_re_review_invocation()
             runtime_handoffs.extend(
                 _validate_stage_inputs(
                     plan.tasks,
@@ -687,6 +702,7 @@ def run_multi_agent(
         coordinator.engine.state.value,
         task_brief_events.snapshot(),
         revision_events.snapshot(),
+        guard.model_call_events(),
     )
     policy_hash = policy.policy_hash()
     idempotency_key = sha256(
@@ -772,6 +788,7 @@ def run_multi_agent(
             "output_tokens": guard.total_output_tokens,
             "revision_count": guard.revision_count,
         },
+        "budget_snapshot": guard.snapshot(),
     }
     # Write stage checkpoints
     checkpoints = [
@@ -864,6 +881,7 @@ def run_multi_agent(
         revision_exhausted=revision_exhausted,
         provider=provider,
         model=model,
+        guard=guard,
     )
     try:
         _safe_write(run_dir, "metrics.json", metrics.as_dict(), guard)
@@ -901,6 +919,8 @@ def _run_and_accumulate(
 ) -> None:
     guard.check_wall_time()
     guard.check_parallel_agents(len(agent_ids))
+    for agent_id in agent_ids:
+        guard.schedule_agent_invocation()
     validated_inputs = _validated_inputs(
         agent_ids,
         stage_index,
@@ -931,12 +951,19 @@ def _budgeted_executor(
     executor: AgentExecutor, validated_input: AgentExecutionInput, guard: RuntimeGuard
 ) -> AgentExecutor:
     def run(context: dict[str, Any]) -> dict[str, Any]:
-        guard.consume_llm_call()
-        guard.check_wall_time()
-        result = executor({**context, "validated_input": validated_input})
-        usage = result.get("usage", {})
-        guard.consume_tokens(usage.get("input_tokens", 0), usage.get("output_tokens", 0))
-        return result
+        import time as _time
+
+        guard.start_agent_invocation()
+        started = _time.perf_counter()
+        try:
+            result = executor({**context, "validated_input": validated_input})
+            guard.complete_agent_invocation()
+            guard.record_agent_latency(max(0, int((_time.perf_counter() - started) * 1000)))
+            return result
+        except Exception:
+            guard.complete_agent_invocation(failed=True)
+            guard.record_agent_latency(max(0, int((_time.perf_counter() - started) * 1000)))
+            raise
 
     return run
 
@@ -1301,6 +1328,7 @@ def _build_trace_tree(
     status: str,
     task_brief_events: tuple[TaskBriefTraceEvent, ...] = (),
     revision_events: tuple[RevisionTraceEvent, ...] = (),
+    model_call_events: tuple[dict[str, object], ...] = (),
 ) -> list[dict[str, object]]:
     root_id = f"run-{uuid4().hex}"
     coordinator_id = f"coordinator-{uuid4().hex}"
@@ -1335,6 +1363,7 @@ def _build_trace_tree(
         )
     traces.extend(event.as_dict() for event in task_brief_events)
     traces.extend(event.as_dict() for event in revision_events)
+    traces.extend(dict(event) for event in model_call_events)
     for stage in stages:
         for agent_id in sorted(stage.agent_results):
             timing = stage.agent_timings[agent_id]
@@ -1375,7 +1404,35 @@ def _safe_write(
     """Write artifact with size check before touching disk."""
     content = json.dumps(data, ensure_ascii=False, indent=2, sort_keys=sort_keys)
     guard.check_artifact_size(len(content.encode("utf-8")))
+    guard.record_artifact_bytes(len(content.encode("utf-8")))
     (run_dir / filename).write_text(content, encoding="utf-8")
+
+
+def _persist_planning_failure(
+    output: Path,
+    run_id: str,
+    guard: RuntimeGuard,
+    error: str,
+) -> None:
+    """Persist a minimal FAILED manifest with a budget snapshot when planning fails."""
+    try:
+        run_dir = output / run_id
+        run_dir.mkdir(parents=True, exist_ok=True)
+        failed_manifest = {
+            "run_id": run_id,
+            "plan_id": "unknown",
+            "workflow_state": "failed",
+            "workflow_history": [],
+            "error": error,
+            "failure_stage": "planning",
+            "stages_completed": 0,
+            "budget_snapshot": guard.last_budget_snapshot or guard.snapshot(),
+            "artifacts": {},
+        }
+        _safe_write(run_dir, "manifest.json", failed_manifest, guard)
+        _safe_write(run_dir, "traces.json", list(guard.model_call_events()), guard)
+    except Exception:
+        logger.debug("Failed to persist planning-failure artifacts", exc_info=True)
 
 
 def _make_mock_llm_client() -> object:
@@ -1437,6 +1494,7 @@ def _persist_failed_run(
             "failed",
             task_brief_events,
             revision_events,
+            guard.model_call_events(),
         )
         failed_manifest = {
             "run_id": run_id,
@@ -1446,6 +1504,8 @@ def _persist_failed_run(
             "error": error,
             "stages_completed": len(stages),
             "discovered_files": discovered_files,
+            "failure_code": error,
+            "budget_snapshot": guard.last_budget_snapshot or guard.snapshot(),
             "artifacts": {"task_briefs": "task-briefs.json"},
             "task_briefs": {
                 "schema_version": task_brief_artifact.schema_version,
@@ -1493,6 +1553,7 @@ def _build_multi_agent_metrics(
     revision_exhausted: bool,
     provider: str,
     model: str,
+    guard: RuntimeGuard,
 ) -> RunMetrics:
     """Build unified RunMetrics from multi-agent execution data."""
     agent_metrics: list[AgentMetrics] = []
@@ -1506,8 +1567,8 @@ def _build_multi_agent_metrics(
     for stage in stages:
         for agent_id, result in stage.agent_results.items():
             usage = result.get("usage", {})
-            tokens_in = usage.get("input_tokens", 0)
-            tokens_out = usage.get("output_tokens", 0)
+            tokens_in = usage.get("input_tokens") or 0
+            tokens_out = usage.get("output_tokens") or 0
             total_in += tokens_in
             total_out += tokens_out
 
@@ -1569,6 +1630,7 @@ def _build_multi_agent_metrics(
         review_agent_id,
     )
 
+    snapshot = guard.snapshot()
     return RunMetrics(
         mode="multi-agent",
         provider=provider,
@@ -1600,6 +1662,21 @@ def _build_multi_agent_metrics(
         parallel_theoretical_ms=parallel_theoretical,
         parallel_actual_ms=parallel_actual,
         parallel_speedup=round(parallel_speedup, 2),
+        configured_role_count=int(snapshot["configured_role_count"]),
+        agent_invocations_scheduled=int(snapshot["agent_invocations"]["scheduled"]),
+        agent_invocations_completed=int(snapshot["agent_invocations"]["completed"]),
+        agent_invocations_failed=int(snapshot["agent_invocations"]["failed"]),
+        provider_call_attempts=int(snapshot["provider_calls"]["attempts"]),
+        successful_provider_calls=int(snapshot["provider_calls"]["successful"]),
+        failed_provider_calls=int(snapshot["provider_calls"]["failed"]),
+        peak_active_provider_calls=int(snapshot["provider_calls"]["peak_active"]),
+        synthetic_model_calls=int(snapshot["synthetic_model_calls"]),
+        token_usage_known=bool(snapshot["tokens"]["usage_known"]),
+        token_usage_unknown_calls=int(snapshot["tokens"]["unknown_calls"]),
+        revision_agent_invocations=int(snapshot["revision"]["agent_invocations"]),
+        re_review_invocations=int(snapshot["revision"]["re_review_invocations"]),
+        provider_latency_ms=int(snapshot["timing"]["provider_latency_ms"]),
+        budget_snapshot=snapshot,
     )
 
 
