@@ -21,6 +21,8 @@ class TestMultiAgentWorkflowState:
             "synthesizing",
             "reviewing",
             "revising",
+            "re_reviewing",
+            "needs_human_review",
             "completed",
             "failed",
         }
@@ -85,12 +87,41 @@ class TestMultiAgentWorkflowEngine:
         engine.transition(MultiAgentWorkflowState.SYNTHESIZING, "re-synthesize")
         assert engine.state is MultiAgentWorkflowState.SYNTHESIZING
 
-        engine.transition(MultiAgentWorkflowState.REVIEWING, "re-review")
-        assert engine.state is MultiAgentWorkflowState.REVIEWING
+        engine.transition(MultiAgentWorkflowState.RE_REVIEWING, "re-review")
+        assert engine.state is MultiAgentWorkflowState.RE_REVIEWING
 
         engine.transition(MultiAgentWorkflowState.COMPLETED, "approved")
         assert engine.state is MultiAgentWorkflowState.COMPLETED
         assert engine.revision_count == 1
+
+    def test_reject_after_revision_limit_enters_needs_human_review(self) -> None:
+        """A second REJECT at the revision limit must not become COMPLETED."""
+        engine = MultiAgentWorkflowEngine(max_revision_rounds=1)
+
+        engine.transition(MultiAgentWorkflowState.PLANNING, "p")
+        engine.transition(MultiAgentWorkflowState.ANALYZING, "a")
+        engine.transition(MultiAgentWorkflowState.EXECUTING_SPECIALISTS, "e")
+        engine.transition(MultiAgentWorkflowState.SYNTHESIZING, "s")
+        engine.transition(MultiAgentWorkflowState.REVIEWING, "r")
+        engine.transition(MultiAgentWorkflowState.REVISING, "needs revision")
+        engine.transition(MultiAgentWorkflowState.SYNTHESIZING, "re-synthesize")
+        engine.transition(MultiAgentWorkflowState.RE_REVIEWING, "re-review")
+        engine.transition(MultiAgentWorkflowState.NEEDS_HUMAN_REVIEW, "limit reached")
+
+        assert engine.state is MultiAgentWorkflowState.NEEDS_HUMAN_REVIEW
+        assert engine.revision_count == 1
+        assert engine.revision_exhausted is True
+
+    def test_first_review_reject_without_budget_enters_needs_human_review(self) -> None:
+        """REJECT with zero revision budget goes straight to human review."""
+        engine = MultiAgentWorkflowEngine(max_revision_rounds=0)
+        engine.transition(MultiAgentWorkflowState.PLANNING, "p")
+        engine.transition(MultiAgentWorkflowState.ANALYZING, "a")
+        engine.transition(MultiAgentWorkflowState.EXECUTING_SPECIALISTS, "e")
+        engine.transition(MultiAgentWorkflowState.SYNTHESIZING, "s")
+        engine.transition(MultiAgentWorkflowState.REVIEWING, "r")
+        engine.transition(MultiAgentWorkflowState.NEEDS_HUMAN_REVIEW, "no budget")
+        assert engine.state is MultiAgentWorkflowState.NEEDS_HUMAN_REVIEW
 
     # ── Revision exhausted ──────────────────────────────────────────
 
@@ -120,12 +151,12 @@ class TestMultiAgentWorkflowEngine:
         assert engine.revision_exhausted is True
 
         engine.transition(MultiAgentWorkflowState.SYNTHESIZING, "s")
-        engine.transition(MultiAgentWorkflowState.REVIEWING, "r")
+        engine.transition(MultiAgentWorkflowState.RE_REVIEWING, "rr")
 
         # Round 3 — exceeds limit
-        engine.transition(MultiAgentWorkflowState.REVISING, "r3")
-        assert engine.revision_count == 3
-        assert engine.revision_exhausted is True  # 3 > 2 is True
+        engine.transition(MultiAgentWorkflowState.NEEDS_HUMAN_REVIEW, "r3 exhausted")
+        assert engine.revision_count == 2
+        assert engine.revision_exhausted is True
 
     # ── Infrastructure failure ──────────────────────────────────────
 
@@ -193,6 +224,20 @@ class TestMultiAgentWorkflowEngine:
         with pytest.raises(StateTransitionError):
             engine.transition(MultiAgentWorkflowState.PLANNING)
         with pytest.raises(StateTransitionError):
+            engine.transition(MultiAgentWorkflowState.NEEDS_HUMAN_REVIEW)
+
+    def test_terminal_needs_human_review_rejects_further_transitions(self) -> None:
+        """Once NEEDS_HUMAN_REVIEW, any further transition raises."""
+        engine = MultiAgentWorkflowEngine(max_revision_rounds=1)
+        engine.transition(MultiAgentWorkflowState.PLANNING, "p")
+        engine.transition(MultiAgentWorkflowState.ANALYZING, "a")
+        engine.transition(MultiAgentWorkflowState.EXECUTING_SPECIALISTS, "e")
+        engine.transition(MultiAgentWorkflowState.SYNTHESIZING, "s")
+        engine.transition(MultiAgentWorkflowState.REVIEWING, "r")
+        engine.transition(MultiAgentWorkflowState.NEEDS_HUMAN_REVIEW, "limit")
+
+        with pytest.raises(StateTransitionError):
+            engine.transition(MultiAgentWorkflowState.COMPLETED)
             engine.transition(MultiAgentWorkflowState.COMPLETED)
 
     # ── History tracking ────────────────────────────────────────────

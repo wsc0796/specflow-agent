@@ -144,17 +144,22 @@ class TestMultiAgentRunner:
         traces = json.loads((run_dir / "traces.json").read_text())
         assert len(outputs) == 6
         assert len(handoffs) == 7
-        assert len(traces) == 14
+        assert len(traces) == 15  # 8 spans + 6 brief GENERATED + 1 REVIEW_FINDINGS_CREATED
         root = next(trace for trace in traces if trace.get("kind") == "run")
         coordinator = next(trace for trace in traces if trace.get("kind") == "coordinator")
         agent_traces = [trace for trace in traces if "agent_version" in trace]
         generated = [trace for trace in traces if trace.get("event_type") == "TASK_BRIEF_GENERATED"]
         consumed = [trace for trace in traces if trace.get("event_type") == "TASK_BRIEF_CONSUMED"]
+        review_events = [
+            trace for trace in traces if trace.get("event_type") == "REVIEW_FINDINGS_CREATED"
+        ]
         assert root["parent_span_id"] is None
         assert coordinator["parent_span_id"] == root["span_id"]
         assert len(agent_traces) == 6
         assert len(generated) == 6
         assert consumed == []
+        assert len(review_events) == 1
+        assert review_events[0]["status"] == "PASS"
         assert {trace["parent_span_id"] for trace in agent_traces} == {coordinator["span_id"]}
 
         metrics = json.loads((run_dir / "metrics.json").read_text(encoding="utf-8"))
@@ -300,13 +305,22 @@ class TestMultiAgentRunner:
         assert '"status": "degraded"' in design_request
         assert "sensitive provider timeout detail" not in json.dumps(traces)
 
-    def test_reject_runs_one_revision_then_completes_when_limit_is_exhausted(
-        self, tmp_path: Path
-    ) -> None:
+    def test_reject_after_revision_limit_enters_needs_human_review(self, tmp_path: Path) -> None:
         repo = tmp_path / "test-repo"
         repo.mkdir()
         output = tmp_path / "output"
         reviews = 0
+        finding = {
+            "schema_version": "review_finding/v1",
+            "finding_id": "F-00000001",
+            "severity": "warning",
+            "category": "completeness",
+            "description": "Design omits persistence module coverage.",
+            "target_agent_id": "design-agent-v1",
+            "affected_artifact": None,
+            "evidence_refs": [],
+            "recommendation": "Add persistence module coverage to the design.",
+        }
 
         def reject_review(_: dict[str, object]) -> dict[str, object]:
             nonlocal reviews
@@ -317,7 +331,8 @@ class TestMultiAgentRunner:
                 "output": {
                     "decision": "REJECT",
                     "summary": "Explicit mock rejection for revision coverage.",
-                    "target_agent_id": "design-agent-v1",
+                    "requires_revision": True,
+                    "findings": [finding],
                 },
             }
 
@@ -329,20 +344,41 @@ class TestMultiAgentRunner:
                 mock=True,
                 _executor_overrides={"review-agent-v1": reject_review},
             )
-            == 0
+            == 5
         )
         manifest = json.loads(
             (next(output.glob("run-multi-*")) / "manifest.json").read_text(encoding="utf-8")
         )
         assert reviews == 2
-        assert manifest["workflow_state"] == "completed"
+        assert manifest["workflow_state"] == "needs_human_review"
+        assert manifest["terminal_state"] == "needs_human_review"
         assert manifest["revision_count"] == 1
         assert manifest["revision_exhausted"] is True
+        assert manifest["review"]["decision"] == "REJECT"
+        assert manifest["review"]["finding_count"] == 2
+        assert manifest["revision"]["task_count"] == 1
+        assert manifest["revision"]["unresolved_finding_count"] == 1
         assert [step[1] for step in manifest["workflow_history"]].count("revising") == 1
+        assert "needs_human_review" in [step[1] for step in manifest["workflow_history"]]
         run_dir = next(output.glob("run-multi-*"))
         outputs = json.loads((run_dir / "agent-outputs.json").read_text(encoding="utf-8"))
         assert "stage-1/design-agent-v1" in outputs
         assert "stage-4/design-agent-v1" in outputs
+        traces = json.loads((run_dir / "traces.json").read_text(encoding="utf-8"))
+        event_types = [trace["event_type"] for trace in traces if "event_type" in trace]
+        assert event_types.count("REVIEW_FINDINGS_CREATED") == 2
+        assert event_types.count("REVISION_REQUEST_SUBMITTED") == 0  # mock path, honest
+        assert event_types.count("FINDING_UNRESOLVED") == 1
+        assert event_types.count("HUMAN_REVIEW_REQUIRED") == 1
+        revision_tasks = json.loads((run_dir / "revision-tasks.json").read_text(encoding="utf-8"))
+        assert revision_tasks[0]["finding_ids"] == ["F-00000001"]
+        assert revision_tasks[0]["status"] == "completed"
+        revision_inputs = json.loads((run_dir / "revision-inputs.json").read_text(encoding="utf-8"))
+        assert revision_inputs[0]["revision_round"] == 1
+        assert revision_inputs[0]["target_agent_id"] == "design-agent-v1"
+        resolutions = json.loads((run_dir / "finding-resolutions.json").read_text(encoding="utf-8"))
+        assert resolutions[0]["finding_id"] == "F-00000001"
+        assert resolutions[0]["status"] == "unresolved"
         handoffs = json.loads((run_dir / "handoffs.json").read_text(encoding="utf-8"))
         assert any(
             handoff["payload_ref"].endswith("stage-1/design-agent-v1") for handoff in handoffs

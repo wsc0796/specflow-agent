@@ -1,80 +1,70 @@
-"""Tests for RevisionController, RevisionTask, and RevisionResult."""
+"""Tests for RevisionController and the persisted RevisionTask contract."""
 
 from __future__ import annotations
 
 import pytest
 
 from specflow.agents.models import AgentRole, RevisionPolicy
-from specflow.coordinator.revision import RevisionController, RevisionResult, RevisionTask
+from specflow.coordinator.revision import RevisionController, RevisionTask
+
+
+def _task(controller: RevisionController, agent_id: str = "design-agent-v1") -> RevisionTask:
+    task = controller.create_revision_task(
+        run_id="run-test",
+        round_number=controller.current_round,
+        target_agent_id=agent_id,
+        target_role=AgentRole.DESIGN,
+        finding_ids=("F-00000001",),
+        prior_output_hash="a" * 64,
+    )
+    assert task is not None
+    return task
 
 
 class TestRevisionTask:
-    """Verify RevisionTask frozen dataclass."""
+    """Verify the persisted RevisionTask contract."""
 
     def test_frozen(self) -> None:
         task = RevisionTask(
-            revision_id="r1",
+            revision_id="revision-1",
+            run_id="run-1",
             target_agent_id="agent-1",
             target_role=AgentRole.DESIGN,
-            review_finding="Missing edge cases",
-            instruction="Add edge case handling",
             round_number=1,
+            finding_ids=("F-00000001",),
+            prior_output_hash="b" * 64,
         )
         with pytest.raises(AttributeError):
-            task.revision_id = "r2"  # type: ignore[misc]
+            task.revision_id = "revision-2"  # type: ignore[misc]
 
-    def test_all_fields(self) -> None:
+    def test_round_trip_snapshot(self) -> None:
         task = RevisionTask(
-            revision_id="rev-abc",
+            revision_id="revision-abc",
+            run_id="run-abc",
             target_agent_id="design-agent-v1",
             target_role=AgentRole.TEST_STRATEGY,
-            review_finding="Not enough test cases",
-            instruction="Add 3 more boundary tests",
             round_number=2,
+            finding_ids=("F-00000001", "F-00000002"),
+            prior_output_hash="c" * 64,
         )
-        assert task.revision_id == "rev-abc"
-        assert task.target_agent_id == "design-agent-v1"
-        assert task.target_role is AgentRole.TEST_STRATEGY
-        assert task.review_finding == "Not enough test cases"
-        assert task.instruction == "Add 3 more boundary tests"
-        assert task.round_number == 2
+        snapshot = task.as_dict()
+        assert snapshot["revision_id"] == "revision-abc"
+        assert snapshot["round_number"] == 2
+        assert snapshot["finding_ids"] == ["F-00000001", "F-00000002"]
+        assert snapshot["status"] == "scheduled"
 
-
-class TestRevisionResult:
-    """Verify RevisionResult frozen dataclass."""
-
-    def test_frozen(self) -> None:
-        task = RevisionTask(
-            revision_id="r1",
-            target_agent_id="a1",
-            target_role=AgentRole.DESIGN,
-            review_finding="f",
-            instruction="fix it",
-            round_number=1,
-        )
-        result = RevisionResult(task=task, output={"fixed": True}, success=True)
-        with pytest.raises(AttributeError):
-            result.success = False  # type: ignore[misc]
-
-    def test_successful_result(self) -> None:
-        task = RevisionTask(
-            revision_id="r1",
-            target_agent_id="a1",
-            target_role=AgentRole.DESIGN,
-            review_finding="f",
-            instruction="fix it",
-            round_number=1,
-        )
-        result = RevisionResult(task=task, output={"data": "revised"}, success=True)
-        assert result.task is task
-        assert result.output == {"data": "revised"}
-        assert result.success is True
+    def test_revision_id_is_distinct_from_finding_ids(self) -> None:
+        """Revision IDs and finding IDs are different namespaces."""
+        controller = RevisionController(RevisionPolicy(max_total_rounds=1))
+        controller.begin_round()
+        task = _task(controller)
+        assert task.revision_id.startswith("revision-")
+        assert not task.revision_id.startswith("F-")
+        assert all(finding_id.startswith("F-") for finding_id in task.finding_ids)
 
 
 class TestRevisionController:
-    """Verify revision lifecycle management."""
-
-    # ── Default policy ──────────────────────────────────────────────
+    """Verify round-based revision lifecycle management."""
 
     def test_default_policy(self) -> None:
         policy = RevisionPolicy()
@@ -104,150 +94,103 @@ class TestRevisionController:
         assert controller.is_revisable(AgentRole.SYNTHESIS) is False
         assert controller.is_revisable(AgentRole.REVIEW) is False
 
-    def test_custom_revisable_roles(self) -> None:
-        """Only explicitly listed roles are revisable."""
-        policy = RevisionPolicy(
-            max_total_rounds=2,
-            revisable_roles=frozenset({AgentRole.REPOSITORY_ANALYST}),
-        )
-        controller = RevisionController(policy)
-        assert controller.is_revisable(AgentRole.REPOSITORY_ANALYST) is True
-        assert controller.is_revisable(AgentRole.DESIGN) is False
+    # ── Rounds ──────────────────────────────────────────────────────
 
-    # ── Creating revision tasks for revisable roles ─────────────────
+    def test_begin_round_increments_once_per_round(self) -> None:
+        controller = RevisionController(RevisionPolicy(max_total_rounds=3))
+        assert controller.begin_round() == 1
+        assert controller.begin_round() == 2
+        assert controller.begin_round() == 3
+        assert controller.exhausted is True
+        assert controller.begin_round() is None
 
-    def test_creates_task_for_revisable_role(self) -> None:
-        """Creating a task for a revisable role returns a RevisionTask."""
-        policy = RevisionPolicy(max_total_rounds=3)
-        controller = RevisionController(policy)
-
-        task = controller.create_revision_task(
-            target_agent_id="design-agent-v1",
-            target_role=AgentRole.DESIGN,
-            finding="Missing error handling",
-            instruction="Add try/except blocks",
-        )
-
-        assert task is not None
-        assert task.target_agent_id == "design-agent-v1"
-        assert task.target_role is AgentRole.DESIGN
-        assert task.review_finding == "Missing error handling"
-        assert task.instruction == "Add try/except blocks"
-        assert task.round_number == 1
-        assert isinstance(task.revision_id, str)
-        assert len(task.revision_id) > 0
-
-    def test_create_multiple_tasks_increments_round(self) -> None:
-        """Each successful creation increments current_round."""
-        policy = RevisionPolicy(max_total_rounds=3)
-        controller = RevisionController(policy)
-
-        t1 = controller.create_revision_task("a1", AgentRole.DESIGN, "f1", "i1")
-        assert t1 is not None
-        assert t1.round_number == 1
+    def test_multiple_tasks_share_one_round(self) -> None:
+        """Multiple target agents in one round do not consume extra rounds."""
+        controller = RevisionController(RevisionPolicy(max_total_rounds=2))
+        assert controller.begin_round() == 1
+        first = _task(controller, "design-agent-v1")
+        second = _task(controller, "test-strategy-agent-v1")
+        assert first.round_number == 1
+        assert second.round_number == 1
         assert controller.current_round == 1
-
-        t2 = controller.create_revision_task("a2", AgentRole.TEST_STRATEGY, "f2", "i2")
-        assert t2 is not None
-        assert t2.round_number == 2
-        assert controller.current_round == 2
-
-    def test_tasks_are_recorded(self) -> None:
-        """Created tasks are accessible via the tasks property."""
-        policy = RevisionPolicy(max_total_rounds=3)
-        controller = RevisionController(policy)
-
-        controller.create_revision_task("a1", AgentRole.DESIGN, "f1", "i1")
-        controller.create_revision_task("a2", AgentRole.TEST_STRATEGY, "f2", "i2")
-
-        assert len(controller.tasks) == 2
-        assert controller.tasks[0].target_agent_id == "a1"
-        assert controller.tasks[1].target_agent_id == "a2"
-
-    # ── Returns None for non-revisable roles ────────────────────────
-
-    def test_returns_none_for_non_revisable_role(self) -> None:
-        """Creating a task for REVIEW (non-revisable) returns None."""
-        policy = RevisionPolicy()
-        controller = RevisionController(policy)
-
-        task = controller.create_revision_task(
-            target_agent_id="review-agent-v1",
-            target_role=AgentRole.REVIEW,
-            finding="Some issue",
-            instruction="Fix it",
-        )
-
-        assert task is None
-        # round should not have incremented
-        assert controller.current_round == 0
-
-    def test_non_revisable_does_not_consume_round(self) -> None:
-        """Attempting a task for non-revisable role does not increment round."""
-        policy = RevisionPolicy(max_total_rounds=2)
-        controller = RevisionController(policy)
-
-        t1 = controller.create_revision_task("d1", AgentRole.DESIGN, "f", "i")
-        assert t1 is not None
-        assert controller.current_round == 1
-
-        # Non-revisable — round should stay at 1
-        t2 = controller.create_revision_task("r1", AgentRole.REVIEW, "f", "i")
-        assert t2 is None
-        assert controller.current_round == 1
-
-    # ── Respects max_total_rounds ───────────────────────────────────
-
-    def test_respects_max_total_rounds(self) -> None:
-        """After max_total_rounds tasks, create_revision_task returns None."""
-        policy = RevisionPolicy(max_total_rounds=2)
-        controller = RevisionController(policy)
-
-        t1 = controller.create_revision_task("a1", AgentRole.DESIGN, "f", "i")
-        assert t1 is not None
         assert controller.exhausted is False
 
-        t2 = controller.create_revision_task("a2", AgentRole.TEST_STRATEGY, "f", "i")
-        assert t2 is not None
-        # After exactly max_total_rounds, exhausted is True (2 >= 2)
-        assert controller.exhausted is True
+    def test_creates_task_requires_open_round(self) -> None:
+        controller = RevisionController(RevisionPolicy())
+        with pytest.raises(ValueError, match="begin_round"):
+            controller.create_revision_task(
+                run_id="run-1",
+                round_number=1,
+                target_agent_id="a1",
+                target_role=AgentRole.DESIGN,
+                finding_ids=("F-00000001",),
+                prior_output_hash="a" * 64,
+            )
 
-        t3 = controller.create_revision_task("a3", AgentRole.RISK_REVIEW, "f", "i")
-        assert t3 is None
-
-    def test_exhausted_with_zero_max_rounds(self) -> None:
-        """With max_total_rounds=0, everything is exhausted immediately."""
-        policy = RevisionPolicy(max_total_rounds=0)
-        controller = RevisionController(policy)
-
-        assert controller.exhausted is True
-        task = controller.create_revision_task("a1", AgentRole.DESIGN, "f", "i")
+    def test_returns_none_for_non_revisable_role(self) -> None:
+        controller = RevisionController(RevisionPolicy())
+        controller.begin_round()
+        task = controller.create_revision_task(
+            run_id="run-1",
+            round_number=1,
+            target_agent_id="review-agent-v1",
+            target_role=AgentRole.REVIEW,
+            finding_ids=("F-00000001",),
+            prior_output_hash="a" * 64,
+        )
         assert task is None
+        assert controller.current_round == 1
+
+    def test_task_requires_finding_ids(self) -> None:
+        controller = RevisionController(RevisionPolicy())
+        controller.begin_round()
+        with pytest.raises(ValueError, match="at least one finding"):
+            controller.create_revision_task(
+                run_id="run-1",
+                round_number=1,
+                target_agent_id="a1",
+                target_role=AgentRole.DESIGN,
+                finding_ids=(),
+                prior_output_hash="a" * 64,
+            )
+
+    # ── Lifecycle transitions ───────────────────────────────────────
+
+    def test_task_lifecycle_scheduled_running_completed(self) -> None:
+        controller = RevisionController(RevisionPolicy(max_total_rounds=1))
+        controller.begin_round()
+        task = _task(controller)
+        controller.mark_running(task.revision_id)
+        running = controller.tasks[0]
+        assert running.status == "running"
+        controller.mark_completed(task.revision_id, result_artifact="revision-results.json")
+        completed = controller.tasks[0]
+        assert completed.status == "completed"
+        assert completed.completed_at is not None
+        assert completed.result_artifact == "revision-results.json"
+
+    def test_task_lifecycle_failed(self) -> None:
+        controller = RevisionController(RevisionPolicy(max_total_rounds=1))
+        controller.begin_round()
+        task = _task(controller)
+        controller.mark_failed(task.revision_id, reason="TEST_FAILURE")
+        assert controller.tasks[0].status == "failed"
+        assert controller.tasks[0].failure_reason == "TEST_FAILURE"
+
+    def test_unknown_revision_id_rejected(self) -> None:
+        controller = RevisionController(RevisionPolicy())
+        with pytest.raises(ValueError, match="Unknown revision task"):
+            controller.mark_completed("revision-nope", result_artifact="x.json")
 
     # ── exhausted property ──────────────────────────────────────────
 
-    def test_exhausted_property_initial(self) -> None:
-        policy = RevisionPolicy(max_total_rounds=5)
-        controller = RevisionController(policy)
-        assert controller.exhausted is False
+    def test_exhausted_with_zero_max_rounds(self) -> None:
+        controller = RevisionController(RevisionPolicy(max_total_rounds=0))
+        assert controller.exhausted is True
+        assert controller.begin_round() is None
 
     def test_exhausted_after_reaching_limit(self) -> None:
-        policy = RevisionPolicy(max_total_rounds=1)
-        controller = RevisionController(policy)
-
+        controller = RevisionController(RevisionPolicy(max_total_rounds=1))
         assert controller.exhausted is False
-        controller.create_revision_task("a1", AgentRole.DESIGN, "f", "i")
-        assert controller.exhausted is True
-
-    def test_exhausted_not_reset_by_failed_attempt(self) -> None:
-        """Non-revisable attempts don't change exhausted state."""
-        policy = RevisionPolicy(max_total_rounds=1)
-        controller = RevisionController(policy)
-
-        controller.create_revision_task("a1", AgentRole.DESIGN, "f", "i")
-        assert controller.exhausted is True
-
-        # Attempt non-revisable
-        result = controller.create_revision_task("r1", AgentRole.REVIEW, "f", "i")
-        assert result is None
+        assert controller.begin_round() == 1
         assert controller.exhausted is True

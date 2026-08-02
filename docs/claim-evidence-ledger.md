@@ -16,3 +16,15 @@ Mock-provider evidence is not live-provider validation or evidence of output-qua
 | Mock benchmark is live validation | REJECTED | Benchmark mode is `mock_contract` | 12-case mock benchmark | No | Mock results demonstrate deterministic contract stability only. |
 | Interrupted Runs resume execution | REJECTED | Current startup handling classifies interrupted records as failed | No execution-resume test | No | Classification is not resume. |
 | Production-ready | REJECTED | Single-process, mock-only API and unresolved runtime limits | No production validation | No | Authentication, deployment, unified budgeting, and live reliability remain unproven. |
+
+## Phase 2 additions (finding-driven revision)
+
+| Claim | Status | Code evidence | Test evidence | Allowed now | Notes |
+| --- | --- | --- | --- | --- | --- |
+| Review findings use a strict, structured schema with stable IDs | VERIFIED | `specflow.revision.models.ReviewFinding`, `derive_finding_id` | `tests/test_finding_driven_revision.py::TestFindingSchema` | Yes | `extra="forbid"`; legacy string findings are rejected, never promoted. |
+| Real review findings drive the target agent's revision request | VERIFIED | `runner_multi` finding grouping, `agents.adapter._build_revision_user_message` | `test_findings_prior_output_and_round_enter_real_request`, `test_changing_finding_changes_only_findings_section` | Yes | Captured on the real `LLMRequest`; only the findings section changes when a finding changes. |
+| Revision uses prior output, Task Brief, evidence, and an explicit round | VERIFIED | `RevisionInput`, `RevisionContext`, revision prompt sections | `TestRevisionRequestWiring` | Yes | Prior output hash is derived and verified; mismatch fails before any provider call. |
+| Every finding has exactly one auditable resolution | VERIFIED | `RevisionResult.build` | `TestRevisionResultSchema` | Yes | Missing, unknown, or duplicate resolution IDs are rejected. |
+| Bounded revision ends in NEEDS_HUMAN_REVIEW after a second rejection | VERIFIED | `MultiAgentWorkflowState.NEEDS_HUMAN_REVIEW`, runner terminal state | `test_golden_needs_human_review_case`, state machine tests | Yes | Never marked as ordinary COMPLETED. |
+| Findings, revisions, and resolutions replay through artifact/trace/manifest | VERIFIED | `review-findings.json`, `revision-*.json`, `finding-resolutions.json`, manifest hashes | `test_manifest_records_revision_artifact_hashes`, trace assertions | Yes | Trace is metadata-only; prompt content is never persisted. |
+| Revision improves overall output quality | REJECTED | No comparative evidence | Mock contract tests only | No | Requires the separately approved Phase 6/7 evaluation. |
