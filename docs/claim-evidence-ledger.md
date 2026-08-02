@@ -37,17 +37,20 @@ Mock-provider evidence is not live-provider validation or evidence of output-qua
 | Agent invocation and provider attempt are distinct metrics | VERIFIED | `RuntimeGuard` counters + `snapshot()` | `test_agent_invocation_and_provider_attempt_are_separate` | Yes | One invocation may contain multiple attempts (retries). |
 | Retry attempts are independently audited | VERIFIED | invoker retry loop, MODEL_CALL_RETRYING/FAILED/SUCCEEDED events | `TestRetryAccounting` | Yes | Failures are never overwritten by the final success. |
 | Tokens come from provider usage; missing usage is unknown, not 0 | VERIFIED | `LLMResponse.usage` optional, provider parse, guard token accounting | `TestTokenAccounting` | Yes | `token_usage_known=false`, `unknown_calls` increment. |
-| Budget failures fail closed with snapshots and partial traces | VERIFIED | reserve/release atomicity, failed manifests | `TestFailureArtifacts`, runner planning-failure snapshot | Yes | Active count restored on every path; never max+1. |
-| Default provider-attempt budget supports the live path | VERIFIED | default `max_provider_call_attempts=24`; normal path 12, one revision 15 | `tests/test_budget_calibration.py` | Yes | 48 is never a global default; only explicit Live/Evaluation/experiment config. |
+| Budget failures fail closed with terminal snapshots and partial traces | VERIFIED_AT_COMMIT | reserve/release atomicity, current terminal snapshot plus separate triggering snapshot | `TestFailureArtifacts`, `test_failed_manifest_uses_terminal_agent_snapshot` | Yes | Verified at `06b1cf2`; active counts are restored and failure envelopes increment `failed`. |
+| Token aggregates remain unknown when any provider usage is missing | VERIFIED_AT_COMMIT | nullable aggregate plus `known_*` subtotals in `RuntimeGuard.snapshot()` | mixed known/unknown and failed-retry tests in `test_runtime_budget.py` | Yes | Verified at `06b1cf2`; partial known totals are never presented as complete totals. |
+| Retry token reserve is enforced | VERIFIED_AT_COMMIT | retry identity on `ProviderAttempt`; normal/retry total limits | reserve boundary tests in `test_runtime_budget.py` | Yes | Initial attempts cannot consume the reserve; retry attempts may use it. |
+| Default provider-attempt budget supports bounded request paths | VERIFIED_AT_COMMIT | effective default and alias are 24; normal path 12; single-target revision path 15 | `tests/test_budget_calibration.py` | Qualified | Verified at `06b1cf2`. Multi-target revision cost is `12 + targets + 2`; 48 requires explicit configuration. |
 | All LLM calls (including legacy 3-worker) use the unified invoker | REJECTED | legacy `workers/` + `runner.py` untouched | Static gate allowlist | No | Legacy pipeline is the frozen Phase 6 A/B baseline. |
 
 ## Phase 5 additions (MCP and release)
 
 | Claim | Status | Code evidence | Test evidence | Allowed now | Notes |
 | --- | --- | --- | --- | --- | --- |
-| MCP tools/list uses the Tool-owned input schema (single source) | VERIFIED | `Tool.input_schema`, `McpToolCatalog` reads `registry.input_schema` | `test_catalog_schema_is_the_tool_owned_schema` | Yes | `_INPUT_SCHEMAS` hand-written copy removed. |
-| MCP tools/call reuses ToolExecutor and the repository security policy | VERIFIED | `McpServer._handle_tools_call` -> `ToolExecutor` | MCP suite 99 passed | Yes | No protocol-layer business logic. |
-| MCP protocol has real stdio coverage (subprocess) | VERIFIED | `tests/test_mcp_server.py::test_stdio_subprocess_smoke` + CI step | 17 MCP server tests | Yes | Spawns the installed CLI as a child process. |
+| MCP tools/list publishes the Tool-owned input schema | VERIFIED_AT_COMMIT | `Tool.input_schema`, `McpToolCatalog` reads `registry.input_schema` | `test_catalog_schema_is_the_tool_owned_schema` | Qualified | Verified at `06b1cf2`; this is a publication source, not proof that instance-specific policy limits cannot be stricter. |
+| MCP published schemas and runtime policy validation cannot drift | PARTIALLY_VERIFIED | runtime enforcement remains fail-closed | non-default repository policy audit | No | Instance-specific limits are not encoded in every published schema. Do not claim a single validation source until this is redesigned. |
+| MCP tools/call reuses ToolExecutor and the repository security policy | VERIFIED_AT_COMMIT | `McpServer._handle_tools_call` -> `ToolExecutor` | MCP/tool suite 102 passed, 1 skipped | Yes | Verified at `06b1cf2`; no protocol-layer business logic. |
+| MCP protocol negotiation and stdio have real subprocess coverage | VERIFIED_AT_COMMIT | explicit initialize lifecycle and supported-version negotiation | expanded `test_stdio_subprocess_smoke`; MCP/tool suite 102 passed, 1 skipped | Yes | Verified at `06b1cf2`; covers valid call, invalid args, unknown tool, traversal, sensitive file rejection, redaction, and clean EOF. |
 | Tool failures expose a machine-readable error type | VERIFIED | `tool_result_to_mcp` `structuredContent.error_type` | MCP adapter tests | Yes | Additive; text stays for compatibility. |
 | Core type-check gate (pyright) | DEFER | 46 errors across 6 files, dominated by runner_multi.py | `artifacts/workflow/final-sol-backlog.md` | No | Not forced; backlogged for Sol. |
 
@@ -55,9 +58,10 @@ Mock-provider evidence is not live-provider validation or evidence of output-qua
 
 | Claim | Status | Code evidence | Test evidence | Allowed now | Notes |
 | --- | --- | --- | --- | --- | --- |
-| Pilot harness is deterministic and protocol-stable | VERIFIED_AT_COMMIT | `evaluation.pilot` (rule scorer, cost collector, blind pack) | `tests/test_pilot_harness.py` (4) | Yes | 15-run mock smoke all succeeded; mock is never provider. |
-| 5-case pilot dataset is real and grounded in the fixture repo | VERIFIED_AT_COMMIT | `evaluation/pilot/cases/*.json` | loader test | Yes | No gold answers exposed to pipelines. |
-| 30-case formal dataset drafted | PARTIALLY_VERIFIED | `evaluation/formal/dataset.jsonl` + generator | structure/dry-run validated | Yes | Authoring complete; protocol freeze pending. |
+| Pilot mock harness mechanics are deterministic | VERIFIED_AT_COMMIT | `evaluation.pilot` candidate derivation, cost collector, blind pack | `tests/test_pilot_harness.py`; fixed 15-run smoke | Qualified | Verified at `06b1cf2`; single mock receives requirement only, legacy uses native artifacts, and reviewer pack withholds the seed. This is not a fair quality comparison. |
+| 5-case pilot dataset is authored and grounded in the fixture repo | VERIFIED_AT_COMMIT | `evaluation/pilot/cases/*.json` | loader and gold-isolation tests | Qualified | Verified at `06b1cf2`; expected labels are scorer-only in the implemented mock single path. Live protocol is not frozen. |
+| Three pipelines have a frozen fair comparison protocol | REJECTED | `frozen-config.json` remains `DRAFT_PENDING_USER_APPROVAL`; pipeline capabilities differ | independent evaluation audit | No | No quality or cost comparison may be published from the mock smoke. |
+| 30-case formal dataset drafted | PARTIALLY_VERIFIED | `evaluation/formal/dataset.jsonl` + deterministic generator | 30 unique rows; generator rerun byte-stable | Qualified | Dataset authoring only. No committed formal runner or six-run dry-run evidence exists; protocol freeze is pending. |
 | Pilot/Formal live-provider execution | BLOCKED | no cost cap / provider approval | `limitations.md` | No | HARD_BLOCKER: `SPECFLOW_LIVE_MAX_COST_USD` / `SPECFLOW_EVAL_MAX_COST_USD` absent. |
 | Live-provider validation | BLOCKED | no explicit cost ceiling or model approval | `live-summary.md` (handoff) | No | Verifier + templates ready; run not executed. |
 | Six-agent quality improvement | REJECTED | no comparative evidence | — | No | Requires the blocked paid evaluation. |

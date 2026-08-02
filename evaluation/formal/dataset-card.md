@@ -6,4 +6,5 @@
 - Task types: bug_fix, new_feature, refactor, test_infra, security, reliability
 - Status: DRAFT_PENDING_FROZEN_EVALUATION_PROTOCOL
 
-No pipeline receives gold answers; expected surfaces are used only by the scorer.
+Expected surfaces are intended for scorer-only use. No formal runner is committed,
+so execution-time gold isolation remains pending verification.

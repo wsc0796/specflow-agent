@@ -1,0 +1,18 @@
+{
+  "integration_commit": "314c7f1632d7ef6cf1b8054d8f77b159715b8562",
+  "verified_code_commit": "06b1cf2a5f908b4ede2afa94ea5b06bca18097ce",
+  "chain": {
+    "phase_0_5": "6008b1a0308358f7b153bca4f624424a12e490c4",
+    "phase_1": "4cfad8636dc7b0b914b86aba2654ba1420b85db7",
+    "phase_2": "66c8d7ff56d39873c3f8df6491f89e3ee82fac17",
+    "phase_3": "bc76214b61592b4a09331e9b5d9ebd5f8dbb3c9d",
+    "phase_3_budget": "d9feb1f3d0b898c36aa8b9b539f16c07a9919f8c",
+    "phase_5": "0aba54f112065ab4b23f5289801af181335dd296",
+    "phase_4_harness": "86014cb5c9378dda3b660ed6953defd6de14130d",
+    "phase_6": "a5455e9e19485313734beb3a2b1c7484236c695f",
+    "phase_7_dataset": "5158c519ddfbf65c226b8eb4d5568b152ee41443",
+    "pre_sol_claims": "314c7f1632d7ef6cf1b8054d8f77b159715b8562",
+    "final_runtime_fix": "0d4816a8d8fd62b4a77ea2f61bd389f2883248e6",
+    "final_boundary_fix": "06b1cf2a5f908b4ede2afa94ea5b06bca18097ce"
+  }
+}

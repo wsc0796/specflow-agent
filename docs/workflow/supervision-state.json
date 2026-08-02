@@ -1,0 +1,21 @@
+{
+  "supervisor": "sol",
+  "mode": "asynchronous_multi_agent",
+  "last_reviewed_integration_commit": "314c7f1632d7ef6cf1b8054d8f77b159715b8562",
+  "verified_remediation_commit": "06b1cf2a5f908b4ede2afa94ea5b06bca18097ce",
+  "current_review_task": "FINAL-AUDIT-001",
+  "last_verdict": "NOT_READY",
+  "must_fix": [],
+  "should_fix": [
+    "generate MCP schemas from instance-specific runtime validation limits",
+    "replace pilot scorer proxy names with accurately defined metrics"
+  ],
+  "deferred": [
+    "core pyright adoption",
+    "distributed budgets",
+    "true resume",
+    "production deployment"
+  ],
+  "next_task_id": "P4-LIVE-RUN-001",
+  "next_task_status": "HARD_BLOCKED"
+}

@@ -80,7 +80,7 @@ copy is in `docs/resume/specflow-resume-v0.md`.
 **M8 independent-review remediation — CLOSED and released to `main` in v1.0.0.** The follow-up T-040
 and T-041 work adds RuntimeGuard budget enforcement and strict inter-agent
 payload schemas. T-061 adds a separately bounded, mock-only reviewer-decision
-record to the Run API. The current v1.1.0 candidate baseline is **784 passed, 2 skipped,
+record to the Run API. The Final Sol v1.1.0 candidate baseline is **803 passed, 2 skipped,
 3 known warnings**; the published tag remains v1.0.1 at `a4fc16c`.
 M8 is local mock acceptance and does not claim a new live-provider run. See `docs/reports/T-040-completion-report.md`,
 `docs/reports/T-041-completion-report.md`, and

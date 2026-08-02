@@ -1,0 +1,18 @@
+{
+  "verified_code_commit": "06b1cf2a5f908b4ede2afa94ea5b06bca18097ce",
+  "gates": {
+    "full_pytest": {"status": "PASS", "passed": 803, "skipped": 2, "warnings": 3},
+    "ruff_check": {"status": "PASS"},
+    "ruff_format": {"status": "PASS", "files": 210},
+    "mcp_tool_suite": {"status": "PASS", "passed": 102, "skipped": 1},
+    "secret_scan": {"status": "PASS", "scope": "all tracked text"},
+    "build": {"status": "PASS", "version": "1.1.0"},
+    "cli_smoke": {"status": "PASS"},
+    "mock_benchmark": {"status": "PASS", "passed": 12, "total": 12, "baseline_changed": false},
+    "pilot_mock_smoke": {"status": "PASS_HARNESS_ONLY", "runs": 15},
+    "live_validation": {"status": "HARD_BLOCKED"},
+    "paid_pilot": {"status": "HARD_BLOCKED"},
+    "formal_evaluation": {"status": "HARD_BLOCKED"}
+  },
+  "release_decision": "NOT_READY"
+}

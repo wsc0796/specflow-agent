@@ -1,0 +1,38 @@
+{
+  "workflow": "specflow-hardening-v1",
+  "integration_branch": "integration/specflow-hardening",
+  "integration_commit": "314c7f1632d7ef6cf1b8054d8f77b159715b8562",
+  "final_audit_branch": "final/sol-audit-314c7f1",
+  "last_verified_code_commit": "06b1cf2a5f908b4ede2afa94ea5b06bca18097ce",
+  "current_phase": "final-sol",
+  "status": "NOT_READY",
+  "completed_phases": ["0", "0.5", "1", "2", "3", "3-budget", "5"],
+  "partial_phases": ["4-prep", "6-mock-harness", "7-dataset-authoring"],
+  "active_tasks": [],
+  "pending_decisions": [
+    "provider/model and SPECFLOW_LIVE_MAX_COST_USD approval",
+    "SPECFLOW_EVAL_MAX_COST_USD and evaluation protocol approval"
+  ],
+  "hard_blockers": [
+    "live provider validation not executed",
+    "paid pilot and formal evaluation not executed",
+    "fair comparative protocol not frozen"
+  ],
+  "claims_unlocked": [
+    "controlled multi-agent runtime",
+    "strict role-specific Task Briefs",
+    "finding-driven bounded revision",
+    "guarded provider-attempt accounting",
+    "honest nullable token aggregates",
+    "MCP ToolExecutor routing",
+    "deterministic mock contract benchmark"
+  ],
+  "claims_blocked": [
+    "live validated",
+    "quality improvement",
+    "production-ready",
+    "release-ready",
+    "true resume",
+    "distributed budget consistency"
+  ]
+}

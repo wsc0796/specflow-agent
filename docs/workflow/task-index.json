@@ -1,0 +1,15 @@
+{
+  "workflow": "specflow-hardening-v1",
+  "tasks": [
+    {"task_id": "P3-INTEGRATE-001", "status": "PASS", "result": "bc76214"},
+    {"task_id": "P3-BUDGET-001", "status": "PASS", "result": "d9feb1f"},
+    {"task_id": "P5-MCP-SCHEMA-001", "status": "PASS_QUALIFIED", "result": "205561c"},
+    {"task_id": "P5-MCP-STDIO-001", "status": "PASS", "result": "06b1cf2"},
+    {"task_id": "P4-LIVE-PREP-001", "status": "PASS", "result": "86014cb"},
+    {"task_id": "P4-LIVE-RUN-001", "status": "HARD_BLOCKED", "result": null},
+    {"task_id": "P6-RUN-001", "status": "MOCK_HARNESS_ONLY", "result": "06b1cf2"},
+    {"task_id": "P7-DATASET-FREEZE-001", "status": "DRAFT", "result": "5158c51"},
+    {"task_id": "P7-BATCH-RUN-001", "status": "HARD_BLOCKED", "result": null},
+    {"task_id": "FINAL-AUDIT-001", "status": "NOT_READY", "result": "06b1cf2"}
+  ]
+}
