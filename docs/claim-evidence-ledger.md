@@ -1,0 +1,18 @@
+# Claim-Evidence Ledger
+
+This ledger describes only behavior directly supported by the current repository and its tests.
+Mock-provider evidence is not live-provider validation or evidence of output-quality improvement.
+
+| Claim | Status | Code evidence | Test evidence | Allowed now | Notes |
+| --- | --- | --- | --- | --- | --- |
+| Task Brief uses a strict, versioned schema | VERIFIED | `specflow.plan.models.SemanticTaskBrief` and related strict Pydantic models | `tests/test_semantic_enricher.py`, `tests/test_task_brief_execution.py` | Yes | Identity and status fields are code-owned; model output is limited to `TaskBriefDraft`. |
+| Six roles consume only their own Task Brief | VERIFIED | `runner_multi._validated_inputs`, `agents.adapter.AgentRunner.execute` | `TestMultiAgentRunner.test_real_agent_requests_persist_consumed_events_and_task_brief_artifact` | Yes | Verified with the real request-construction path and a deterministic fake provider, not a live provider. |
+| Task Brief observably affects the worker LLM request | VERIFIED | `agents.adapter._build_user_message` | `test_task_brief_change_changes_only_target_real_llm_request_section` | Yes | Only the target Role Task Brief section changes; requirement, evidence, prior output, and output contract remain equal. |
+| Task Brief generation, consumption, artifact, and hash are auditable | VERIFIED | `TaskBriefArtifact`, `TaskBriefTraceEvent`, multi-agent manifest wiring | `tests/test_cli_multi_agent.py`, `tests/test_task_brief_execution.py` | Yes | Trace remains metadata-only and the manifest hash is revalidated from the artifact. |
+| All LLM calls use one RuntimeGuard budget | REJECTED | Phase 0 found enrichment calls outside unified Guard accounting | Not covered in Phase 1 | No | Deferred to Phase 3; default budget was not changed. |
+| Review findings drive revision | REJECTED | Phase 0 found findings absent from revision input | Not covered in Phase 1 | No | Phase 2 scope; no Review/Revision behavior changed here. |
+| Task Brief improves result quality | PENDING | No comparative quality evidence | Mock contract tests only | No | Requires a separately approved evaluation against a fixed dataset. |
+| Six agents outperform a single agent | PENDING | No controlled comparison proving causality | Existing mock benchmark is contract-only | No | Do not infer quality from topology or test count. |
+| Mock benchmark is live validation | REJECTED | Benchmark mode is `mock_contract` | 12-case mock benchmark | No | Mock results demonstrate deterministic contract stability only. |
+| Interrupted Runs resume execution | REJECTED | Current startup handling classifies interrupted records as failed | No execution-resume test | No | Classification is not resume. |
+| Production-ready | REJECTED | Single-process, mock-only API and unresolved runtime limits | No production validation | No | Authentication, deployment, unified budgeting, and live reliability remain unproven. |

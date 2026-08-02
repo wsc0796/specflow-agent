@@ -20,7 +20,7 @@ from specflow.plan.hash_utils import (
     compute_effective_plan_hash,
     compute_semantic_brief_hash,
 )
-from specflow.plan.models import AgentTask, EffectiveDelegationPlan
+from specflow.plan.models import AgentTask, ControlledEvidenceSummary, EffectiveDelegationPlan
 from specflow.plan.planner import DeterministicPlanner
 from specflow.plan.validator import PlanValidator
 
@@ -72,7 +72,13 @@ class Coordinator:
 
     # ── Planning ────────────────────────────────────────────────────
 
-    def plan(self, run_id: str) -> EffectiveDelegationPlan:
+    def plan(
+        self,
+        run_id: str,
+        *,
+        requirement: str,
+        evidence_summary: ControlledEvidenceSummary,
+    ) -> EffectiveDelegationPlan:
         """Build an executable delegation plan for the fixed 6-agent topology.
 
         Steps
@@ -104,7 +110,18 @@ class Coordinator:
             model=self._model,
             provider=self._provider,
         )
-        briefs = enricher.enrich(spec)
+        if self._schema_registry is None:
+            raise ValueError("Coordinator requires a SchemaRegistry for task brief enrichment")
+        output_schemas = {
+            agent.agent_id: self._schema_registry.export_json_schema(agent.output_schema_id)
+            for agent in spec.agents
+        }
+        briefs = enricher.enrich(
+            spec,
+            requirement=requirement,
+            evidence_summary=evidence_summary,
+            output_schemas=output_schemas,
+        )
 
         # Step 5: Compute semantic brief hash
         brief_dicts = [

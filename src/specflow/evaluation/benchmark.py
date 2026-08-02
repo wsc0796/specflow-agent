@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from statistics import fmean
 
+from specflow.plan.models import TaskBriefArtifact
 from specflow.runner_multi import run_multi_agent
 
 
@@ -171,6 +172,7 @@ def _read_run(case: BenchmarkCase, run_dir: Path, output: Path) -> dict[str, obj
             "traces.json",
             "sources.json",
             "checkpoints.json",
+            "task-briefs.json",
         )
         if any(
             not (run_dir / name).is_file() or (run_dir / name).is_symlink() for name in required
@@ -178,6 +180,16 @@ def _read_run(case: BenchmarkCase, run_dir: Path, output: Path) -> dict[str, obj
             raise ValueError("Benchmark artifact set is incomplete")
         manifest = _read_json(run_dir / "manifest.json")
         metrics = _read_json(run_dir / "metrics.json")
+        task_briefs = TaskBriefArtifact.model_validate(_read_json(run_dir / "task-briefs.json"))
+        task_brief_manifest = manifest.get("task_briefs", {})
+        artifacts = manifest.get("artifacts", {})
+        if (
+            not isinstance(task_brief_manifest, dict)
+            or not isinstance(artifacts, dict)
+            or task_brief_manifest.get("canonical_hash") != task_briefs.canonical_hash
+            or artifacts.get("task_briefs") != "task-briefs.json"
+        ):
+            raise ValueError("Task brief artifact does not match manifest")
     except (OSError, ValueError, json.JSONDecodeError):
         return {
             "case_id": case.case_id,

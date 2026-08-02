@@ -2,6 +2,8 @@
 
 import json
 
+from task_brief_test_helpers import execution_input, task_brief
+
 from specflow.agents.adapter import AgentRunner
 from specflow.agents.models import AgentIdentity, AgentRole
 from specflow.schema.agent_payloads import DesignPayload
@@ -29,6 +31,26 @@ def _make_identity(role: AgentRole = AgentRole.DESIGN) -> AgentIdentity:
     )
 
 
+def _context(
+    identity: AgentIdentity,
+    *,
+    requirement: str = "Test",
+    prior_outputs: dict | None = None,
+) -> dict:
+    brief = task_brief(
+        agent_id=identity.agent_id,
+        role=identity.role,
+        output_schema_id=identity.output_schema_id,
+    )
+    return {
+        "validated_input": execution_input(
+            brief=brief,
+            requirement=requirement,
+            prior_outputs=prior_outputs,
+        )
+    }
+
+
 class FakeLLMClient:
     def __init__(self, content: str = "") -> None:
         self.content = content or json.dumps({"summary": "A valid design response."})
@@ -51,7 +73,7 @@ class TestAgentRunner:
         runner = AgentRunner(
             ident, FakeLLMClient(), model="test", schema_registry=_schema_registry()
         )
-        result = runner.execute({"requirement": "Add feature X"})
+        result = runner.execute(_context(ident, requirement="Add feature X"))
         assert result["agent_id"] == "test-agent-v1"
         assert result["success"] is True
         assert result["output"]["summary"] == "A valid design response."
@@ -60,7 +82,7 @@ class TestAgentRunner:
         ident = _make_identity(AgentRole.RISK_REVIEW)
         client = FakeLLMClient()
         runner = AgentRunner(ident, client, model="test", schema_registry=_schema_registry())
-        runner.execute({"requirement": "Test"})
+        runner.execute(_context(ident))
         user_msg = client.last_request.messages[-1].content.lower()
         assert "risk_review" in user_msg
 
@@ -68,7 +90,7 @@ class TestAgentRunner:
         ident = _make_identity()
         client = FakeLLMClient()
         runner = AgentRunner(ident, client, model="test", schema_registry=_schema_registry())
-        runner.execute({"requirement": "Build a search API"})
+        runner.execute(_context(ident, requirement="Build a search API"))
         msgs = client.last_request.messages
         user_msg = msgs[-1].content  # last message is always the user message
         assert "Build a search API" in user_msg
@@ -78,10 +100,10 @@ class TestAgentRunner:
         client = FakeLLMClient()
         runner = AgentRunner(ident, client, model="test", schema_registry=_schema_registry())
         runner.execute(
-            {
-                "requirement": "Test",
-                "prior_outputs": {"repo-analyst-agent-v1": {"output": {"files": ["a.py"]}}},
-            }
+            _context(
+                ident,
+                prior_outputs={"repo-analyst-agent-v1": {"files": ["a.py"]}},
+            )
         )
         user_msg = client.last_request.messages[-1].content
         assert "repo-analyst-agent-v1" in user_msg
@@ -96,7 +118,7 @@ class TestAgentRunner:
         runner = AgentRunner(
             ident, FailingClient(), model="test", schema_registry=_schema_registry()
         )
-        result = runner.execute({"requirement": "Test"})
+        result = runner.execute(_context(ident))
         assert result["success"] is False
         assert result["degraded"] is True
         assert "output" in result  # must carry output for downstream compat
@@ -108,11 +130,12 @@ class TestAgentRunner:
         ident = _make_identity()
         client = FakeLLMClient()
         runner = AgentRunner(ident, client, model="test", schema_registry=_schema_registry())
-        runner.execute({"requirement": "Test"})
+        runner.execute(_context(ident))
         assert client.last_request.response_format == "json"
 
     def test_runner_fails_closed_without_schema_registry(self):
-        result = AgentRunner(_make_identity(), FakeLLMClient(), model="test").execute({})
+        identity = _make_identity()
+        result = AgentRunner(identity, FakeLLMClient(), model="test").execute(_context(identity))
         assert result["success"] is False
         assert result["output"]["error_code"] == "SCHEMA_REGISTRY_UNAVAILABLE"
 
@@ -125,13 +148,14 @@ class TestAgentRunner:
                 calls += 1
                 raise RuntimeError("security path traversal")
 
+        identity = _make_identity()
         result = AgentRunner(
-            _make_identity(),
+            identity,
             SecurityFailingClient(),
             model="test",
             schema_registry=_schema_registry(),
             max_retries=2,
-        ).execute({})
+        ).execute(_context(identity))
         assert calls == 1
         assert result["output"]["error_code"] == "SECURITY_PATH_TRAVERSAL"
 
@@ -140,12 +164,13 @@ class TestAgentRunner:
             def complete(self, request):
                 raise RuntimeError("Bearer sk-abcdefghijklmnopqrstuvwxyz C:\\private\\repo")
 
+        identity = _make_identity()
         result = AgentRunner(
-            _make_identity(),
+            identity,
             SecretFailingClient(),
             model="test",
             schema_registry=_schema_registry(),
-        ).execute({})
+        ).execute(_context(identity))
         serialized = json.dumps(result)
         assert "sk-" not in serialized
         assert "private" not in serialized

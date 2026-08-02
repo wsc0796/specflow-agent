@@ -42,6 +42,8 @@ def _enriched_brief(agent_id: str, **overrides: Any) -> SemanticTaskBrief:
     """Create a fully enriched task brief."""
     defaults: dict[str, Any] = dict(
         agent_id=agent_id,
+        role=AgentRole.DESIGN,
+        output_schema_id="agent/test/v1/output",
         task_description=f"Enriched task for {agent_id}",
         analysis_focus=(),
         evaluation_hints=(),
@@ -54,6 +56,9 @@ def _enriched_brief(agent_id: str, **overrides: Any) -> SemanticTaskBrief:
             prompt_version="1.0.0",
             trace_id=f"trace-{agent_id}",
             generated_at=datetime.now(UTC).isoformat(),
+            requirement_hash="a" * 64,
+            evidence_summary_hash="b" * 64,
+            outcome=EnrichmentStatus.ENRICHED,
         ),
     )
     defaults.update(overrides)
@@ -64,7 +69,21 @@ def _degraded_brief(agent_id: str, **overrides: Any) -> SemanticTaskBrief:
     """Create a degraded (fallback) task brief."""
     defaults: dict[str, Any] = dict(
         agent_id=agent_id,
+        role=AgentRole.DESIGN,
+        output_schema_id="agent/test/v1/output",
         task_description=f"Degraded task for {agent_id}",
+        provenance=EnrichmentProvenance(
+            provider="test-provider",
+            model="test-model",
+            prompt_id="enrichment/test/v1",
+            prompt_version="1.0.0",
+            trace_id=f"trace-{agent_id}",
+            generated_at=datetime.now(UTC).isoformat(),
+            requirement_hash="a" * 64,
+            evidence_summary_hash="b" * 64,
+            outcome=EnrichmentStatus.DEGRADED,
+            failure_type="provider_error",
+        ),
     )
     defaults.update(overrides)
     return SemanticTaskBrief.degraded_default(**defaults)
@@ -130,8 +149,8 @@ def _build_effective_plan(
     otherwise both are degraded.
     """
     factory = _enriched_brief if all_enriched else _degraded_brief
-    a1_brief = factory("a1", task_description="Repo analysis")
-    a2_brief = factory("a2", task_description="Design work")
+    a1_brief = factory("a1", role=AgentRole.REPOSITORY_ANALYST, task_description="Repo analysis")
+    a2_brief = factory("a2", role=AgentRole.DESIGN, task_description="Design work")
     tasks = (
         AgentTask(
             agent_id="a1",
@@ -184,6 +203,8 @@ class TestEffectiveDelegationPlan:
         briefs = tuple(
             _enriched_brief(
                 a.agent_id,
+                role=a.role,
+                output_schema_id=a.output_schema_id,
                 task_description=f"Execute {a.role.value} analysis",
                 analysis_focus=(f"{a.role.value}_focus",),
             )

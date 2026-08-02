@@ -10,6 +10,7 @@ from dataclasses import asdict, replace
 from datetime import UTC, datetime
 from hashlib import sha256
 from pathlib import Path
+from threading import Lock
 from typing import Any
 from uuid import uuid4
 
@@ -26,11 +27,17 @@ from specflow.coordinator.scheduler import MultiAgentScheduler, StageExecutionRe
 from specflow.coordinator.state_machine import MultiAgentWorkflowState
 from specflow.evaluation.metrics import AgentMetrics, RunMetrics
 from specflow.evidence import EvidenceCollector
-from specflow.evidence.models import EvidenceCollectionConfig
+from specflow.evidence.models import EvidenceBundle, EvidenceCollectionConfig
 from specflow.handoff.models import AgentHandoff
 from specflow.handoff.validator import HandoffValidator
 from specflow.llm import LLMClient, OpenAICompatibleConfig, OpenAICompatibleLLMClient
 from specflow.plan.hash_utils import canonical_json_bytes
+from specflow.plan.models import (
+    AgentTask,
+    ControlledEvidenceSummary,
+    EvidenceReference,
+    TaskBriefArtifact,
+)
 from specflow.policy import (
     DEFAULT_POLICY,
     ExecutionPolicy,
@@ -38,11 +45,64 @@ from specflow.policy import (
     RuntimeGuard,
     SpecFlowError,
 )
+from specflow.schema.models import AgentExecutionInput
 from specflow.tools import ToolExecutor, ToolRegistry
 from specflow.tools.repository_tools import RepositoryToolSet
-from specflow.trace.models import AgentTraceSpan
+from specflow.trace.models import AgentTraceSpan, TaskBriefTraceEvent
 
 AgentExecutor = Callable[[dict[str, Any]], dict[str, Any]]
+
+
+class _TaskBriefEventRecorder:
+    """Thread-safe in-memory collector persisted with the run trace tree."""
+
+    def __init__(self) -> None:
+        self._events: list[TaskBriefTraceEvent] = []
+        self._lock = Lock()
+
+    def record(self, event: TaskBriefTraceEvent) -> None:
+        with self._lock:
+            self._events.append(event)
+
+    def snapshot(self) -> tuple[TaskBriefTraceEvent, ...]:
+        order = {"TASK_BRIEF_GENERATED": 0, "TASK_BRIEF_CONSUMED": 1}
+        with self._lock:
+            return tuple(
+                sorted(
+                    self._events,
+                    key=lambda event: (
+                        order[event.event_type],
+                        event.stage,
+                        event.agent_id,
+                        event.trace_id,
+                    ),
+                )
+            )
+
+
+def _controlled_evidence_summary(evidence: EvidenceBundle) -> ControlledEvidenceSummary:
+    """Derive stable, bounded evidence references from the collected evidence bundle."""
+    references: dict[str, EvidenceReference] = {}
+    for excerpt in evidence.excerpts:
+        source_hash = str(evidence.source_hashes.get(excerpt.relative_path, ""))
+        identity = {
+            "relative_path": excerpt.relative_path,
+            "line_number": excerpt.line_number,
+            "source_hash": source_hash,
+        }
+        evidence_id = f"evidence-{sha256(canonical_json_bytes(identity)).hexdigest()[:24]}"
+        references[evidence_id] = EvidenceReference(
+            evidence_id=evidence_id,
+            relative_path=excerpt.relative_path,
+            line_number=excerpt.line_number,
+            source_hash=source_hash,
+        )
+    return ControlledEvidenceSummary(
+        content=evidence.serialized_context(),
+        evidence_hash=evidence.evidence_hash,
+        references=tuple(references[key] for key in sorted(references)),
+        truncated=evidence.truncated,
+    )
 
 
 def run_multi_agent(
@@ -55,6 +115,7 @@ def run_multi_agent(
     model: str = "mock-model",
     policy: ExecutionPolicy = DEFAULT_POLICY,
     _executor_overrides: Mapping[str, AgentExecutor] | None = None,
+    _llm_client_override: object | None = None,
 ) -> int:
     """Execute the fixed plan and persist auditable multi-agent artifacts.
 
@@ -101,6 +162,7 @@ def run_multi_agent(
             technology_stack=(),
         )
         evidence_text = evidence.serialized_context()
+        evidence_summary = _controlled_evidence_summary(evidence)
         tool_call_records = [
             r.as_dict() if hasattr(r, "as_dict") else asdict(r) for r in evidence.tool_call_records
         ]
@@ -116,7 +178,9 @@ def run_multi_agent(
 
     # Create LLM client: real provider or mock
     llm_client: object
-    if mock or provider == "mock":
+    if _llm_client_override is not None:
+        llm_client = _llm_client_override
+    elif mock or provider == "mock":
         llm_client = _make_mock_llm_client()
     else:
         try:
@@ -139,7 +203,34 @@ def run_multi_agent(
         provider=provider,
         schema_registry=schema_registry,
     )
-    plan = coordinator.plan(run_id)
+    try:
+        plan = coordinator.plan(
+            run_id,
+            requirement=requirement,
+            evidence_summary=evidence_summary,
+        )
+        task_brief_artifact = TaskBriefArtifact.build(
+            run_id,
+            tuple(task.task_brief for task in plan.tasks),
+        )
+    except Exception:
+        return 3
+    task_brief_events = _TaskBriefEventRecorder()
+    for task in plan.tasks:
+        brief = task.task_brief
+        task_brief_events.record(
+            TaskBriefTraceEvent(
+                event_type="TASK_BRIEF_GENERATED",
+                run_id=run_id,
+                agent_id=task.agent_id,
+                role=task.role,
+                brief_hash=brief.brief_hash(),
+                schema_version=brief.schema_version,
+                status=brief.status,
+                stage=task.stage,
+                trace_id=brief.provenance.trace_id,
+            )
+        )
 
     # Build executors: AgentRunner for real, raw agent.execute for mock
     executors: dict[str, AgentExecutor] = {}
@@ -158,6 +249,7 @@ def run_multi_agent(
                 model=model,
                 temperature=0.0,
                 max_tokens=policy.tokens.max_agent_output_tokens,
+                task_brief_event_sink=task_brief_events.record,
             )
             executors[identity.agent_id] = runner.execute
     executors.update(_executor_overrides or {})
@@ -165,6 +257,7 @@ def run_multi_agent(
         "run_id": run_id,
         "requirement": requirement,
         "repository_evidence": evidence_text,
+        "evidence_summary": evidence_summary,
     }
     scheduler = MultiAgentScheduler(max_parallel_workers=policy.max_parallel_agents)
     prior_outputs: dict[str, dict[str, Any]] = {}
@@ -183,6 +276,7 @@ def run_multi_agent(
             executors,
             base_context,
             prior_outputs,
+            plan.tasks,
             registry,
             schema_registry,
             guard,
@@ -199,6 +293,7 @@ def run_multi_agent(
             executors,
             base_context,
             prior_outputs,
+            plan.tasks,
             registry,
             schema_registry,
             guard,
@@ -215,6 +310,7 @@ def run_multi_agent(
             executors,
             base_context,
             prior_outputs,
+            plan.tasks,
             registry,
             schema_registry,
             guard,
@@ -231,6 +327,7 @@ def run_multi_agent(
             executors,
             base_context,
             prior_outputs,
+            plan.tasks,
             registry,
             schema_registry,
             guard,
@@ -271,6 +368,7 @@ def run_multi_agent(
                     executors,
                     {**base_context, "revision_task": revision_task.__dict__},
                     prior_outputs,
+                    plan.tasks,
                     registry,
                     schema_registry,
                     guard,
@@ -296,6 +394,7 @@ def run_multi_agent(
                     executors,
                     base_context,
                     prior_outputs,
+                    plan.tasks,
                     registry,
                     schema_registry,
                     guard,
@@ -319,6 +418,7 @@ def run_multi_agent(
                     executors,
                     base_context,
                     prior_outputs,
+                    plan.tasks,
                     registry,
                     schema_registry,
                     guard,
@@ -342,6 +442,8 @@ def run_multi_agent(
             discovered_files=discovered_files,
             guard=guard,
             error="MULTI_AGENT_RUN_FAILED",
+            task_brief_artifact=task_brief_artifact,
+            task_brief_events=task_brief_events.snapshot(),
         )
         return 3
 
@@ -355,7 +457,14 @@ def run_multi_agent(
         for agent_id, result in stage.agent_results.items()
     }
     handoffs = runtime_handoffs
-    traces = _build_trace_tree(stages, registry, run_id, model, coordinator.engine.state.value)
+    traces = _build_trace_tree(
+        stages,
+        registry,
+        run_id,
+        model,
+        coordinator.engine.state.value,
+        task_brief_events.snapshot(),
+    )
     policy_hash = policy.policy_hash()
     idempotency_key = sha256(
         f"{sha256(repo.resolve().as_uri().encode()).hexdigest()}"
@@ -389,6 +498,14 @@ def run_multi_agent(
             "traces": "traces.json",
             "sources": "sources.json",
             "metrics": "metrics.json",
+            "task_briefs": "task-briefs.json",
+        },
+        "task_briefs": {
+            "schema_version": task_brief_artifact.schema_version,
+            "canonical_hash": task_brief_artifact.canonical_hash,
+            "generated_count": task_brief_artifact.generated_count,
+            "enriched_agents": list(task_brief_artifact.enriched_agents),
+            "degraded_agents": list(task_brief_artifact.degraded_agents),
         },
         "discovered_files": discovered_files,
         "tool_call_count": len(tool_call_records),
@@ -418,6 +535,13 @@ def run_multi_agent(
     ]
     try:
         _safe_write(run_dir, "checkpoints.json", checkpoints, guard)
+        _safe_write(
+            run_dir,
+            "task-briefs.json",
+            task_brief_artifact.model_dump(mode="json"),
+            guard,
+            sort_keys=True,
+        )
         _safe_write(run_dir, "manifest.json", manifest, guard)
         _safe_write(run_dir, "agent-outputs.json", agent_outputs, guard, sort_keys=True)
         _safe_write(run_dir, "handoffs.json", [handoff.__dict__ for handoff in handoffs], guard)
@@ -476,6 +600,7 @@ def _run_and_accumulate(
     executors: Mapping[str, AgentExecutor],
     context: Mapping[str, Any],
     prior_outputs: dict[str, dict[str, Any]],
+    tasks: tuple[AgentTask, ...],
     registry: AgentRegistry,
     schema_registry: object,
     guard: RuntimeGuard,
@@ -483,7 +608,13 @@ def _run_and_accumulate(
     guard.check_wall_time()
     guard.check_parallel_agents(len(agent_ids))
     validated_inputs = _validated_inputs(
-        agent_ids, registry, schema_registry, context, prior_outputs
+        agent_ids,
+        stage_index,
+        tasks,
+        registry,
+        schema_registry,
+        context,
+        prior_outputs,
     )
     guarded_executors = {
         agent_id: _budgeted_executor(executors[agent_id], validated_inputs[agent_id], guard)
@@ -499,7 +630,7 @@ def _run_and_accumulate(
 
 
 def _budgeted_executor(
-    executor: AgentExecutor, validated_input: dict[str, Any], guard: RuntimeGuard
+    executor: AgentExecutor, validated_input: AgentExecutionInput, guard: RuntimeGuard
 ) -> AgentExecutor:
     def run(context: dict[str, Any]) -> dict[str, Any]:
         guard.consume_llm_call()
@@ -514,20 +645,37 @@ def _budgeted_executor(
 
 def _validated_inputs(
     agent_ids: tuple[str, ...],
+    stage_index: int,
+    tasks: tuple[AgentTask, ...],
     registry: AgentRegistry,
     schema_registry: object,
     context: Mapping[str, Any],
     prior_outputs: Mapping[str, dict[str, Any]],
-) -> dict[str, dict[str, Any]]:
+) -> dict[str, AgentExecutionInput]:
     """Build and validate only the declared input contract for each receiver."""
     output = {agent_id: result.get("output", {}) for agent_id, result in prior_outputs.items()}
     requirement = str(context.get("requirement", ""))
-    evidence = str(context.get("repository_evidence", ""))
-    inputs: dict[str, dict[str, Any]] = {}
+    raw_evidence_summary = context.get("evidence_summary")
+    evidence_summary = (
+        raw_evidence_summary
+        if isinstance(raw_evidence_summary, ControlledEvidenceSummary)
+        else ControlledEvidenceSummary.model_validate(raw_evidence_summary)
+    )
+    run_id = str(context.get("run_id", ""))
+    task_by_id = {task.agent_id: task for task in tasks}
+    inputs: dict[str, AgentExecutionInput] = {}
     for agent_id in agent_ids:
-        role = registry.get(agent_id).role.value
+        try:
+            task = task_by_id[agent_id]
+        except KeyError as exc:
+            raise ValueError("TASK_BRIEF_MISSING") from exc
+        identity = registry.get(agent_id).identity
+        role = identity.role.value
         if role == "repository_analyst":
-            payload = {"requirement": requirement, "repository_evidence": evidence}
+            payload = {
+                "requirement": requirement,
+                "repository_evidence": evidence_summary.content,
+            }
         elif role in {"design", "test_strategy", "risk_review"}:
             payload = {
                 "requirement": requirement,
@@ -547,8 +695,27 @@ def _validated_inputs(
             }
         else:
             raise ValueError("UNKNOWN_AGENT_ROLE")
-        model = schema_registry.get(registry.get(agent_id).identity.input_schema_id)
-        inputs[agent_id] = model.model_validate(payload).model_dump()
+        model = schema_registry.get(identity.input_schema_id)
+        role_payload = model.model_validate(payload).model_dump()
+        missing_dependencies = task.depends_on - output.keys()
+        if missing_dependencies:
+            raise ValueError("PRIOR_OUTPUT_MISSING")
+        dependency_outputs = {
+            dependency_id: output[dependency_id] for dependency_id in sorted(task.depends_on)
+        }
+        inputs[agent_id] = AgentExecutionInput(
+            run_id=run_id,
+            stage=stage_index,
+            agent_id=agent_id,
+            role=identity.role,
+            requirement=requirement,
+            evidence_summary=evidence_summary,
+            repository_analysis=role_payload.get("repository_analysis"),
+            task_brief=task.task_brief,
+            prior_outputs=dependency_outputs,
+            revision_context=None,
+            output_schema_id=identity.output_schema_id,
+        )
     return inputs
 
 
@@ -682,7 +849,12 @@ def _output_ref(stage_index: int, agent_id: str) -> str:
 
 
 def _build_trace_tree(
-    stages, registry, run_id: str, model: str, status: str
+    stages,
+    registry,
+    run_id: str,
+    model: str,
+    status: str,
+    task_brief_events: tuple[TaskBriefTraceEvent, ...] = (),
 ) -> list[dict[str, object]]:
     root_id = f"run-{uuid4().hex}"
     coordinator_id = f"coordinator-{uuid4().hex}"
@@ -715,6 +887,7 @@ def _build_trace_tree(
                 "status": status,
             }
         )
+    traces.extend(event.as_dict() for event in task_brief_events)
     for stage in stages:
         for agent_id in sorted(stage.agent_results):
             timing = stage.agent_timings[agent_id]
@@ -785,6 +958,8 @@ def _persist_failed_run(
     discovered_files: int,
     guard: RuntimeGuard,
     error: str,
+    task_brief_artifact: TaskBriefArtifact,
+    task_brief_events: tuple[TaskBriefTraceEvent, ...],
 ) -> None:
     """Persist FAILED manifest, state history, and partial traces for audit."""
     try:
@@ -806,7 +981,14 @@ def _persist_failed_run(
     try:
         run_dir = output / run_id
         run_dir.mkdir(parents=True, exist_ok=True)
-        traces = _build_trace_tree(stages, registry, run_id, model, "failed")
+        traces = _build_trace_tree(
+            stages,
+            registry,
+            run_id,
+            model,
+            "failed",
+            task_brief_events,
+        )
         failed_manifest = {
             "run_id": run_id,
             "plan_id": getattr(plan, "plan_id", "unknown"),
@@ -815,7 +997,22 @@ def _persist_failed_run(
             "error": error,
             "stages_completed": len(stages),
             "discovered_files": discovered_files,
+            "artifacts": {"task_briefs": "task-briefs.json"},
+            "task_briefs": {
+                "schema_version": task_brief_artifact.schema_version,
+                "canonical_hash": task_brief_artifact.canonical_hash,
+                "generated_count": task_brief_artifact.generated_count,
+                "enriched_agents": list(task_brief_artifact.enriched_agents),
+                "degraded_agents": list(task_brief_artifact.degraded_agents),
+            },
         }
+        _safe_write(
+            run_dir,
+            "task-briefs.json",
+            task_brief_artifact.model_dump(mode="json"),
+            guard,
+            sort_keys=True,
+        )
         _safe_write(run_dir, "manifest.json", failed_manifest, guard)
         _safe_write(run_dir, "traces.json", traces, guard)
         # Persist partial agent outputs for debugging

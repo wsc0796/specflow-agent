@@ -3,6 +3,36 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from enum import StrEnum
+
+from pydantic import BaseModel, ConfigDict, Field
+
+from specflow.agents.models import AgentRole
+from specflow.plan.models import EnrichmentStatus
+
+
+class TaskBriefEventType(StrEnum):
+    GENERATED = "TASK_BRIEF_GENERATED"
+    CONSUMED = "TASK_BRIEF_CONSUMED"
+
+
+class TaskBriefTraceEvent(BaseModel):
+    """Metadata-only audit event for the task brief lifecycle."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    event_type: TaskBriefEventType
+    run_id: str = Field(min_length=1)
+    agent_id: str = Field(min_length=1)
+    role: AgentRole
+    brief_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    schema_version: str = Field(min_length=1)
+    status: EnrichmentStatus
+    stage: int = Field(ge=0)
+    trace_id: str = Field(min_length=1)
+
+    def as_dict(self) -> dict[str, object]:
+        return self.model_dump(mode="json")
 
 
 @dataclass(frozen=True)

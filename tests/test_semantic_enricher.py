@@ -6,6 +6,7 @@ import json
 from typing import Any
 
 import pytest
+from task_brief_test_helpers import controlled_evidence, evidence_reference, provenance
 
 from specflow.agents.models import (
     AgentConstraints,
@@ -93,6 +94,18 @@ def _make_spec(agent_count: int = 2) -> StructuralDelegationSpec:
     )
 
 
+def _enrich(
+    enricher: SemanticPlanEnricher,
+    spec: StructuralDelegationSpec,
+) -> tuple[SemanticTaskBrief, ...]:
+    return enricher.enrich(
+        spec,
+        requirement="Inspect the repository",
+        evidence_summary=controlled_evidence(),
+        output_schemas={agent.agent_id: {"type": "object"} for agent in spec.agents},
+    )
+
+
 # ====================================================================
 # Tests
 # ====================================================================
@@ -110,7 +123,7 @@ class TestEnrichAll:
             }
         )
         enricher = SemanticPlanEnricher(llm_client=llm, model="gpt-4", provider="openai")
-        briefs = enricher.enrich(spec)
+        briefs = _enrich(enricher, spec)
 
         assert len(briefs) == 3
         for brief in briefs:
@@ -130,7 +143,7 @@ class TestEnrichAll:
             }
         )
         enricher = SemanticPlanEnricher(llm_client=llm, model="gpt-4", provider="openai")
-        briefs = enricher.enrich(spec)
+        briefs = _enrich(enricher, spec)
 
         assert briefs[0].enrichment_status == EnrichmentStatus.ENRICHED
         assert isinstance(briefs[0].provenance, EnrichmentProvenance)
@@ -141,12 +154,13 @@ class TestDegradedOnFailure:
         spec = _make_spec(2)
         llm = FailingLLMClient()
         enricher = SemanticPlanEnricher(llm_client=llm, model="gpt-4", provider="openai")
-        briefs = enricher.enrich(spec)
+        briefs = _enrich(enricher, spec)
 
         assert len(briefs) == 2
         for brief in briefs:
             assert brief.enrichment_status == EnrichmentStatus.DEGRADED
-            assert brief.provenance is None
+            assert brief.provenance.failure_type == "provider_error"
+            assert brief.task_description
 
     def test_malformed_json_produces_degraded(self) -> None:
         class MalformedLLMClient:
@@ -163,11 +177,35 @@ class TestDegradedOnFailure:
         enricher = SemanticPlanEnricher(
             llm_client=MalformedLLMClient(), model="gpt-4", provider="openai"
         )
-        briefs = enricher.enrich(spec)
+        briefs = _enrich(enricher, spec)
 
         assert len(briefs) == 1
         assert briefs[0].enrichment_status == EnrichmentStatus.DEGRADED
-        assert briefs[0].provenance is None
+        assert briefs[0].provenance.failure_type == "invalid_json"
+
+    def test_unknown_model_evidence_reference_produces_schema_degraded_brief(self) -> None:
+        spec = _make_spec(1)
+        llm = FakeLLMClient(
+            {
+                "task_description": "Cite invented evidence",
+                "analysis_focus": [],
+                "evaluation_hints": [],
+                "repository_scope_hint": "",
+                "evidence_refs": ["evidence-invented"],
+            }
+        )
+        enricher = SemanticPlanEnricher(llm_client=llm, model="gpt-4", provider="openai")
+        briefs = enricher.enrich(
+            spec,
+            requirement="Inspect the repository",
+            evidence_summary=controlled_evidence(
+                references=(evidence_reference("evidence-known"),)
+            ),
+            output_schemas={spec.agents[0].agent_id: {"type": "object"}},
+        )
+        assert briefs[0].status is EnrichmentStatus.DEGRADED
+        assert briefs[0].evidence_refs == ()
+        assert briefs[0].provenance.failure_type == "schema_validation_error"
 
 
 class TestAgentSetPreservation:
@@ -184,7 +222,7 @@ class TestAgentSetPreservation:
             }
         )
         enricher = SemanticPlanEnricher(llm_client=llm, model="gpt-4", provider="openai")
-        briefs = enricher.enrich(spec)
+        briefs = _enrich(enricher, spec)
 
         brief_ids = {b.agent_id for b in briefs}
         assert brief_ids == original_ids
@@ -220,7 +258,7 @@ class TestAgentSetPreservation:
         enricher = SemanticPlanEnricher(
             llm_client=PartiallyFailingClient(), model="gpt-4", provider="openai"
         )
-        briefs = enricher.enrich(spec)
+        briefs = _enrich(enricher, spec)
 
         assert len(briefs) == 3
         enriched = [b for b in briefs if b.enrichment_status == EnrichmentStatus.ENRICHED]
@@ -233,33 +271,40 @@ class TestSemanticTaskBrief:
     def test_degraded_default_factory(self) -> None:
         brief = SemanticTaskBrief.degraded_default(
             agent_id="test-agent",
+            role=AgentRole.DESIGN,
+            output_schema_id="test/v1/output",
             task_description="do something",
+            provenance=provenance(EnrichmentStatus.DEGRADED),
         )
         assert brief.agent_id == "test-agent"
         assert brief.enrichment_status == EnrichmentStatus.DEGRADED
-        assert brief.provenance is None
+        assert brief.provenance.failure_type == "provider_error"
         assert brief.analysis_focus == ()
 
     def test_empty_agent_id_raises(self) -> None:
-        with pytest.raises(ValueError, match="agent_id must not be empty"):
+        with pytest.raises(ValueError, match="at least 1 character"):
             SemanticTaskBrief(
                 agent_id="",
+                role=AgentRole.DESIGN,
+                output_schema_id="test/v1/output",
                 task_description="task",
                 analysis_focus=(),
                 evaluation_hints=(),
                 repository_scope_hint="",
                 enrichment_status=EnrichmentStatus.ENRICHED,
-                provenance=None,
+                provenance=provenance(),
             )
 
     def test_non_enum_status_raises(self) -> None:
-        with pytest.raises(ValueError, match="enrichment_status must be an EnrichmentStatus"):
+        with pytest.raises(ValueError, match="enriched.*degraded"):
             SemanticTaskBrief(
                 agent_id="a1",
+                role=AgentRole.DESIGN,
+                output_schema_id="test/v1/output",
                 task_description="task",
                 analysis_focus=(),
                 evaluation_hints=(),
                 repository_scope_hint="",
                 enrichment_status="invalid",  # type: ignore[arg-type]
-                provenance=None,
+                provenance=provenance(),
             )

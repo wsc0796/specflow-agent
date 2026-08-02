@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import json
+from functools import partial
 
 import pytest
+from task_brief_test_helpers import controlled_evidence
 
 from specflow.agents.models import AgentRole
 from specflow.coordinator.coordinator import Coordinator
@@ -12,6 +14,7 @@ from specflow.coordinator.revision import RevisionController
 from specflow.coordinator.state_machine import MultiAgentWorkflowEngine
 from specflow.llm.mock import MockLLMClient
 from specflow.plan.models import EffectiveDelegationPlan
+from specflow.schema import build_schema_registry
 
 
 def _mock_enrichment_response() -> str:
@@ -67,6 +70,12 @@ class TestCoordinatorPlan:
             llm_client=llm,
             model="test-model",
             provider="test-provider",
+            schema_registry=build_schema_registry(),
+        )
+        self._coordinator.plan = partial(
+            self._coordinator.plan,
+            requirement="Inspect the repository",
+            evidence_summary=controlled_evidence(),
         )
 
     # ── Basic structure ─────────────────────────────────────────────
@@ -110,7 +119,7 @@ class TestCoordinatorPlan:
     def test_deterministic_hashes_for_same_plan(self) -> None:
         """Two calls with the same inputs produce the same hashes."""
         plan1 = self._coordinator.plan(run_id="test-deterministic")
-        plan2 = self._coordinator.plan(run_id="test-deterministic")  # noqa: Duplicate call
+        plan2 = self._coordinator.plan(run_id="test-deterministic")
 
         # Note: briefs are enriched fresh each call but the mock returns the same
         # JSON, so hashes should be identical.
