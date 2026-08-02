@@ -5,7 +5,7 @@
   "base_commit": "bc76214",
   "branch": "fix/phase-4a-live-case-prep",
   "status": "PASS",
-  "result_commit": "PENDING_FINALIZED_IN_COMMIT_B",
+  "result_commit": "b07cc02",
   "deliverables": [
     "artifacts/workflow/phase-4/phase4a-report.md",
     "artifacts/workflow/phase-4/handoff/changed-files.txt",
