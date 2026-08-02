@@ -1,0 +1,2 @@
+Phase 6A is docs-only preparation. No source or test files changed; no tests executed.
+Baseline at bc76214: full pytest 777 passed, 2 skipped; benchmark 12/12; baseline SHA BE9BB6F1 unchanged.

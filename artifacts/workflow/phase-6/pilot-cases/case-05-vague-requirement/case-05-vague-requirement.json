@@ -1,0 +1,12 @@
+{
+  "case_id": "pilot_05_vague_requirement",
+  "title": "Improve the shop backend (vague)",
+  "requirement": "改进这个商城后端,让它更好。",
+  "repository_type": "small_fastapi_fixture",
+  "expected_domains": ["orders", "catalog", "auth", "cache"],
+  "expected_file_patterns": ["app/orders.py", "app/catalog.py", "app/auth.py"],
+  "expected_risks": ["需求理解发散", "范围失控", "无验收标准", "假设未声明"],
+  "expected_acceptance_topics": ["需求澄清问题", "范围收敛", "优先级", "不确定性声明"],
+  "forbidden_claims": ["production-ready", "quality improvement"],
+  "human_review_notes": "重点看是否主动列出澄清问题、是否声明不确定性、是否避免对模糊需求过度承诺。"
+}

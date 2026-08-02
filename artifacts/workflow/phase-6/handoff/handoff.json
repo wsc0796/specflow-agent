@@ -1,0 +1,31 @@
+{
+  "workflow": "specflow-hardening-v1",
+  "phase": "6A",
+  "role": "pilot-task-set-design",
+  "base_commit": "bc76214",
+  "branch": "fix/phase-6a-pilot-design",
+  "status": "PASS",
+  "result_commit": "PENDING_FINALIZED_IN_COMMIT_B",
+  "deliverables": [
+    "artifacts/workflow/phase-6/pilot-task-set.md",
+    "artifacts/workflow/phase-6/pilot-cases/case-01..05 (.json + .md)",
+    "artifacts/workflow/phase-6/fairness-protocol.md",
+    "artifacts/workflow/phase-6/scoring-rubric.md",
+    "artifacts/workflow/phase-6/unified-output-schema-draft.md",
+    "artifacts/workflow/phase-6/evaluation-matrix.md",
+    "artifacts/workflow/phase-6/cost-collector-fields.md",
+    "artifacts/workflow/phase-6/handoff/changed-files.txt",
+    "artifacts/workflow/phase-6/handoff/test-results.txt",
+    "artifacts/workflow/phase-6/handoff/handoff.json",
+    "artifacts/workflow/phase-6/handoff/unresolved-issues.md"
+  ],
+  "exit": "PASS",
+  "pending_decisions": [
+    "B1 single-agent pipeline definition/implementation",
+    "Unified output schema as 6C basis",
+    "DECISION_D1 (24/48) and Phase 4B approvals before pilot",
+    "Cost basis approval",
+    "EVALUATION_BASE_COMMIT freeze"
+  ],
+  "notes": "Docs-only window executed by phase_4a_live_prep due to sub-agent delivery failure."
+}
