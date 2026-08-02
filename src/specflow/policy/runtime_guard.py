@@ -299,6 +299,8 @@ class RuntimeGuard:
         """Record a mock/synthetic model call that is NOT a provider attempt."""
         with self._lock:
             self._synthetic_model_calls += 1
+            snapshot = self._snapshot_locked()
+            self._budget_snapshots.append(snapshot)
             self._model_call_events.append(
                 {
                     "event_type": "MODEL_CALL_SUCCEEDED",
@@ -307,6 +309,7 @@ class RuntimeGuard:
                     "execution_mode": "mock",
                     "attempt_index": self._synthetic_model_calls,
                     "synthetic": True,
+                    "snapshot_id": snapshot["snapshot_id"],
                 }
             )
 
