@@ -19,3 +19,5 @@ evaluation/pilot/outputs/
 evaluation/pilot/rule-scores.csv
 evaluation/pilot/cost-metrics.csv
 evaluation/pilot/blind-review-pack.json
+
+evaluation/formal/dry-run/

@@ -1,0 +1,11 @@
+{
+  "schema_version": "evaluation_frozen_config/v1",
+  "status": "DRAFT_PENDING_PROTOCOL_FREEZE",
+  "repository": {"commit": "a5455e9", "path": "benchmarks/fixtures/portfolio-python"},
+  "pipelines": ["single", "legacy", "six-role"],
+  "tasks": 30,
+  "runs": 90,
+  "provider": "PENDING_USER_APPROVAL",
+  "max_provider_call_attempts": {"default": 24, "evaluation_override_allowed": 48},
+  "rules": ["no protocol change after seeing results", "no selective reruns", "missing data recorded, never fabricated"]
+}
