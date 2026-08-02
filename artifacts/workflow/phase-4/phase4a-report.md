@@ -6,7 +6,7 @@
 ## 1. 现状盘点(全部基于 bc76214 代码)
 
 ### 1.1 执行策略与预算
-- `src/specflow/policy/models.py::ExecutionPolicy`:默认 `max_wall_time_seconds=300`、`max_provider_call_attempts=10`、`max_parallel_agents=3`、`max_parallel_provider_calls=3`、`max_revisions=1`;`max_llm_calls` 是 deprecated 别名,显式传入时会驱动 provider-attempt 预算。
+- `src/specflow/policy/models.py::ExecutionPolicy`:默认 `max_wall_time_seconds=300`、`max_provider_call_attempts=24`(已批准校准)、`max_parallel_agents=3`、`max_parallel_provider_calls=3`、`max_revisions=1`;`max_llm_calls` 是 deprecated 别名,显式传入时会驱动 provider-attempt 预算。
 - `TokenPolicy` 默认值:`max_run_input_tokens=50000`、`max_run_output_tokens=12000`、`max_run_total_tokens=62000`、`max_agent_input_tokens=10000`、`max_agent_output_tokens=3000`、`reserved_retry_tokens=6000`。
 - `src/specflow/policy/defaults.py::DEFAULT_POLICY` 是编译期常量;**当前没有任何环境变量 / CLI / API 入口可以覆盖 Run 级预算**。
 - `src/specflow/policy/runtime_guard.py::RuntimeGuard`:`reserve_provider_attempt` 在同一临界区完成 wall-clock、并行上限、attempt 预算检查;`release_provider_attempt` 结算 token(usage 缺失 → `TOKEN_USAGE_UNAVAILABLE`,绝不记 0);`snapshot()` 已输出 limits + tokens + provider/agent 计数。
@@ -40,7 +40,7 @@
 | 7 | 文档 | `README.md`、Live guide | 配置说明、边界、未支持主张清单 |
 
 ## 3. 风险与未决问题
-- **DECISION_D1(用户决策)**:默认 `max_provider_call_attempts` 校准为 24 还是 48;当前保持 10 不变。
+- **DECISION_D1(已批准)**:默认 `max_provider_call_attempts` 校准为 **24**(2026-08-02 批准);48 不作为全局默认,仅允许 Live/Evaluation/实验显式配置。
 - **Live 运行费用上限缺失**:仓库没有费用记账,只能用 token + wall-clock 作为代理上限;Phase 4B 需用户批准模型与最大费用边界。
 - **API 认证不在 verified base**:`api_security.py` 只存在于主工作区未提交改动中,bc76214 不含;live 阶段仅限本地单用户。
 - 错误码粒度与 Phase 3F taxonomy 存在差距(见改动点 2)。

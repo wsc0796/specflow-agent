@@ -26,9 +26,10 @@
   "tool_permissions": "read-only repository tools only; no write/execute",
   "call_budget": {
     "max_provider_call_attempts": {
-      "current_default": 10,
-      "required_for_live_path": "24 or 48",
-      "status": "PENDING_DECISION_D1"
+      "current_default": 24,
+      "live_default": 24,
+      "explicit_override_only": "48 allowed only as explicit Live/Evaluation/experiment config; never a global default",
+      "status": "APPROVED"
     }
   },
   "token_budget": {
