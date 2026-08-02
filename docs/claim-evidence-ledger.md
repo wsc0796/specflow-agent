@@ -40,3 +40,25 @@ Mock-provider evidence is not live-provider validation or evidence of output-qua
 | Budget failures fail closed with snapshots and partial traces | VERIFIED | reserve/release atomicity, failed manifests | `TestFailureArtifacts`, runner planning-failure snapshot | Yes | Active count restored on every path; never max+1. |
 | Default provider-attempt budget supports the live path | VERIFIED | default `max_provider_call_attempts=24`; normal path 12, one revision 15 | `tests/test_budget_calibration.py` | Yes | 48 is never a global default; only explicit Live/Evaluation/experiment config. |
 | All LLM calls (including legacy 3-worker) use the unified invoker | REJECTED | legacy `workers/` + `runner.py` untouched | Static gate allowlist | No | Legacy pipeline is the frozen Phase 6 A/B baseline. |
+
+## Phase 5 additions (MCP and release)
+
+| Claim | Status | Code evidence | Test evidence | Allowed now | Notes |
+| --- | --- | --- | --- | --- | --- |
+| MCP tools/list uses the Tool-owned input schema (single source) | VERIFIED | `Tool.input_schema`, `McpToolCatalog` reads `registry.input_schema` | `test_catalog_schema_is_the_tool_owned_schema` | Yes | `_INPUT_SCHEMAS` hand-written copy removed. |
+| MCP tools/call reuses ToolExecutor and the repository security policy | VERIFIED | `McpServer._handle_tools_call` -> `ToolExecutor` | MCP suite 99 passed | Yes | No protocol-layer business logic. |
+| MCP protocol has real stdio coverage (subprocess) | VERIFIED | `tests/test_mcp_server.py::test_stdio_subprocess_smoke` + CI step | 17 MCP server tests | Yes | Spawns the installed CLI as a child process. |
+| Tool failures expose a machine-readable error type | VERIFIED | `tool_result_to_mcp` `structuredContent.error_type` | MCP adapter tests | Yes | Additive; text stays for compatibility. |
+| Core type-check gate (pyright) | DEFER | 46 errors across 6 files, dominated by runner_multi.py | `artifacts/workflow/final-sol-backlog.md` | No | Not forced; backlogged for Sol. |
+
+## Phase 6/7 additions (evaluation)
+
+| Claim | Status | Code evidence | Test evidence | Allowed now | Notes |
+| --- | --- | --- | --- | --- | --- |
+| Pilot harness is deterministic and protocol-stable | VERIFIED_AT_COMMIT | `evaluation.pilot` (rule scorer, cost collector, blind pack) | `tests/test_pilot_harness.py` (4) | Yes | 15-run mock smoke all succeeded; mock is never provider. |
+| 5-case pilot dataset is real and grounded in the fixture repo | VERIFIED_AT_COMMIT | `evaluation/pilot/cases/*.json` | loader test | Yes | No gold answers exposed to pipelines. |
+| 30-case formal dataset drafted | PARTIALLY_VERIFIED | `evaluation/formal/dataset.jsonl` + generator | structure/dry-run validated | Yes | Authoring complete; protocol freeze pending. |
+| Pilot/Formal live-provider execution | BLOCKED | no cost cap / provider approval | `limitations.md` | No | HARD_BLOCKER: `SPECFLOW_LIVE_MAX_COST_USD` / `SPECFLOW_EVAL_MAX_COST_USD` absent. |
+| Live-provider validation | BLOCKED | no explicit cost ceiling or model approval | `live-summary.md` (handoff) | No | Verifier + templates ready; run not executed. |
+| Six-agent quality improvement | REJECTED | no comparative evidence | — | No | Requires the blocked paid evaluation. |
+| Release-ready | REJECTED | — | — | No | Single-process, mock-verified, evaluation pending. |
