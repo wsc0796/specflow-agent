@@ -4,6 +4,7 @@ import json
 
 from specflow.agents.adapter import AgentRunner
 from specflow.agents.models import AgentIdentity, AgentRole
+from specflow.llm.models import LLMResponse, LLMUsage
 from specflow.schema.agent_payloads import DesignPayload
 from specflow.schema.registry import SchemaRegistry
 
@@ -36,13 +37,13 @@ class FakeLLMClient:
 
     def complete(self, request):
         self.last_request = request
-
-        class Response:
-            content = self.content
-            input_tokens = 100
-            output_tokens = 50
-
-        return Response()
+        return LLMResponse(
+            content=self.content,
+            model="test",
+            usage=LLMUsage(input_tokens=100, output_tokens=50),
+            latency_ms=12,
+            finish_reason="stop",
+        )
 
 
 class TestAgentRunner:
@@ -55,6 +56,38 @@ class TestAgentRunner:
         assert result["agent_id"] == "test-agent-v1"
         assert result["success"] is True
         assert result["output"]["summary"] == "A valid design response."
+
+    def test_runner_propagates_real_response_usage(self):
+        """Regression: token counts live on ``LLMResponse.usage``.
+
+        Reading flat ``response.input_tokens`` attributes silently zeroes the
+        budget for real providers, so the adapter must consume ``usage``.
+        """
+        runner = AgentRunner(
+            _make_identity(), FakeLLMClient(), model="test", schema_registry=_schema_registry()
+        )
+        result = runner.execute({"requirement": "Add feature X"})
+        assert result["usage"] == {"input_tokens": 100, "output_tokens": 50}
+
+    def test_runner_survives_provider_without_usage(self):
+        """Provider-neutral degradation: a response missing usage is not fatal."""
+
+        class NoUsageClient:
+            def complete(self, request):
+                return LLMResponse(
+                    content=json.dumps({"summary": "A valid design response."}),
+                    model="test",
+                    usage=LLMUsage(input_tokens=0, output_tokens=0),
+                    latency_ms=12,
+                    finish_reason="stop",
+                )
+
+        runner = AgentRunner(
+            _make_identity(), NoUsageClient(), model="test", schema_registry=_schema_registry()
+        )
+        result = runner.execute({"requirement": "Test"})
+        assert result["success"] is True
+        assert result["usage"] == {"input_tokens": 0, "output_tokens": 0}
 
     def test_runner_includes_role_in_user_message(self):
         ident = _make_identity(AgentRole.RISK_REVIEW)

@@ -25,6 +25,16 @@ def sanitize_tool_text(text: str) -> str:
     return cleaned
 
 
+def final_dlp_scan(text: str) -> str:
+    """Final line-of-defense redaction before content leaves the process.
+
+    Applies every credential pattern *without* collapsing newlines, so it is
+    safe to run on evidence blocks that must keep their layout (e.g. the
+    repository evidence sent to a live provider and persisted to ``sources.json``).
+    """
+    return _redact_tool_secrets(text)
+
+
 def sanitize_json_text(text: str) -> str:
     """Redact JSON string values while retaining meaningful line structure."""
     return _JSON_CONTROL_RE.sub("", _redact_tool_secrets(text))

@@ -57,6 +57,8 @@ class RepositoryAccessPolicy:
             ".npmrc",
             ".pypirc",
             "id_rsa",
+            "credentials",
+            "kubeconfig",
             "token.json",
             "tokens.json",
             "service-account.json",
@@ -64,6 +66,7 @@ class RepositoryAccessPolicy:
             "application_default_credentials.json",
         }
     )
+    _sensitive_directory_names = frozenset({".aws", ".docker", ".kube", ".ssh"})
     _sensitive_suffixes = frozenset({".pem", ".key", ".p12", ".pfx", ".jks"})
     _sensitive_stems = frozenset(
         {
@@ -183,6 +186,8 @@ class RepositoryAccessPolicy:
         """Return whether explicit filename rules identify a sensitive path."""
         parts = PurePosixPath(relative_path.replace("\\", "/")).parts
         if any(part.casefold() in self.ignored_directory_names for part in parts[:-1]):
+            return True
+        if any(part.casefold() in self._sensitive_directory_names for part in parts[:-1]):
             return True
         name = parts[-1].casefold() if parts else ""
         if name in self._sensitive_exact_names:

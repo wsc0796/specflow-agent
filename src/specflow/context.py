@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import re
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -27,6 +28,67 @@ from specflow.technology import Evidence, TechnologyStack
 # URL credentials: https://user:pass@host → https://<credentials>@host
 _URL_CREDENTIALS = re.compile(r"(https?://)[^/@]+:[^/@]+@")
 
+_SENSITIVE_ASSIGNMENT_NAME = (
+    r"(?:"
+    r"api[_-]?key|access[_-]?key|access[_-]?token|auth[_-]?token|client[_-]?secret|"
+    r"refresh[_-]?token|private[_-]?key|secret[_-]?key|session[_-]?token|"
+    r"secret|password|token|credential"
+    r")"
+)
+
+# Values that are clearly not secrets despite being long quoted strings.
+_BENIGN_QUOTED_VALUE = re.compile(
+    r"(?:"
+    r"https?://\S+|ftp://\S+|"
+    r"\d+(?:\.\d+){1,5}|"
+    r"\d{4}-\d{2}-\d{2}(?:[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?)?|"
+    r"[0-9a-fA-F-]{36}|"  # UUID
+    r"[\w./:+-]+@[\w.-]+|"  # email
+    r"(?:/|\.\.?/|~?/)[\w./-]*|"  # file paths
+    r"[A-Za-z0-9_.-]{1,120}"  # plain identifiers / filenames
+    r")"
+)
+
+
+def _high_entropy_assignment_value(value: str) -> bool:
+    """Heuristic for long, mixed-class quoted values that are likely secrets."""
+    if len(value) < 32 or _BENIGN_QUOTED_VALUE.fullmatch(value):
+        return False
+    # Spaced prose (no credential-ish symbols) is not a credential.
+    if " " in value and not any(char in value for char in "=+/\\|;,"):
+        return False
+    has_lower = any(char.islower() for char in value)
+    has_upper = any(char.isupper() for char in value)
+    has_digit = any(char.isdigit() for char in value)
+    has_symbol = any(not char.isalnum() and not char.isspace() for char in value)
+    if not (has_lower and has_upper and (has_digit or has_symbol)):
+        return False
+    counts: dict[str, int] = {}
+    for char in value:
+        counts[char] = counts.get(char, 0) + 1
+    entropy = -sum(
+        (count / len(value)) * math.log2(count / len(value)) for count in counts.values()
+    )
+    return entropy >= 3.5
+
+
+def _redact_high_entropy_assignment(match: re.Match[str]) -> str:
+    value = match.group(3)
+    if _high_entropy_assignment_value(value):
+        quote = match.group(2)
+        return f"{match.group(1)}{quote}<redacted>{quote}"
+    return match.group(0)
+
+
+def _redact_assignment(match: re.Match[str]) -> str:
+    """Redact a quoted value under a sensitive variable name."""
+    value = match.group(3)
+    if any(marker in value for marker in ("<redacted>", "<credentials>", "<jwt>")):
+        return match.group(0)  # already redacted by a more specific pattern
+    quote = match.group(2)
+    return f"{match.group(1)}{quote}<redacted>{quote}"
+
+
 # Common token / key patterns
 _TOKEN_PATTERNS = [
     (re.compile(r"sk-[a-zA-Z0-9_-]{20,}"), "sk-<redacted>"),
@@ -35,6 +97,65 @@ _TOKEN_PATTERNS = [
     (re.compile(r"api_key[=:]\s*\S+", re.IGNORECASE), "api_key=<redacted>"),
     (re.compile(r"secret[=:]\s*\S+", re.IGNORECASE), "secret=<redacted>"),
     (re.compile(r"password[=:]\s*\S+", re.IGNORECASE), "password=<redacted>"),
+    # AWS access key IDs
+    (
+        re.compile(r"\b(?:A3T[A-Z0-9]|AKIA|ASIA|AGPA|AIDA|AROA|AIPA|ANPA|ANVA)[0-9A-Z]{16}\b"),
+        "AKIA<redacted>",
+    ),
+    # AWS secret access key assignments
+    (
+        re.compile(
+            r"(?i)\b(aws[_-]?secret[_-]?access[_-]?key|secret[_-]?access[_-]?key)"
+            r"\s*[=:]\s*[\"']?[A-Za-z0-9/+=]{40}[\"']?"
+        ),
+        r"\1=<redacted>",
+    ),
+    # GitHub tokens
+    (re.compile(r"\bgh[pousr]_[A-Za-z0-9]{30,}\b"), "ghp_<redacted>"),
+    (re.compile(r"\bgithub_pat_[A-Za-z0-9_]{20,}\b"), "github_pat_<redacted>"),
+    # GitLab personal / project access tokens
+    (re.compile(r"\bglpat-[A-Za-z0-9_-]{20,}\b"), "glpat-<redacted>"),
+    # Slack tokens
+    (re.compile(r"\bxox[baprs]-[A-Za-z0-9-]{10,}\b"), "xox-<redacted>"),
+    # Google API keys
+    (re.compile(r"\bAIza[0-9A-Za-z_-]{35}\b"), "AIza<redacted>"),
+    # Azure storage account keys inside connection strings
+    (re.compile(r"(?i)\bAccountKey=[A-Za-z0-9+/=]{40,}"), "AccountKey=<redacted>"),
+    # PEM / OpenSSH private keys (single- or multi-line)
+    (
+        re.compile(
+            r"-----BEGIN (?:RSA |EC |DSA |OPENSSH |ENCRYPTED )?PRIVATE KEY-----"
+            r"[\s\S]*?"
+            r"-----END (?:RSA |EC |DSA |OPENSSH |ENCRYPTED )?PRIVATE KEY-----"
+        ),
+        "<private-key-redacted>",
+    ),
+    # Database / message-broker DSNs with embedded credentials
+    (
+        re.compile(
+            r"\b(?:postgres|postgresql|mysql|mariadb|redis|rediss|mongodb|mongodb\+srv|"
+            r"amqp|amqps|oracle|sqlserver)://[^\s/@:]*:[^\s/@]+@"
+        ),
+        lambda m: m.group(0)[: m.group(0).index("://") + 3] + "<credentials>@",
+    ),
+    # Assignment-style secrets: SENSITIVE_NAME = "value" (or single quotes).
+    # Any quoted value under a sensitive variable name is redacted, regardless
+    # of entropy — even short passwords like "hunter2" must not reach a
+    # provider.  The optional quote before ``=``/``:`` covers JSON keys such as
+    # ``"client_secret": "value"``.
+    (
+        re.compile(
+            r"(?i)\b([a-z0-9_]*?"
+            + _SENSITIVE_ASSIGNMENT_NAME
+            + r"[a-z0-9_]*?\s*[\"']?\s*[=:]\s*)([\"'])([^\"'\n]{4,})\2"
+        ),
+        _redact_assignment,
+    ),
+    # Generic high-entropy quoted assignment values (heuristic catch-all)
+    (
+        re.compile(r"\b([A-Za-z_][A-Za-z0-9_]*\s*[=:]\s*)([\"'])([^\"'\n]{32,})\2"),
+        _redact_high_entropy_assignment,
+    ),
 ]
 
 # Control characters to strip (keep printable + space + common Unicode)

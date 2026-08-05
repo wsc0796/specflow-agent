@@ -75,8 +75,11 @@ SessionDependency = Annotated[Session, Depends(get_session)]
 
 
 @router.post("", response_model=ProjectRead, status_code=status.HTTP_201_CREATED)
-def create_project(payload: ProjectCreate, session: SessionDependency) -> ProjectRead:
+def create_project(
+    payload: ProjectCreate, request: Request, session: SessionDependency
+) -> ProjectRead:
     try:
+        request.app.state.security.validate_repository_path(payload.repository_path)
         return ProjectRead.model_validate(
             ProjectService(ProjectRepository()).create(session, payload)
         )

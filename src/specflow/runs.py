@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
-from collections.abc import Generator
+import json
+import logging
+import re
+from collections.abc import Callable, Generator
 from datetime import UTC, datetime
 from hashlib import sha256
 from pathlib import Path
@@ -18,9 +21,11 @@ from specflow.policy import DEFAULT_POLICY, RunStatus
 from specflow.runner_multi import run_multi_agent
 
 router = APIRouter(prefix="/api/v1/runs", tags=["runs"])
+logger = logging.getLogger(__name__)
 _MAX_ARTIFACT_FILES = 32
 _INTERRUPTED_ERROR_CODE = "INTERRUPTED"
 _REVIEWABLE_RUN_STATES = frozenset({RunStatus.COMPLETED, RunStatus.COMPLETED_DEGRADED})
+_SAFE_RUNNER_ERROR_CODE = re.compile(r"[A-Z][A-Z0-9_]{0,63}")
 
 
 class RunCreate(BaseModel):
@@ -105,14 +110,24 @@ class RunRepository:
 
 
 class RunService:
-    def __init__(self, repository: RunRepository, artifact_root: Path) -> None:
+    def __init__(
+        self,
+        repository: RunRepository,
+        artifact_root: Path,
+        validate_repository_path: Callable[[str], Path],
+    ) -> None:
         self.repository = repository
         self.artifact_root = artifact_root.resolve()
+        self._validate_repository_path = validate_repository_path
 
     def create(self, session: Session, payload: RunCreate) -> WorkflowRun:
         project = session.get(Project, payload.project_id)
         if project is None:
             raise LookupError("project not found")
+        # Project records can predate an allowlist change, and a path can be
+        # retargeted through a symlink after registration. Revalidate at the
+        # execution boundary before any runner reads the repository.
+        repository_path = self._validate_repository_path(project.repository_path)
 
         run = self.repository.add(
             session,
@@ -135,19 +150,33 @@ class RunService:
         output = self.artifact_root / run.id
         try:
             exit_code = run_multi_agent(
-                repo=Path(project.repository_path),
+                repo=repository_path,
                 requirement=payload.requirement,
                 output=output,
                 mock=True,
             )
         except Exception:
+            logger.exception("run %s failed with an unexpected exception", run.id)
             exit_code = -1
 
         run.current_state, run.result_status, run.error_code = _outcome_from_exit_code(exit_code)
+        if exit_code == 3:
+            manifest_error = self._failed_error_code(output)
+            if manifest_error:
+                run.error_code = manifest_error
         run.artifact_directory = self._artifact_directory(output)
         run.finished_at = datetime.now(UTC)
         run.version += 1
-        session.commit()
+        try:
+            session.commit()
+        except Exception:
+            logger.exception(
+                "run %s final state commit failed; rolling back (recovery will "
+                "resolve the stale state on next startup)",
+                run.id,
+            )
+            session.rollback()
+            raise
         return run
 
     def get(self, session: Session, run_id: str) -> WorkflowRun:
@@ -206,6 +235,34 @@ class RunService:
             return None
         return candidate.relative_to(self.artifact_root).as_posix()
 
+    def _failed_error_code(self, output_dir: Path) -> str | None:
+        """Read the runner's persisted error code for a failed run, if any."""
+        if output_dir.is_symlink() or not output_dir.is_dir():
+            return None
+        try:
+            directories = [
+                path
+                for path in output_dir.glob("run-multi-*")
+                if path.is_dir() and not path.is_symlink()
+            ]
+            if len(directories) != 1:
+                return None
+            run_directory = directories[0].resolve()
+            if not run_directory.is_relative_to(self.artifact_root):
+                return None
+            manifest_path = run_directory / "manifest.json"
+            if manifest_path.is_symlink() or not manifest_path.is_file():
+                return None
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            if not isinstance(manifest, dict):
+                return None
+            error = manifest.get("error")
+            if not isinstance(error, str) or not _SAFE_RUNNER_ERROR_CODE.fullmatch(error):
+                return None
+            return error
+        except (OSError, ValueError):
+            return None
+
 
 def recover_interrupted_runs(database: Database) -> int:
     """Resolve runs left active by a previous single-process interruption.
@@ -246,15 +303,23 @@ SessionDependency = Annotated[Session, Depends(get_session)]
 
 
 def _service(request: Request) -> RunService:
-    return RunService(RunRepository(), request.app.state.artifact_root)
+    return RunService(
+        RunRepository(),
+        request.app.state.artifact_root,
+        request.app.state.security.validate_repository_path,
+    )
 
 
 @router.post("", response_model=RunRead, status_code=status.HTTP_201_CREATED)
 def create_run(payload: RunCreate, request: Request, session: SessionDependency) -> RunRead:
+    permit = request.app.state.security.rate_limit_create_run()
     try:
-        return _to_read(_service(request).create(session, payload))
+        result = _service(request).create(session, payload)
+        return _to_read(result)
     except LookupError as error:
         raise HTTPException(404, "Project not found.") from error
+    finally:
+        permit.release()
 
 
 @router.get("/{run_id}/review-package", response_model=ReviewPackageRead)
@@ -287,6 +352,7 @@ def create_review_decision(
     session: SessionDependency,
 ) -> ReviewDecisionRead:
     try:
+        request.app.state.security.validate_reviewer_label(payload.reviewer_label)
         return _to_decision_read(_service(request).record_decision(session, run_id, payload))
     except LookupError as error:
         raise HTTPException(404, "Run not found.") from error

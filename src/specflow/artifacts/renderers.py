@@ -47,7 +47,9 @@ def render_technical_spec(manifest: RunManifest, analysis_json: str) -> str:
         lines.append("")
 
     if manifest.degraded:
-        lines.append("> **Warning**: This output was generated in degraded mode and requires review.\n")
+        lines.append(
+            "> **Warning**: This output was generated in degraded mode and requires review.\n"
+        )
 
     lines.append(f"---\n*analysis_hash: {manifest.analysis_hash}*")
     return "\n".join(lines)
@@ -94,8 +96,8 @@ def render_run_summary(manifest: RunManifest, evidence: EvidenceBundle) -> str:
     """Render a run summary Markdown document."""
     lines: list[str] = []
     lines.append("# Run Summary\n")
-    lines.append(f"| Field | Value |")
-    lines.append(f"|---|---|")
+    lines.append("| Field | Value |")
+    lines.append("|---|---|")
     lines.append(f"| Run ID | {manifest.run_id} |")
     lines.append(f"| Status | {manifest.status} |")
     lines.append(f"| Provider | {manifest.provider_type} |")
@@ -117,9 +119,7 @@ def render_run_summary(manifest: RunManifest, evidence: EvidenceBundle) -> str:
     if evidence.tool_call_records:
         lines.append("## Tool Calls\n")
         for r in evidence.tool_call_records[:10]:
-            lines.append(
-                f"- `{r.tool_name}` ({r.status}) — {r.arguments_summary[:80]}"
-            )
+            lines.append(f"- `{r.tool_name}` ({r.status}) — {r.arguments_summary[:80]}")
         if len(evidence.tool_call_records) > 10:
             lines.append(f"- ... and {len(evidence.tool_call_records) - 10} more")
         lines.append("")

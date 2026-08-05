@@ -3,12 +3,10 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from types import MappingProxyType
+from dataclasses import dataclass
+from datetime import UTC, datetime
 from typing import Any
 
-from specflow.artifacts.exceptions import ArtifactWriteError
 from specflow.tools.sanitization import sanitize_tool_text
 
 
@@ -65,7 +63,7 @@ class RunManifest:
 
 
 def _now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def _hash_text(text: str) -> str:

@@ -11,6 +11,8 @@ htmlcov/
 !.env.example
 *.sqlite3
 data/
-artifacts/
-artifacts-multi/
+# runtime artifact dirs live at repo root only; anchor to avoid excluding the src/specflow/artifacts package
+/artifacts/
+/artifacts-multi/
+/artifacts-ab/
 evaluation/results/mock/artifacts/

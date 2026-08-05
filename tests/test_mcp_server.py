@@ -116,9 +116,7 @@ class TestHandshake:
 
     def test_initialize_requires_protocol_version(self, server) -> None:
         with pytest.raises(McpInvalidParamsError):
-            server.handle_message(
-                {"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}}
-            )
+            server.handle_message({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}})
 
     def test_methods_rejected_before_initialized(self, server) -> None:
         with pytest.raises(McpNotInitializedError):
@@ -189,9 +187,7 @@ class TestToolsCall:
     def test_call_requires_name(self, server) -> None:
         _initialize(server)
         with pytest.raises(McpInvalidParamsError):
-            server.handle_message(
-                {"jsonrpc": "2.0", "id": 3, "method": "tools/call", "params": {}}
-            )
+            server.handle_message({"jsonrpc": "2.0", "id": 3, "method": "tools/call", "params": {}})
 
     def test_call_rejects_invalid_tool_name(self, server) -> None:
         _initialize(server)
@@ -228,8 +224,7 @@ class TestProtocolErrors:
 
     def test_unknown_notification_ignored(self, server) -> None:
         assert (
-            server.handle_message({"jsonrpc": "2.0", "method": "notifications/cancelled"})
-            is None
+            server.handle_message({"jsonrpc": "2.0", "method": "notifications/cancelled"}) is None
         )
 
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
@@ -70,6 +71,8 @@ class MultiAgentScheduler:
         stages: tuple[tuple[str, ...], ...],
         agent_executors: dict[str, AgentExecutor],
         context: dict[str, Any],
+        *,
+        deadline: float | None = None,
     ) -> tuple[StageExecutionResult, ...]:
         """Run all stages sequentially.
 
@@ -84,6 +87,12 @@ class MultiAgentScheduler:
         context:
             Base context dict passed (with accumulated prior outputs) to
             every agent executor.
+        deadline:
+            Optional absolute monotonic deadline (``time.monotonic()`` scale).
+            When set, each stage waits at most the remaining budget for its
+            agents. Queued work is cancelled; already-started synchronous work
+            is allowed to exit before control returns, because Python threads
+            cannot be safely force-cancelled.
 
         Returns
         -------
@@ -112,8 +121,20 @@ class MultiAgentScheduler:
                 if agent_id not in agent_executors:
                     raise ScheduleExecutionError(f"No executor registered for agent {agent_id!r}")
 
-            # Execute agents in this stage concurrently
-            with ThreadPoolExecutor(max_workers=self._max_workers) as executor:
+            # Execute agents in this stage concurrently. The executor is
+            # owned manually so a timed-out stage can cancel queued work, then
+            # wait for started work to exit before the caller releases shared
+            # run capacity.
+            executor = ThreadPoolExecutor(max_workers=self._max_workers)
+            try:
+                remaining = None
+                if deadline is not None:
+                    remaining = max(0.0, deadline - time.monotonic())
+                if remaining is not None and remaining <= 0:
+                    raise ScheduleExecutionError(
+                        "TIME_BUDGET_EXCEEDED: stage exceeded the wall-clock budget"
+                    )
+
                 future_map = {}
                 for agent_id in stage_agent_ids:
                     agent_ctx: dict[str, Any] = {
@@ -125,15 +146,24 @@ class MultiAgentScheduler:
                     future_map[future] = agent_id
                     agent_timings[agent_id] = AgentExecutionTiming(submitted_at=submitted_at)
 
-                for future in as_completed(future_map):
-                    agent_id = future_map[future]
-                    try:
-                        agent_results[agent_id] = future.result()
-                        agent_timings[agent_id].completed_at = datetime.now(UTC).isoformat()
-                    except Exception as exc:
-                        raise ScheduleExecutionError(
-                            f"Agent {agent_id!r} execution failed: {exc}"
-                        ) from exc
+                try:
+                    for future in as_completed(future_map, timeout=remaining):
+                        agent_id = future_map[future]
+                        try:
+                            agent_results[agent_id] = future.result()
+                            agent_timings[agent_id].completed_at = datetime.now(UTC).isoformat()
+                        except Exception as exc:
+                            raise ScheduleExecutionError(
+                                f"Agent {agent_id!r} execution failed: {exc}"
+                            ) from exc
+                except TimeoutError as exc:
+                    for future in future_map:
+                        future.cancel()
+                    raise ScheduleExecutionError(
+                        "TIME_BUDGET_EXCEEDED: stage did not finish within the wall-clock budget"
+                    ) from exc
+            finally:
+                executor.shutdown(wait=True, cancel_futures=True)
 
             completed_at = datetime.now(UTC).isoformat()
 

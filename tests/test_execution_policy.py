@@ -119,6 +119,30 @@ class TestRuntimeGuard:
         with pytest.raises(SpecFlowError, match="budget exceeded"):
             g.consume_llm_call()
 
+    def test_llm_call_counter_is_thread_safe(self):
+        """Concurrent consume_llm_call calls must not lose increments."""
+        from threading import Barrier, Thread
+
+        calls = 500
+        g = RuntimeGuard(ExecutionPolicy(max_llm_calls=calls))
+        barrier = Barrier(calls)
+        errors: list[Exception] = []
+
+        def worker() -> None:
+            barrier.wait(timeout=10)
+            try:
+                g.consume_llm_call()
+            except Exception as exc:  # pragma: no cover - failure path
+                errors.append(exc)
+
+        threads = [Thread(target=worker) for _ in range(calls)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join(timeout=20)
+        assert errors == []
+        assert g.llm_calls == calls
+
     def test_tokens_within_budget(self):
         g = RuntimeGuard(
             ExecutionPolicy(tokens=TokenPolicy(max_run_total_tokens=1000, reserved_retry_tokens=0))
@@ -185,6 +209,20 @@ class TestRuntimeGuard:
         t[0] = 100.0
         with pytest.raises(SpecFlowError, match="budget exceeded"):
             g.check_wall_time()
+
+    def test_deadline_and_remaining_time_follow_policy(self):
+        t = [100.0]
+
+        def fake_time() -> float:
+            return t[0]
+
+        g = RuntimeGuard(ExecutionPolicy(max_wall_time_seconds=30), time_source=fake_time)
+        assert g.deadline == 130.0
+        assert g.remaining_time() == 30.0
+        t[0] = 115.0
+        assert g.remaining_time() == 15.0
+        t[0] = 200.0
+        assert g.remaining_time() == 0.0
 
     def test_artifact_size_ok(self):
         g = RuntimeGuard(ExecutionPolicy())
