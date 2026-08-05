@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import os
 from pathlib import Path, PurePosixPath
 
 from specflow.artifacts.exceptions import ArtifactExistsError, ArtifactWriteError
@@ -14,7 +13,6 @@ from specflow.artifacts.renderers import (
     render_test_plan,
 )
 from specflow.evidence import EvidenceBundle
-from specflow.tools.sanitization import sanitize_tool_text
 
 
 class ArtifactStore:

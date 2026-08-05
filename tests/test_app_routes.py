@@ -7,7 +7,9 @@ from specflow.main import app
 
 
 def _health_routes() -> list[APIRoute]:
-    return [route for route in app.routes if isinstance(route, APIRoute) and route.path == "/health"]
+    return [
+        route for route in app.routes if isinstance(route, APIRoute) and route.path == "/health"
+    ]
 
 
 def test_module_level_app_has_single_health_route() -> None:
