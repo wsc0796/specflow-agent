@@ -307,6 +307,9 @@ the default portfolio workflow:
 | `SPECFLOW_MAX_RUNS_PER_MINUTE` | Run-creation burst cap (default `30`). |
 | `SPECFLOW_MAX_CONCURRENT_RUNS` | Maximum simultaneous runs (default `1`). |
 
+Runtime quota defaults are defined in `specflow.api_security`; regression tests
+keep this table and `.env.example` aligned with those runtime constants.
+
 Example for a LAN-exposed deployment:
 
 ```powershell

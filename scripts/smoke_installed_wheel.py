@@ -17,6 +17,7 @@ import tempfile
 import time
 import urllib.error
 import urllib.request
+from hashlib import sha256
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -94,7 +95,10 @@ class Smoke:
                 "import specflow.artifacts",
                 lambda: _run([str(py), "-c", "import specflow, specflow.artifacts"]),
             )
-            self.check("boot API + GET /health", lambda: self._api(work, py, api_dir, repo_dir))
+            self.check(
+                "boot API + mock run + artifact read",
+                lambda: self._api(work, py, api_dir, repo_dir),
+            )
         if self.failures:
             print(f"[smoke] RESULT: FAIL ({len(self.failures)}): {', '.join(self.failures)}")
             return 1
@@ -156,12 +160,37 @@ class Smoke:
             status, artifacts = _http("GET", f"{base}/api/v1/runs/{run_id}/artifacts")
             assert status == 200, f"artifacts fetch failed: {status}"
             assert artifacts.get("files"), f"no artifacts generated: {artifacts}"
+            assert "manifest.json" in artifacts["files"], f"manifest missing: {artifacts}"
+            self._verify_manifest(api_dir, run_id)
         finally:
             server.terminate()
             try:
                 server.wait(timeout=10)
             except subprocess.TimeoutExpired:
                 server.kill()
+
+    def _verify_manifest(self, api_dir: Path, api_run_id: str) -> None:
+        """Read a generated artifact and verify its persisted integrity record."""
+        output_root = api_dir / "data" / "runs" / api_run_id
+        run_directories = sorted(
+            path
+            for path in output_root.glob("run-multi-*")
+            if path.is_dir() and not path.is_symlink()
+        )
+        assert len(run_directories) == 1, f"unexpected run directories: {run_directories}"
+        run_directory = run_directories[0]
+        manifest_path = run_directory / "manifest.json"
+        integrity_path = run_directory / "artifact-integrity.json"
+        assert manifest_path.is_file() and not manifest_path.is_symlink()
+        assert integrity_path.is_file() and not integrity_path.is_symlink()
+
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        integrity = json.loads(integrity_path.read_text(encoding="utf-8"))
+        assert manifest["run_id"] == run_directory.name
+        assert manifest["workflow_state"] == "completed"
+        expected_digest = integrity.get("artifact_hashes", {}).get("manifest.json")
+        assert isinstance(expected_digest, str), "manifest digest missing from integrity record"
+        assert sha256(manifest_path.read_bytes()).hexdigest() == expected_digest
 
     def _wait_for_run(self, base: str, run_id: str) -> str:
         deadline = time.monotonic() + TIMEOUT_SECONDS

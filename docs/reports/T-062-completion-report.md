@@ -20,6 +20,10 @@ allowlist, quota, scheduler-lifecycle, and safe-error propagation gaps.
   executors to return before the caller can release shared run capacity. This
   is intentionally documented as bounded detection plus draining, not forced
   cancellation of arbitrary Python threads.
+- Runtime quota defaults are defined once in code and regression-tested against
+  the runtime constructors, README, and `.env.example`.
+- The installed-wheel smoke parses the generated `manifest.json` and verifies
+  its SHA-256 against `artifact-integrity.json`, rather than only listing names.
 - Added public-boundary regression coverage for all four behaviours and
   formatted the pre-existing `tests/test_mcp_server.py` violation so the
   repository-wide format gate is clean.
@@ -35,7 +39,7 @@ allowlist, quota, scheduler-lifecycle, and safe-error propagation gaps.
 | `uv build` | passed |
 | `git diff --check` | passed |
 | Wheel contains `specflow/artifacts/*` | 5 files |
-| `python scripts/smoke_installed_wheel.py` | PASS (clean venv, boot, mock run, artifacts) |
+| `python scripts/smoke_installed_wheel.py` | PASS (clean venv, boot, mock run, parsed and integrity-checked artifact) |
 
 ## Known limits
 

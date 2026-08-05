@@ -26,6 +26,9 @@ from pathlib import Path
 
 from fastapi import Header, HTTPException, Request, status
 
+DEFAULT_MAX_RUNS_PER_MINUTE = 30
+DEFAULT_MAX_CONCURRENT_RUNS = 1
+
 
 def _bearer_token(authorization: str | None) -> str | None:
     if not authorization:
@@ -63,7 +66,11 @@ class RunRateLimiter:
     shared limiter (e.g. Redis) instead.
     """
 
-    def __init__(self, per_minute: int = 30, max_concurrent: int = 1) -> None:
+    def __init__(
+        self,
+        per_minute: int = DEFAULT_MAX_RUNS_PER_MINUTE,
+        max_concurrent: int = DEFAULT_MAX_CONCURRENT_RUNS,
+    ) -> None:
         self._per_minute = per_minute
         self._max_concurrent = max_concurrent
         self._semaphore = threading.BoundedSemaphore(max_concurrent)
@@ -110,8 +117,8 @@ class ApiSecurity:
         api_key: str | None = None,
         allowed_repository_roots: tuple[str, ...] = (),
         reviewer_labels: frozenset[str] = frozenset(),
-        max_runs_per_minute: int = 30,
-        max_concurrent_runs: int = 1,
+        max_runs_per_minute: int = DEFAULT_MAX_RUNS_PER_MINUTE,
+        max_concurrent_runs: int = DEFAULT_MAX_CONCURRENT_RUNS,
     ) -> None:
         self.api_key = api_key
         self._allowed_roots = tuple(
@@ -137,8 +144,14 @@ class ApiSecurity:
             api_key=api_key,
             allowed_repository_roots=roots,
             reviewer_labels=labels,
-            max_runs_per_minute=_positive_int(source.get("SPECFLOW_MAX_RUNS_PER_MINUTE", "30"), 30),
-            max_concurrent_runs=_positive_int(source.get("SPECFLOW_MAX_CONCURRENT_RUNS", "1"), 1),
+            max_runs_per_minute=_positive_int(
+                source.get("SPECFLOW_MAX_RUNS_PER_MINUTE", str(DEFAULT_MAX_RUNS_PER_MINUTE)),
+                DEFAULT_MAX_RUNS_PER_MINUTE,
+            ),
+            max_concurrent_runs=_positive_int(
+                source.get("SPECFLOW_MAX_CONCURRENT_RUNS", str(DEFAULT_MAX_CONCURRENT_RUNS)),
+                DEFAULT_MAX_CONCURRENT_RUNS,
+            ),
         )
 
     # ── dependency hooks ─────────────────────────────────────────

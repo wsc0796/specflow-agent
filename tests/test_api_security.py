@@ -7,7 +7,12 @@ import pytest
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
-from specflow.api_security import ApiSecurity, RunRateLimiter
+from specflow.api_security import (
+    DEFAULT_MAX_CONCURRENT_RUNS,
+    DEFAULT_MAX_RUNS_PER_MINUTE,
+    ApiSecurity,
+    RunRateLimiter,
+)
 from specflow.main import create_app
 
 
@@ -287,10 +292,25 @@ def test_empty_api_key_header_rejects(tmp_path: Path, header_value: str) -> None
 
 
 def test_default_quotas_match_documented_values() -> None:
-    """from_env defaults must match README and .env.example (T-062)."""
+    """Runtime quota constants must be the source for code and docs (T-062)."""
     security = ApiSecurity.from_env(environment={})
-    assert security._rate_limiter._per_minute == 30
-    assert security._rate_limiter._max_concurrent == 1
+    direct_security = ApiSecurity()
+    direct_limiter = RunRateLimiter()
+    for limiter in (
+        security._rate_limiter,
+        direct_security._rate_limiter,
+        direct_limiter,
+    ):
+        assert limiter._per_minute == DEFAULT_MAX_RUNS_PER_MINUTE
+        assert limiter._max_concurrent == DEFAULT_MAX_CONCURRENT_RUNS
+
+    root = Path(__file__).resolve().parents[1]
+    readme = (root / "README.md").read_text(encoding="utf-8")
+    env_example = (root / ".env.example").read_text(encoding="utf-8")
+    assert f"Run-creation burst cap (default `{DEFAULT_MAX_RUNS_PER_MINUTE}`)." in readme
+    assert f"Maximum simultaneous runs (default `{DEFAULT_MAX_CONCURRENT_RUNS}`)." in readme
+    assert f"# SPECFLOW_MAX_RUNS_PER_MINUTE={DEFAULT_MAX_RUNS_PER_MINUTE}" in env_example
+    assert f"# SPECFLOW_MAX_CONCURRENT_RUNS={DEFAULT_MAX_CONCURRENT_RUNS}" in env_example
 
 
 def test_correct_key_works_on_both_headers(tmp_path: Path) -> None:
