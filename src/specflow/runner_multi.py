@@ -63,6 +63,7 @@ def run_multi_agent(
     model: str = "mock-model",
     policy: ExecutionPolicy = DEFAULT_POLICY,
     _executor_overrides: Mapping[str, AgentExecutor] | None = None,
+    _llm_client: LLMClient | None = None,
 ) -> int:
     """Execute the fixed plan and persist auditable multi-agent artifacts.
 
@@ -125,7 +126,11 @@ def run_multi_agent(
 
     # Create LLM client: real provider or mock
     llm_client: object
-    if mock or provider == "mock":
+    if _llm_client is not None:
+        if mock or provider == "mock":
+            raise ValueError("_llm_client injection requires a non-mock provider")
+        llm_client = _llm_client
+    elif mock or provider == "mock":
         llm_client = _make_mock_llm_client()
     else:
         try:
@@ -174,6 +179,7 @@ def run_multi_agent(
         "run_id": run_id,
         "requirement": requirement,
         "repository_evidence": evidence_text,
+        "agent_ids": tuple(identity.agent_id for identity in registry.list_agents()),
     }
     scheduler = MultiAgentScheduler(max_parallel_workers=policy.max_parallel_agents)
     prior_outputs: dict[str, dict[str, Any]] = {}

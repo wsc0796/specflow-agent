@@ -16,3 +16,5 @@ data/
 /artifacts-multi/
 /artifacts-ab/
 evaluation/results/mock/artifacts/
+/evals/live-provider-v1/runs/
+/evals/live-provider-v1/pricing.yaml

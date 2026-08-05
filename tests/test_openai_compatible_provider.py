@@ -117,6 +117,35 @@ def test_successful_response_is_normalized() -> None:
     assert result.latency_ms >= 0
 
 
+def test_private_response_observer_receives_only_successful_response_body() -> None:
+    observed: list[dict[str, object]] = []
+    client = OpenAICompatibleLLMClient(
+        _config(),
+        transport=httpx.MockTransport(lambda _: _response()),
+        _response_observer=observed.append,
+    )
+
+    result = client.complete(_request())
+
+    assert result.content == '{"ok":true}'
+    assert len(observed) == 1
+    assert observed[0]["id"] == "completion-1"
+    assert "authorization" not in observed[0]
+
+
+def test_private_response_observer_failure_does_not_fail_completion() -> None:
+    def observer(_: dict[str, object]) -> None:
+        raise RuntimeError("capture failed")
+
+    client = OpenAICompatibleLLMClient(
+        _config(),
+        transport=httpx.MockTransport(lambda _: _response()),
+        _response_observer=observer,
+    )
+
+    assert client.complete(_request()).content == '{"ok":true}'
+
+
 def test_request_uses_configured_model_and_openai_shape() -> None:
     captured: list[httpx.Request] = []
 
@@ -133,6 +162,40 @@ def test_request_uses_configured_model_and_openai_shape() -> None:
     assert '"max_tokens":256' in payload
     assert '"response_format":{"type":"json_object"}' in payload
     assert captured[0].headers["authorization"] == f"Bearer {_TEST_CREDENTIAL}"
+
+
+def test_deepseek_request_disables_thinking_mode() -> None:
+    """DeepSeek V4 defaults to thinking mode; structured agents need the final
+    answer to be complete, so thinking is explicitly disabled for DeepSeek."""
+    captured: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured.append(request)
+        return _response()
+
+    client = OpenAICompatibleLLMClient(
+        _config(model="deepseek-v4-flash"),
+        transport=httpx.MockTransport(handler),
+    )
+    client.complete(_request(model="deepseek-v4-flash"))
+
+    assert len(captured) == 1
+    payload = captured[0].read().decode("utf-8")
+    assert '"thinking":{"type":"disabled"}' in payload
+
+
+def test_non_deepseek_request_keeps_default_parameters() -> None:
+    captured: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured.append(request)
+        return _response()
+
+    _client(handler).complete(_request())
+
+    assert len(captured) == 1
+    payload = captured[0].read().decode("utf-8")
+    assert "thinking" not in payload
 
 
 def test_timeout_is_mapped_without_raw_error() -> None:

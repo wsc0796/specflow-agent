@@ -1,0 +1,28 @@
+task_id: employee-login-call-chain
+repository: wsc0796/sky-takeout-python
+repository_commit: 4ede5d01039be8c703e4cc2cc94f18084ebf1ba1
+user_request: >-
+  Trace the /api/employee/login request from route handler through credential
+  verification to JWT token issuance. Identify the concrete files and explain
+  what is verified without exposing configuration values or proposing code
+  changes.
+expected_files:
+  - app/api/routes/employee.py
+  - app/services/employee_service.py
+  - app/utils/jwt.py
+required_evidence:
+  - app/api/routes/employee.py
+  - app/services/employee_service.py
+  - app/utils/jwt.py
+required_output_fields:
+  - stage-0/repository-analyst-agent-v1.output.summary
+  - stage-1/design-agent-v1.output.evidence_refs
+  - stage-2/synthesis-agent-v1.output.summary
+  - stage-3/review-agent-v1.output.decision
+forbidden_assumptions:
+  - Passwords are stored in plaintext.
+  - The login endpoint uses OAuth.
+timeout_seconds: 300
+human_notes: >-
+  Check that route, service, bcrypt verification, and JWT issuance are all
+  grounded in the cited source instead of inferred from framework conventions.

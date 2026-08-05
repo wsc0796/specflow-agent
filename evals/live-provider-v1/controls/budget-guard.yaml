@@ -1,0 +1,20 @@
+task_id: budget-guard
+evaluation_class: control
+max_llm_calls: 1
+repository: wsc0796/sky-takeout-python
+repository_commit: 4ede5d01039be8c703e4cc2cc94f18084ebf1ba1
+user_request: >-
+  Identify the FastAPI entry point and route registration using source evidence.
+  This control intentionally has a one-call LLM budget and must stop safely
+  once that budget is exhausted.
+expected_files:
+  - app/main.py
+required_evidence:
+  - app/main.py
+required_output_fields: []
+forbidden_assumptions:
+  - The control proves model quality.
+timeout_seconds: 300
+human_notes: >-
+  This is a runtime-control sample. Confirm the safe call-budget failure and
+  exclude it from quality success-rate calculations.

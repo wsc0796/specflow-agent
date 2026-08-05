@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import json
 import time
-from typing import Any
+from collections.abc import Mapping
+from typing import Any, Literal, get_args, get_origin
 
 from specflow.agents.models import AgentIdentity
 from specflow.llm.client import LLMClient
@@ -66,12 +67,26 @@ class AgentRunner:
         task_description = context.get("task_description", self._identity.description)
         evidence = validated_input.get("repository_evidence", "")
 
+        output_contract = ""
+        if self._schema_registry is not None:
+            try:
+                output_model = self._schema_registry.get(self._identity.output_schema_id)
+                agent_ids = context.get("agent_ids", ())
+                if isinstance(agent_ids, (list, tuple, set, frozenset)):
+                    agent_ids = tuple(str(agent_id) for agent_id in agent_ids)
+                else:
+                    agent_ids = ()
+                output_contract = _output_contract(output_model, agent_ids=agent_ids)
+            except Exception:
+                output_contract = ""
+
         user_message = _build_user_message(
             role=self._identity.role.value,
             task_description=task_description,
             requirement=requirement,
             prior_outputs=prior_outputs,
             evidence=evidence,
+            output_contract=output_contract,
         )
 
         messages: list[LLMMessage] = []
@@ -171,6 +186,7 @@ def _build_user_message(
     requirement: str,
     prior_outputs: dict[str, Any],
     evidence: str = "",
+    output_contract: str = "",
 ) -> str:
     """Build a structured user message for one agent execution."""
     parts: list[str] = [
@@ -202,7 +218,59 @@ def _build_user_message(
             parts.append(summary)
 
     parts.extend(["", "Return a JSON object with your structured analysis."])
+    if output_contract:
+        parts.extend(["", output_contract])
     return "\n".join(parts)
+
+
+def _output_contract(output_model: type, *, agent_ids: tuple[str, ...] = ()) -> str:
+    """Render the agent's declared output schema as a prompt-level contract.
+
+    Providers are told the exact top-level field set before responding, so a
+    real model cannot silently invent a different JSON shape that later stages
+    would reject.  ``extra="forbid"`` schemas stay authoritative: the contract
+    mirrors them, and validation still rejects unknown fields.
+    """
+    lines = [
+        "Output contract — return a JSON object with exactly these top-level fields and no others:",
+    ]
+    for name, field in output_model.model_fields.items():
+        type_text = _format_annotation(field.annotation)
+        description = (field.description or "").strip()
+        if name == "target_agent_id" and agent_ids:
+            allowed = ", ".join(repr(agent_id) for agent_id in agent_ids)
+            if description:
+                description = f"{description}. Allowed values: {allowed}"
+            else:
+                description = f"Allowed values: {allowed}"
+        if description:
+            lines.append(f"- {name}: {type_text} ({description})")
+        else:
+            lines.append(f"- {name}: {type_text}")
+    return "\n".join(lines)
+
+
+def _format_annotation(annotation: Any) -> str:
+    """Convert a Pydantic field annotation into a short human-readable type."""
+    origin = get_origin(annotation)
+    if origin is Literal:
+        values = get_args(annotation)
+        return " | ".join(repr(value) for value in values)
+    if origin in (list, set, frozenset, tuple):
+        args = get_args(annotation)
+        inner = _format_annotation(args[0]) if args and args[0] is not Any else "any"
+        return f"array of {inner}"
+    if origin in (dict, Mapping):
+        return "object"
+    if annotation is str:
+        return "string"
+    if annotation is int:
+        return "integer"
+    if annotation is float:
+        return "number"
+    if annotation is bool:
+        return "boolean"
+    return "any"
 
 
 def _summarize_output(output: dict[str, Any], max_chars: int = 500) -> str:

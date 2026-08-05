@@ -1,0 +1,26 @@
+task_id: dish-cache-consistency
+repository: wsc0796/sky-takeout-python
+repository_commit: 4ede5d01039be8c703e4cc2cc94f18084ebf1ba1
+user_request: >-
+  Review the dish detail cache behavior for create, update, delete, and read
+  operations. Produce an evidence-backed risk and test note for cache
+  consistency; do not implement the change.
+expected_files:
+  - app/api/routes/dish.py
+  - app/services/dish_service.py
+  - app/core/redis.py
+required_evidence:
+  - app/services/dish_service.py
+  - app/core/redis.py
+required_output_fields:
+  - stage-0/repository-analyst-agent-v1.output.key_files
+  - stage-1/risk-review-agent-v1.output.risks
+  - stage-1/test-strategy-agent-v1.output.test_scenarios
+  - stage-3/review-agent-v1.output.decision
+forbidden_assumptions:
+  - Redis failures make the API unavailable.
+  - The cache is invalidated only when a dish is created.
+timeout_seconds: 300
+human_notes: >-
+  Check whether cache key, TTL, fallback behavior, and invalidation paths are
+  tied to source evidence rather than generic cache advice.

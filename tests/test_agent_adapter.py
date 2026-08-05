@@ -5,13 +5,20 @@ import json
 from specflow.agents.adapter import AgentRunner
 from specflow.agents.models import AgentIdentity, AgentRole
 from specflow.llm.models import LLMResponse, LLMUsage
-from specflow.schema.agent_payloads import DesignPayload
+from specflow.schema.agent_payloads import DesignPayload, ReviewPayload
 from specflow.schema.registry import SchemaRegistry
 
 
 def _schema_registry() -> SchemaRegistry:
     registry = SchemaRegistry()
     registry.register("agent/test/v1/output", DesignPayload)
+    registry.freeze()
+    return registry
+
+
+def _review_schema_registry() -> SchemaRegistry:
+    registry = SchemaRegistry()
+    registry.register("agent/test/v1/output", ReviewPayload)
     registry.freeze()
     return registry
 
@@ -143,6 +150,45 @@ class TestAgentRunner:
         runner = AgentRunner(ident, client, model="test", schema_registry=_schema_registry())
         runner.execute({"requirement": "Test"})
         assert client.last_request.response_format == "json"
+
+    def test_runner_declares_output_contract_in_user_message(self):
+        """Real providers must be told the exact output field set before responding."""
+        ident = _make_identity()
+        client = FakeLLMClient()
+        runner = AgentRunner(ident, client, model="test", schema_registry=_schema_registry())
+        runner.execute({"requirement": "Test"})
+        user_msg = client.last_request.messages[-1].content
+        assert "Output contract" in user_msg
+        assert "exactly these top-level fields and no others" in user_msg
+        assert "- summary: string" in user_msg
+        assert "- architecture_changes: array of string" in user_msg
+
+    def test_runner_contract_includes_literal_choices(self):
+        """Literal fields (e.g. Review decision) must expose their allowed values."""
+        client = FakeLLMClient()
+        runner = AgentRunner(
+            _make_identity(), client, model="test", schema_registry=_review_schema_registry()
+        )
+        runner.execute({"requirement": "Test"})
+        user_msg = client.last_request.messages[-1].content
+        assert "'PASS' | 'REJECT'" in user_msg
+
+    def test_runner_contract_lists_allowed_revision_targets(self):
+        """A Review REJECT must name a real agent id, so the contract lists them."""
+        client = FakeLLMClient()
+        runner = AgentRunner(
+            _make_identity(), client, model="test", schema_registry=_review_schema_registry()
+        )
+        runner.execute(
+            {
+                "requirement": "Test",
+                "agent_ids": ["design-agent-v1", "synthesis-agent-v1", "review-agent-v1"],
+            }
+        )
+        user_msg = client.last_request.messages[-1].content
+        assert (
+            "Allowed values: 'design-agent-v1', 'synthesis-agent-v1', 'review-agent-v1'" in user_msg
+        )
 
     def test_runner_fails_closed_without_schema_registry(self):
         result = AgentRunner(_make_identity(), FakeLLMClient(), model="test").execute({})
