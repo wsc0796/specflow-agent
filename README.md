@@ -325,7 +325,9 @@ bounded, read-only tools; sensitive paths (`.env`, `.aws/`, `.ssh/`, `.kube/`,
 matched lines pass through a DLP redaction pass covering provider-specific
 tokens, AWS/GitHub/GitLab/Slack/Google/Azure credentials, PEM blocks, DSNs with
 embedded passwords, and sensitive-variable assignments — plus a final scan
-before evidence is sent to a live provider or persisted to `sources.json`.
+in both pipelines before evidence is sent to a live provider or persisted to
+`sources.json`. Agent output values pass through the same final DLP ruleset
+before multi-agent handoffs and artifact persistence.
 
 Even with all controls enabled, this is a single-process service: for a
 multi-user or public deployment add a reverse proxy, per-user ownership and

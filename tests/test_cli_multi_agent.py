@@ -8,11 +8,41 @@ import pytest
 
 from specflow.plan.hash_utils import canonical_json_bytes
 from specflow.policy.models import ExecutionPolicy
-from specflow.runner_multi import _build_registry, _validated_inputs, run_multi_agent
+from specflow.runner_multi import (
+    _build_registry,
+    _sanitize_artifact_value,
+    _validated_inputs,
+    run_multi_agent,
+)
 from specflow.schema import build_schema_registry
 
 
 class TestMultiAgentRunner:
+    def test_artifact_sanitization_uses_full_dlp_ruleset(self) -> None:
+        raw_values = {
+            "openai": "sk-abc123def456ghi789jkl012mno345pqr678stu",
+            "github": "ghp_1234567890abcdefghijklmnopqrstuvwxyz",
+            "jwt": "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.signature",
+            "assignment": 'client_secret = "artifact-secret"',
+            "path": "C:/sensitive/repository/config.py",
+        }
+
+        sanitized = _sanitize_artifact_value(raw_values)
+        serialized = json.dumps(sanitized)
+
+        for secret in (
+            "sk-abc123def456ghi789jkl012mno345pqr678stu",
+            "ghp_1234567890abcdefghijklmnopqrstuvwxyz",
+            "eyJhbGciOiJIUzI1NiJ9",
+            "artifact-secret",
+            "C:/sensitive/repository/config.py",
+        ):
+            assert secret not in serialized
+        assert "sk-<redacted>" in serialized
+        assert "ghp_<redacted>" in serialized
+        assert "<jwt>" in serialized
+        assert "<absolute-path-redacted>" in serialized
+
     def test_receiver_input_schema_is_executed_before_scheduling(self) -> None:
         registry = _build_registry()
         schemas = build_schema_registry()
