@@ -1,11 +1,9 @@
-"""Optional hardening for the HTTP entry point.
+"""Fail-closed security controls for the HTTP entry point.
 
-The service is designed for a single-user, localhost-only deployment.  The
-controls below are opt-in through environment variables so the default
-portfolio workflow remains unchanged:
+The API requires an ASCII ``SPECFLOW_API_KEY`` at startup. Every HTTP route
+except the liveness endpoint requires that key through ``X-API-Key`` or an
+``Authorization: Bearer`` header.
 
-- ``SPECFLOW_API_KEY``: when set, every ``/api/v1`` request must present the
-  key via ``X-API-Key`` or ``Authorization: Bearer``.
 - ``SPECFLOW_ALLOWED_REPOSITORY_ROOTS``: when set (``;``-separated paths),
   registered ``repository_path`` values must resolve inside one of them.
 - ``SPECFLOW_REVIEWER_LABELS``: when set (comma-separated), review decisions
@@ -28,6 +26,10 @@ from fastapi import Header, HTTPException, Request, status
 
 DEFAULT_MAX_RUNS_PER_MINUTE = 30
 DEFAULT_MAX_CONCURRENT_RUNS = 1
+
+
+class ApiSecurityConfigurationError(RuntimeError):
+    """Raised when the server would start without a usable API credential."""
 
 
 def _bearer_token(authorization: str | None) -> str | None:
@@ -109,7 +111,7 @@ class RunPermit:
 
 
 class ApiSecurity:
-    """Opt-in authentication, path allowlisting, and run quotas."""
+    """HTTP authentication, path allowlisting, and run quotas."""
 
     def __init__(
         self,
@@ -154,6 +156,18 @@ class ApiSecurity:
             ),
         )
 
+    def validate_configuration(self) -> None:
+        """Reject startup unless the process has a usable API credential."""
+        if (
+            not isinstance(self.api_key, str)
+            or not self.api_key
+            or self.api_key != self.api_key.strip()
+            or not self.api_key.isascii()
+        ):
+            raise ApiSecurityConfigurationError(
+                "SPECFLOW_API_KEY must be a non-empty ASCII value before starting the API."
+            )
+
     # ── dependency hooks ─────────────────────────────────────────
 
     def require_api_key(
@@ -162,9 +176,12 @@ class ApiSecurity:
         x_api_key: str | None = Header(default=None),
         authorization: str | None = Header(default=None),
     ) -> None:
-        """Reject unauthenticated API calls when a key is configured."""
+        """Reject a request without the configured API key."""
         if not self.api_key:
-            return
+            raise HTTPException(
+                status.HTTP_503_SERVICE_UNAVAILABLE,
+                "API authentication is not configured.",
+            )
         provided = x_api_key or _bearer_token(authorization)
         if not provided or not _keys_match(provided, self.api_key):
             raise HTTPException(
@@ -172,6 +189,14 @@ class ApiSecurity:
                 "Invalid or missing API key.",
                 headers={"WWW-Authenticate": "Bearer"},
             )
+
+    def require_request(self, request: Request) -> None:
+        """Apply API-key verification from a raw ASGI request."""
+        self.require_api_key(
+            request,
+            x_api_key=request.headers.get("x-api-key"),
+            authorization=request.headers.get("authorization"),
+        )
 
     def validate_repository_path(self, repository_path: str) -> Path:
         """Return the resolved path, or reject it outside the allowlist."""

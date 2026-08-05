@@ -233,12 +233,13 @@ $env:SPECFLOW_LLM_TIMEOUT_SECONDS = "60"
 
 ```powershell
 uv sync --all-groups
+$env:SPECFLOW_API_KEY = "<random long ASCII secret>"
 uv run uvicorn specflow.main:app --reload
 ```
 
-Uvicorn binds to `127.0.0.1` by default; do not expose the API on a public or
-LAN interface unless you have enabled authentication (see
-[Security boundaries](#security-boundaries)).
+The API refuses to start unless `SPECFLOW_API_KEY` is a non-empty ASCII value.
+Uvicorn binds to `127.0.0.1` by default; use a reverse proxy and the additional
+deployment controls below before exposing it beyond localhost.
 
 Open `http://127.0.0.1:8000/health`. Expected response:
 
@@ -246,7 +247,7 @@ Open `http://127.0.0.1:8000/health`. Expected response:
 {"status":"ok"}
 ```
 
-Interactive API documentation is available at `http://127.0.0.1:8000/docs`.
+Documentation and OpenAPI routes require the same API key as business routes.
 
 ## Run API (mock-only, single process)
 
@@ -258,19 +259,23 @@ queue or live-provider endpoint.
 
 ```powershell
 # First create a registered project, then retain its returned `id`.
+$headers = @{"X-API-Key"=$env:SPECFLOW_API_KEY}
 $project = Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8000/api/v1/projects `
+  -Headers $headers `
   -ContentType 'application/json' `
   -Body '{"name":"Example API","repository_path":"C:\\projects\\example-api"}'
 
 $run = Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8000/api/v1/runs `
+  -Headers $headers `
   -ContentType 'application/json' `
   -Body (@{project_id=$project.id;requirement="Add a search endpoint"} | ConvertTo-Json)
 
-Invoke-RestMethod -Uri "http://127.0.0.1:8000/api/v1/runs/$($run.id)"
-Invoke-RestMethod -Uri "http://127.0.0.1:8000/api/v1/runs/$($run.id)/artifacts"
-Invoke-RestMethod -Uri "http://127.0.0.1:8000/api/v1/runs/$($run.id)/review-package"
+Invoke-RestMethod -Headers $headers -Uri "http://127.0.0.1:8000/api/v1/runs/$($run.id)"
+Invoke-RestMethod -Headers $headers -Uri "http://127.0.0.1:8000/api/v1/runs/$($run.id)/artifacts"
+Invoke-RestMethod -Headers $headers -Uri "http://127.0.0.1:8000/api/v1/runs/$($run.id)/review-package"
 
 Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:8000/api/v1/runs/$($run.id)/review-decisions" `
+  -Headers $headers `
   -ContentType 'application/json' `
   -Body '{"decision":"accepted","reviewer_label":"Engineering lead","rationale":"Proceed with implementation after human review."}'
 ```
@@ -281,27 +286,28 @@ path or arbitrary artifact contents. A completed or completed-degraded Run may
 also expose a bounded review package and append-only reviewer decisions.
 `reviewer_label` is unverified display metadata, not an authenticated identity;
 this single-process/mock-only slice has no user accounts, queue, async
-execution, or repository write capability. Optional API-key authentication,
-repository-path allowlisting and reviewer-label allowlisting can be enabled
-through environment variables (see below).
+execution, or repository write capability. API-key authentication is required;
+repository-path and reviewer-label allowlists can also be configured through
+environment variables (see below).
 
 To register a project record (this does not scan or validate the path yet):
 
 ```powershell
 Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8000/api/v1/projects `
+  -Headers @{"X-API-Key"=$env:SPECFLOW_API_KEY} `
   -ContentType 'application/json' `
   -Body '{"name":"Example API","repository_path":"C:\\projects\\example-api"}'
 ```
 
 ## Security boundaries
 
-The service is designed for a single-user, localhost-only deployment. The
-following controls are opt-in via environment variables and change nothing in
-the default portfolio workflow:
+The service requires an API key and is designed for a single-user,
+localhost-only deployment. The following controls are configured through
+environment variables:
 
-| Variable | Effect when set |
+| Variable | Effect |
 | --- | --- |
-| `SPECFLOW_API_KEY` | Every `/api/v1` request must present the key via `X-API-Key` or `Authorization: Bearer`. `/health` stays open. |
+| `SPECFLOW_API_KEY` | Required non-empty ASCII credential. Every route except `/health`, including `/docs`, `/redoc`, and `/openapi.json`, must present it via `X-API-Key` or `Authorization: Bearer`. |
 | `SPECFLOW_ALLOWED_REPOSITORY_ROOTS` | Semicolon-separated roots; `repository_path` must resolve inside one of them. |
 | `SPECFLOW_REVIEWER_LABELS` | Comma-separated approved labels; review decisions must use one of them. |
 | `SPECFLOW_MAX_RUNS_PER_MINUTE` | Run-creation burst cap (default `30`). |

@@ -3,12 +3,21 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 from sqlalchemy import inspect
 
+from specflow.api_security import ApiSecurity
 from specflow.db import Project, ProjectScan, WorkflowRun
 from specflow.main import create_app
 
+TEST_API_KEY = "test-api-key"
+
 
 def client_for(tmp_path: Path) -> TestClient:
-    return TestClient(create_app(f"sqlite:///{(tmp_path / 'test.db').as_posix()}"))
+    return TestClient(
+        create_app(
+            f"sqlite:///{(tmp_path / 'test.db').as_posix()}",
+            security=ApiSecurity(api_key=TEST_API_KEY),
+        ),
+        headers={"X-API-Key": TEST_API_KEY},
+    )
 
 
 def test_create_and_get_project(tmp_path: Path) -> None:
@@ -52,7 +61,10 @@ def test_project_input_errors(tmp_path: Path) -> None:
 
 
 def test_core_persistence_tables_and_relationships(tmp_path: Path) -> None:
-    app = create_app(f"sqlite:///{(tmp_path / 'test.db').as_posix()}")
+    app = create_app(
+        f"sqlite:///{(tmp_path / 'test.db').as_posix()}",
+        security=ApiSecurity(api_key=TEST_API_KEY),
+    )
     with TestClient(app):
         database = app.state.database
         assert {

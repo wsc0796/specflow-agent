@@ -4,20 +4,33 @@ import sqlite3
 from pathlib import Path
 
 import pytest
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy import inspect
 
+from specflow.api_security import ApiSecurity
 from specflow.db import WorkflowRun
 from specflow.main import create_app
 from specflow.policy import RunStatus
 
+TEST_API_KEY = "test-api-key"
+
+
+def app_for(database_url: str, artifact_root: Path) -> FastAPI:
+    return create_app(
+        database_url,
+        artifact_root=artifact_root,
+        security=ApiSecurity(api_key=TEST_API_KEY),
+    )
+
 
 def client_for(tmp_path: Path) -> TestClient:
     return TestClient(
-        create_app(
+        app_for(
             f"sqlite:///{(tmp_path / 'test.db').as_posix()}",
-            artifact_root=tmp_path / "run-artifacts",
-        )
+            tmp_path / "run-artifacts",
+        ),
+        headers={"X-API-Key": TEST_API_KEY},
     )
 
 
@@ -432,8 +445,8 @@ def test_startup_adds_run_metadata_to_a_legacy_sqlite_database(tmp_path: Path) -
             """
         )
 
-    app = create_app(f"sqlite:///{database_path.as_posix()}", artifact_root=tmp_path / "artifacts")
-    with TestClient(app):
+    app = app_for(f"sqlite:///{database_path.as_posix()}", tmp_path / "artifacts")
+    with TestClient(app, headers={"X-API-Key": TEST_API_KEY}):
         columns = {
             column["name"]
             for column in inspect(app.state.database.engine).get_columns("workflow_runs")
@@ -453,9 +466,9 @@ def test_startup_recovers_interrupted_running_run_once(tmp_path: Path, monkeypat
     database_path = tmp_path / "restart.db"
     database_url = f"sqlite:///{database_path.as_posix()}"
     artifacts = tmp_path / "artifacts"
-    initial_app = create_app(database_url, artifact_root=artifacts)
+    initial_app = app_for(database_url, artifacts)
 
-    with TestClient(initial_app) as client:
+    with TestClient(initial_app, headers={"X-API-Key": TEST_API_KEY}) as client:
         project_id = register_project(client, tmp_path / "repository")
         with next(initial_app.state.database.sessions()) as session:
             session.add(
@@ -473,8 +486,8 @@ def test_startup_recovers_interrupted_running_run_once(tmp_path: Path, monkeypat
         raise AssertionError("startup recovery must not execute the runner")
 
     monkeypatch.setattr("specflow.runs.run_multi_agent", fail_if_runner_called)
-    restarted_app = create_app(database_url, artifact_root=artifacts)
-    with TestClient(restarted_app) as client:
+    restarted_app = app_for(database_url, artifacts)
+    with TestClient(restarted_app, headers={"X-API-Key": TEST_API_KEY}) as client:
         response = client.get("/api/v1/runs/interrupted-run")
         assert response.status_code == 200
         body = response.json()
@@ -487,8 +500,8 @@ def test_startup_recovers_interrupted_running_run_once(tmp_path: Path, monkeypat
             assert recovered is not None
             assert recovered.version == 8
 
-    second_restart = create_app(database_url, artifact_root=artifacts)
-    with TestClient(second_restart):
+    second_restart = app_for(database_url, artifacts)
+    with TestClient(second_restart, headers={"X-API-Key": TEST_API_KEY}):
         with next(second_restart.state.database.sessions()) as session:
             recovered = session.get(WorkflowRun, "interrupted-run")
             assert recovered is not None
@@ -498,9 +511,9 @@ def test_startup_recovers_interrupted_running_run_once(tmp_path: Path, monkeypat
 def test_startup_leaves_non_running_runs_untouched(tmp_path: Path) -> None:
     database_path = tmp_path / "states.db"
     database_url = f"sqlite:///{database_path.as_posix()}"
-    app = create_app(database_url, artifact_root=tmp_path / "artifacts")
+    app = app_for(database_url, tmp_path / "artifacts")
 
-    with TestClient(app) as client:
+    with TestClient(app, headers={"X-API-Key": TEST_API_KEY}) as client:
         project_id = register_project(client, tmp_path / "repository")
         states = [
             RunStatus.CREATED,
@@ -533,8 +546,8 @@ def test_startup_leaves_non_running_runs_untouched(tmp_path: Path) -> None:
             )
             session.commit()
 
-    restarted_app = create_app(database_url, artifact_root=tmp_path / "artifacts")
-    with TestClient(restarted_app):
+    restarted_app = app_for(database_url, tmp_path / "artifacts")
+    with TestClient(restarted_app, headers={"X-API-Key": TEST_API_KEY}):
         with next(restarted_app.state.database.sessions()) as session:
             for index, run_status in enumerate(states):
                 preserved = session.get(WorkflowRun, f"non-running-{index}")
