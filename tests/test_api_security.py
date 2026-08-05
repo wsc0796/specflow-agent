@@ -290,6 +290,13 @@ def test_empty_api_key_header_rejects(tmp_path: Path, header_value: str) -> None
         assert response.status_code == 401
 
 
+def test_default_quotas_match_documented_values() -> None:
+    """from_env defaults must match README and .env.example (T-062)."""
+    security = ApiSecurity.from_env(environment={})
+    assert security._rate_limiter._per_minute == 30
+    assert security._rate_limiter._max_concurrent == 1
+
+
 def test_correct_key_works_on_both_headers(tmp_path: Path) -> None:
     with _client(tmp_path, api_key="top-secret-key") as client:
         via_header = client.get(
