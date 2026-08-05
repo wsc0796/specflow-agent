@@ -1,0 +1,7 @@
+schema_version: "1.0"
+provider: openai-compatible
+model: replace-with-provider-model
+input_usd_per_million_tokens: null
+output_usd_per_million_tokens: null
+source_url: https://provider.example/pricing
+retrieved_at: YYYY-MM-DD

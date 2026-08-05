@@ -11,7 +11,9 @@ strict payload-schema follow-up work:
 - M6: Multi-Agent Orchestration (Live Provider validated)
 - M7: Evaluation, Demo & Resume (portfolio-ready)
 
-752 passing tests, 3 skipped, 3 known warnings after T-062.
+760 passing tests, 3 skipped, 3 known warnings after adding the T-063
+live-provider evaluation harness. The harness has no live result until a
+configured Provider run and human review are recorded.
 M8 production hardening remains limited to the implemented policy, schema,
 fallback, evidence, and artifact boundaries; it does not claim a new
 live-provider validation or deployment work. T-056 adds a separately specified

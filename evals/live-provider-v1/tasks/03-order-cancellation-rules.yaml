@@ -1,0 +1,28 @@
+task_id: order-cancellation-rules
+repository: wsc0796/sky-takeout-python
+repository_commit: 4ede5d01039be8c703e4cc2cc94f18084ebf1ba1
+user_request: >-
+  Analyze the existing order cancellation behavior. Explain the request path,
+  state transition, and test risks for a request to allow cancellation changes.
+  Cite source evidence and do not modify the repository.
+expected_files:
+  - app/api/routes/order.py
+  - app/services/order_service.py
+  - app/models/order.py
+required_evidence:
+  - app/api/routes/order.py
+  - app/services/order_service.py
+  - app/models/order.py
+required_output_fields:
+  - stage-0/repository-analyst-agent-v1.output.key_files
+  - stage-1/risk-review-agent-v1.output.risks
+  - stage-2/synthesis-agent-v1.output.consolidated_tests
+  - stage-3/review-agent-v1.output.decision
+forbidden_assumptions:
+  - Paid orders can be cancelled.
+  - Cancellation is implemented as a delete operation.
+timeout_seconds: 300
+human_notes: >-
+  Check that the answer recognizes the CREATED-only cancellation rule and
+  discusses tests or concurrency boundaries without claiming transactions that
+  are not shown.

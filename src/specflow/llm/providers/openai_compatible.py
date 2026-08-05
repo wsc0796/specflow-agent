@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from time import perf_counter
 from typing import Any
 
@@ -20,11 +21,15 @@ class OpenAICompatibleLLMClient:
         config: OpenAICompatibleConfig,
         *,
         transport: httpx.BaseTransport | None = None,
+        _response_observer: Callable[[dict[str, Any]], None] | None = None,
     ) -> None:
         if not isinstance(config, OpenAICompatibleConfig):
             raise TypeError("config must be an OpenAICompatibleConfig")
         self._config = config
         self._transport = transport
+        # Private evaluation hook. It receives only successfully parsed response
+        # bodies; request payloads, headers, and credentials are never exposed.
+        self._response_observer = _response_observer
 
     def __repr__(self) -> str:
         return (
@@ -84,6 +89,7 @@ class OpenAICompatibleLLMClient:
             raise LLMResponseError("LLM provider returned invalid JSON")
 
         content, model, usage, finish_reason = self._parse_response(payload)
+        self._notify_response_observer(payload)
         return LLMResponse(
             content=content,
             model=model,
@@ -91,6 +97,17 @@ class OpenAICompatibleLLMClient:
             latency_ms=max(0, int((perf_counter() - started) * 1000)),
             finish_reason=finish_reason,
         )
+
+    def _notify_response_observer(self, payload: Any) -> None:
+        """Best-effort private observer for an evaluation-only response recorder."""
+        if self._response_observer is None or not isinstance(payload, dict):
+            return
+        try:
+            self._response_observer(payload)
+        except Exception:
+            # Evidence recording must not change the Provider contract or turn
+            # a valid completion into a failed Agent run.
+            return
 
     def _request_payload(self, request: LLMRequest) -> dict[str, Any]:
         payload: dict[str, Any] = {

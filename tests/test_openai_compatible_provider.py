@@ -117,6 +117,35 @@ def test_successful_response_is_normalized() -> None:
     assert result.latency_ms >= 0
 
 
+def test_private_response_observer_receives_only_successful_response_body() -> None:
+    observed: list[dict[str, object]] = []
+    client = OpenAICompatibleLLMClient(
+        _config(),
+        transport=httpx.MockTransport(lambda _: _response()),
+        _response_observer=observed.append,
+    )
+
+    result = client.complete(_request())
+
+    assert result.content == '{"ok":true}'
+    assert len(observed) == 1
+    assert observed[0]["id"] == "completion-1"
+    assert "authorization" not in observed[0]
+
+
+def test_private_response_observer_failure_does_not_fail_completion() -> None:
+    def observer(_: dict[str, object]) -> None:
+        raise RuntimeError("capture failed")
+
+    client = OpenAICompatibleLLMClient(
+        _config(),
+        transport=httpx.MockTransport(lambda _: _response()),
+        _response_observer=observer,
+    )
+
+    assert client.complete(_request()).content == '{"ok":true}'
+
+
 def test_request_uses_configured_model_and_openai_shape() -> None:
     captured: list[httpx.Request] = []
 

@@ -1,0 +1,16 @@
+{
+  "schema_version": "1.0",
+  "suite": "live-provider-v1",
+  "repository": "wsc0796/sky-takeout-python",
+  "repository_commit": "4ede5d01039be8c703e4cc2cc94f18084ebf1ba1",
+  "task_sha256": {
+    "01-repository-entrypoints.yaml": "d1afe51ffd0ca7ea929cfe947f3e2ae7b4fd1815dede3beee0e3f8cb37cc01e1",
+    "02-employee-login-call-chain.yaml": "d8da05b025e7fd0755ff783de1a89305d4caf8b9ca198972af8d808ba50e0779",
+    "03-order-cancellation-rules.yaml": "83e7f75866d4fd15483deaa88484cccce1ffb807ff5a7e16dd17d6afa1a3945e",
+    "04-dish-cache-consistency.yaml": "998dc771bd152d8de0c66e0da13514f906208bebd960ae740cc53f5822de4193",
+    "05-jwt-config-boundary.yaml": "a1f959ddbcc1cc5911a9925fd8673f6139daeb3de9b924418ceb15e35404b5be"
+  },
+  "control_sha256": {
+    "budget-guard.yaml": "e2e6327264bb45bf8b21fe571ad26a7a93c6c564afb80ca992309bd6a1963375"
+  }
+}

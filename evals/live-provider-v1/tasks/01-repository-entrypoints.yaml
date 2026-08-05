@@ -1,0 +1,27 @@
+task_id: repository-entrypoints
+repository: wsc0796/sky-takeout-python
+repository_commit: 4ede5d01039be8c703e4cc2cc94f18084ebf1ba1
+user_request: >-
+  Map the FastAPI application entry point and the route modules registered at
+  startup. Produce an evidence-backed change-impact note for adding one new
+  protected endpoint. Cite actual source paths and state scope boundaries; do
+  not propose code changes.
+expected_files:
+  - app/main.py
+  - app/api/routes/employee.py
+  - app/api/dependencies.py
+required_evidence:
+  - app/main.py
+  - app/api/routes/employee.py
+required_output_fields:
+  - stage-0/repository-analyst-agent-v1.output.summary
+  - stage-0/repository-analyst-agent-v1.output.key_files
+  - stage-2/synthesis-agent-v1.output.summary
+  - stage-3/review-agent-v1.output.decision
+forbidden_assumptions:
+  - The service uses a router auto-discovery mechanism.
+  - All routes are protected by authentication.
+timeout_seconds: 300
+human_notes: >-
+  Check whether the explanation distinguishes router registration from route
+  dependencies and does not invent middleware or an authorization system.
