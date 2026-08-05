@@ -119,9 +119,7 @@ def render_run_summary(manifest: RunManifest, evidence: EvidenceBundle) -> str:
     if evidence.tool_call_records:
         lines.append("## Tool Calls\n")
         for r in evidence.tool_call_records[:10]:
-            lines.append(
-                f"- `{r.tool_name}` ({r.status}) — {r.arguments_summary[:80]}"
-            )
+            lines.append(f"- `{r.tool_name}` ({r.status}) — {r.arguments_summary[:80]}")
         if len(evidence.tool_call_records) > 10:
             lines.append(f"- ... and {len(evidence.tool_call_records) - 10} more")
         lines.append("")

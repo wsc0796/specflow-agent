@@ -28,7 +28,7 @@ allowlist, quota, scheduler-lifecycle, and safe-error propagation gaps.
 
 | Gate | Result |
 | --- | --- |
-| `uv run pytest -q` | 751 passed, 3 skipped, 3 warnings |
+| `uv run pytest -q` | 752 passed, 3 skipped, 3 warnings |
 | `uv run ruff check .` | passed |
 | `uv run ruff format --check .` | passed |
 | `python scripts/check_secrets.py` | passed |

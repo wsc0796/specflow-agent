@@ -275,18 +275,14 @@ def test_malformed_or_wrong_scheme_authorization_rejects(
     tmp_path: Path, authorization: str
 ) -> None:
     with _client(tmp_path, api_key="top-secret-key") as client:
-        response = client.get(
-            "/api/v1/projects/nope", headers={"Authorization": authorization}
-        )
+        response = client.get("/api/v1/projects/nope", headers={"Authorization": authorization})
         assert response.status_code == 401
 
 
 @pytest.mark.parametrize("header_value", ["", "   "])
 def test_empty_api_key_header_rejects(tmp_path: Path, header_value: str) -> None:
     with _client(tmp_path, api_key="top-secret-key") as client:
-        response = client.get(
-            "/api/v1/projects/nope", headers={"X-API-Key": header_value}
-        )
+        response = client.get("/api/v1/projects/nope", headers={"X-API-Key": header_value})
         assert response.status_code == 401
 
 
@@ -299,9 +295,7 @@ def test_default_quotas_match_documented_values() -> None:
 
 def test_correct_key_works_on_both_headers(tmp_path: Path) -> None:
     with _client(tmp_path, api_key="top-secret-key") as client:
-        via_header = client.get(
-            "/api/v1/projects/nope", headers={"X-API-Key": "top-secret-key"}
-        )
+        via_header = client.get("/api/v1/projects/nope", headers={"X-API-Key": "top-secret-key"})
         assert via_header.status_code == 404  # authenticated, just not found
         via_bearer = client.get(
             "/api/v1/projects/nope",

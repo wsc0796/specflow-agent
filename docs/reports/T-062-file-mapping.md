@@ -1,7 +1,7 @@
 # T-062 File Mapping — PR #4 (`codex/t062-runtime-hardening-status`)
 
 Every file changed by PR #4 mapped to the T-062 specification
-(`docs/tasks/T-062-runtime-boundary-remediation.md`). 30 files, +1665/-87.
+(`docs/tasks/T-062-runtime-boundary-remediation.md`). 34 files, +1754/-97.
 
 ## Acceptance keys
 
@@ -30,7 +30,9 @@ Every file changed by PR #4 mapped to the T-062 specification
 | `src/specflow/projects.py` | Allowlist validation on project registration | A1 | Keep |
 | `src/specflow/agents/adapter.py` | Token-usage accounting no longer swallows missing fields | A4 (budget accuracy) | Keep |
 | `src/specflow/db.py` | SQLite `busy_timeout` for concurrent writer threads | A4 | Keep |
-| `src/specflow/context.py` (see above) | — | — | — |
+| `src/specflow/artifacts/models.py` | Lint surfaced by anchoring the package (unused imports, UTC alias) | R | Keep |
+| `src/specflow/artifacts/renderers.py` | Formatting surfaced by anchoring the package | R | Keep |
+| `src/specflow/artifacts/store.py` | Lint surfaced by anchoring the package (unused imports) | R | Keep |
 | `tests/test_api_security.py` | Allowlist recheck (A1); quota semantics (A2); Unicode key, oversized key, quotas doc lock (R); default-quota guard | A1, A2, R | Keep |
 | `tests/test_runs.py` | Path revalidation + safe error_code persistence (A1, A3) | A1, A3 | Keep |
 | `tests/test_scheduler.py` | Deadline cancel-and-wait behavior (A4) | A4 | Keep |
@@ -56,14 +58,13 @@ Every file changed by PR #4 mapped to the T-062 specification
 - `artifacts-ab/` is tracked in git and leaks into the sdist; removing it
   (``git rm -r --cached artifacts-ab``) is deferred to a separate follow-up PR
   so the diff stays reviewable.
-- CI smoke job for the installed wheel is proposed after merge (script is
-  locally repeatable already).
+- The installed-wheel smoke runs in CI (`.github/workflows/ci.yml`, `smoke` job).
 
 ## Verification log (2026-08-05, Windows 11)
 
 | Check | Result |
 | --- | --- |
-| `uv run pytest -q` | 751 passed, 3 skipped |
+| `uv run pytest -q` | 752 passed, 3 skipped |
 | `uv run ruff check .` | pass |
 | `uv build` | wheel + sdist built |
 | Wheel contains `specflow/artifacts/*` | yes (5 files) |
