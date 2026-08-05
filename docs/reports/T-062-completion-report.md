@@ -28,12 +28,14 @@ allowlist, quota, scheduler-lifecycle, and safe-error propagation gaps.
 
 | Gate | Result |
 | --- | --- |
-| `uv run pytest -q` | 740 passed, 3 skipped, 3 warnings |
+| `uv run pytest -q` | 751 passed, 3 skipped, 3 warnings |
 | `uv run ruff check .` | passed |
 | `uv run ruff format --check .` | passed |
 | `python scripts/check_secrets.py` | passed |
 | `uv build` | passed |
 | `git diff --check` | passed |
+| Wheel contains `specflow/artifacts/*` | 5 files |
+| `python scripts/smoke_installed_wheel.py` | PASS (clean venv, boot, mock run, artifacts) |
 
 ## Known limits
 

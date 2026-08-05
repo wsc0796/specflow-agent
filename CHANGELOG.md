@@ -13,6 +13,12 @@
   and scheduler failures, SQLite `busy_timeout`, engine disposal on shutdown,
   and opt-in HTTP hardening (API key, repository-root allowlist,
   reviewer-label allowlist, run quotas) documented in the README.
+- Release-realism fixes: `specflow.artifacts` now ships in the wheel (the
+  unanchored `artifacts/` gitignore pattern no longer excludes the source
+  package), the duplicate `/health` registration is removed, non-ASCII API
+  keys fail closed with a clean 401, and a repeatable installed-wheel smoke
+  script (build → clean venv → boot → mock run → artifact check) guards the
+  install path.
 - Added a release-truth gate: package metadata now drives the OpenAPI version
   and `specflow --version` CLI output.
 - Added deterministic tests and CI smoke coverage that keep package, runtime,
