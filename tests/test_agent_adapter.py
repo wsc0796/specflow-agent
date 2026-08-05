@@ -173,6 +173,23 @@ class TestAgentRunner:
         user_msg = client.last_request.messages[-1].content
         assert "'PASS' | 'REJECT'" in user_msg
 
+    def test_runner_contract_lists_allowed_revision_targets(self):
+        """A Review REJECT must name a real agent id, so the contract lists them."""
+        client = FakeLLMClient()
+        runner = AgentRunner(
+            _make_identity(), client, model="test", schema_registry=_review_schema_registry()
+        )
+        runner.execute(
+            {
+                "requirement": "Test",
+                "agent_ids": ["design-agent-v1", "synthesis-agent-v1", "review-agent-v1"],
+            }
+        )
+        user_msg = client.last_request.messages[-1].content
+        assert (
+            "Allowed values: 'design-agent-v1', 'synthesis-agent-v1', 'review-agent-v1'" in user_msg
+        )
+
     def test_runner_fails_closed_without_schema_registry(self):
         result = AgentRunner(_make_identity(), FakeLLMClient(), model="test").execute({})
         assert result["success"] is False

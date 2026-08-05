@@ -71,7 +71,12 @@ class AgentRunner:
         if self._schema_registry is not None:
             try:
                 output_model = self._schema_registry.get(self._identity.output_schema_id)
-                output_contract = _output_contract(output_model)
+                agent_ids = context.get("agent_ids", ())
+                if isinstance(agent_ids, (list, tuple, set, frozenset)):
+                    agent_ids = tuple(str(agent_id) for agent_id in agent_ids)
+                else:
+                    agent_ids = ()
+                output_contract = _output_contract(output_model, agent_ids=agent_ids)
             except Exception:
                 output_contract = ""
 
@@ -218,7 +223,7 @@ def _build_user_message(
     return "\n".join(parts)
 
 
-def _output_contract(output_model: type) -> str:
+def _output_contract(output_model: type, *, agent_ids: tuple[str, ...] = ()) -> str:
     """Render the agent's declared output schema as a prompt-level contract.
 
     Providers are told the exact top-level field set before responding, so a
@@ -232,6 +237,12 @@ def _output_contract(output_model: type) -> str:
     for name, field in output_model.model_fields.items():
         type_text = _format_annotation(field.annotation)
         description = (field.description or "").strip()
+        if name == "target_agent_id" and agent_ids:
+            allowed = ", ".join(repr(agent_id) for agent_id in agent_ids)
+            if description:
+                description = f"{description}. Allowed values: {allowed}"
+            else:
+                description = f"Allowed values: {allowed}"
         if description:
             lines.append(f"- {name}: {type_text} ({description})")
         else:

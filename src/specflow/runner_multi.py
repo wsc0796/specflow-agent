@@ -179,6 +179,7 @@ def run_multi_agent(
         "run_id": run_id,
         "requirement": requirement,
         "repository_evidence": evidence_text,
+        "agent_ids": tuple(identity.agent_id for identity in registry.list_agents()),
     }
     scheduler = MultiAgentScheduler(max_parallel_workers=policy.max_parallel_agents)
     prior_outputs: dict[str, dict[str, Any]] = {}
