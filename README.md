@@ -299,6 +299,10 @@ Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8000/api/v1/projects `
   -Body '{"name":"Example API","repository_path":"C:\\projects\\example-api"}'
 ```
 
+Project responses expose `repository_alias` for display and never return the
+local `repository_path`; the submitted path remains an internal execution
+boundary subject to the configured allowlist.
+
 ## Security boundaries
 
 The service requires an API key and is designed for a single-user,

@@ -11,7 +11,7 @@ strict payload-schema follow-up work:
 - M6: Multi-Agent Orchestration (Live Provider validated)
 - M7: Evaluation, Demo & Resume (portfolio-ready)
 
-756 passing tests, 3 skipped, 3 known warnings after T-064.
+757 passing tests, 3 skipped, 3 known warnings after T-065.
 M8 production hardening remains limited to the implemented policy, schema,
 fallback, evidence, and artifact boundaries; it does not claim a new
 live-provider validation or deployment work. T-056 adds a separately specified
@@ -25,6 +25,8 @@ T-063 aligns the final DLP boundary across legacy evidence and multi-agent
 outputs. T-064 requires a non-empty ASCII API key at HTTP startup and protects
 every route except `/health`, including documentation and OpenAPI routes. It
 does not add user identity, authorization, or multi-tenant ownership.
+T-065 removes local repository paths from Project API responses and logs legacy
+error-artifact write failures without changing safe exit behavior.
 
 All tasks T-001 through T-032 are completed. Implemented:
 health endpoint, Project persistence API, safe scanning, deterministic technology

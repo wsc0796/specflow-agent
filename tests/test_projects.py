@@ -31,7 +31,10 @@ def test_create_and_get_project(tmp_path: Path) -> None:
         assert body["status"] == "registered"
         fetched = client.get(f"/api/v1/projects/{body['id']}")
         assert fetched.status_code == 200
-        assert fetched.json()["repository_path"] == "C:/demo"
+        body = fetched.json()
+        assert body["repository_alias"] == "Demo"
+        assert "repository_path" not in body
+        assert "C:/demo" not in body.values()
 
 
 def test_project_input_errors(tmp_path: Path) -> None:

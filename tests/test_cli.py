@@ -1,18 +1,32 @@
 """Tests for CLI entry point."""
 
 import json
+import logging
 from pathlib import Path
 
 import pytest
 
 from specflow import __version__
 from specflow.cli import main
+from specflow.runner import _write_error_artifact
 
 
 def test_cli_help_exits_gracefully() -> None:
     with pytest.raises(SystemExit) as exc_info:
         main(["run", "--help"])
     assert exc_info.value.code == 0
+
+
+def test_error_artifact_write_failure_is_logged(tmp_path: Path, monkeypatch, caplog) -> None:
+    def fail_write(*args, **kwargs):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(Path, "write_text", fail_write)
+    with caplog.at_level(logging.ERROR, logger="specflow.runner"):
+        _write_error_artifact(tmp_path / "artifacts", "run-test", "now", "FAILED")
+
+    assert "failed to persist error artifact for run run-test" in caplog.text
+    assert "OSError" in caplog.text
 
 
 def test_cli_version_reports_installed_package_version(capsys) -> None:

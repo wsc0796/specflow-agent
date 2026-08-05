@@ -5,6 +5,9 @@
 - Changed the HTTP boundary from opt-in to fail-closed: API startup now
   requires a non-empty ASCII `SPECFLOW_API_KEY`, every route except `/health`
   is authenticated, and `/docs`, `/redoc`, and `/openapi.json` are protected.
+- Project API responses now expose only a display alias instead of local
+  repository paths, and legacy error-artifact write failures are logged with a
+  safe run id and exception type.
 - Security audit remediation: fixed real-provider token accounting (usage is
   read from `LLMResponse.usage`), thread-safe LLM call budgets, bounded stage
   deadline detection with queued-future cancellation and synchronous worker

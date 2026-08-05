@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 from dataclasses import asdict, is_dataclass
 from pathlib import Path
 
@@ -31,6 +32,8 @@ from specflow.workers import AnalysisOutput, GenerationOutput, WorkerContext, Wo
 from specflow.workers.analyze import AnalyzeWorker
 from specflow.workers.generate import GenerateWorker
 from specflow.workers.review import ReviewWorker
+
+logger = logging.getLogger(__name__)
 
 
 def run(
@@ -419,5 +422,9 @@ def _write_error_artifact(output: Path, run_id: str, started_at: str, error: str
             ),
             encoding="utf-8",
         )
-    except OSError:
-        pass
+    except OSError as error:
+        logger.error(
+            "failed to persist error artifact for run %s: %s",
+            run_id,
+            type(error).__name__,
+        )
