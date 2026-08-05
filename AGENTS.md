@@ -11,9 +11,10 @@ strict payload-schema follow-up work:
 - M6: Multi-Agent Orchestration (Live Provider validated)
 - M7: Evaluation, Demo & Resume (portfolio-ready)
 
-760 passing tests, 3 skipped, 3 known warnings after adding the T-063
-live-provider evaluation harness. The harness has no live result until a
-configured Provider run and human review are recorded.
+771 passing tests, 3 skipped, 3 known warnings after merging the T-063
+live-provider evaluation harness with main@40db000 (T-064/T-065). The
+harness has no live result until a configured Provider run and human review
+are recorded.
 M8 production hardening remains limited to the implemented policy, schema,
 fallback, evidence, and artifact boundaries; it does not claim a new
 live-provider validation or deployment work. T-056 adds a separately specified
@@ -23,6 +24,12 @@ a queue, background-worker, retry/resume system, or production deployment.
 T-061 adds a separate append-only reviewer-decision table and bounded review
 package endpoints for completed Runs. Reviewer labels are unverified metadata;
 this is not authentication, authorization, multi-user workflow or PR automation.
+T-063 aligns the final DLP boundary across legacy evidence and multi-agent
+outputs. T-064 requires a non-empty ASCII API key at HTTP startup and protects
+every route except `/health`, including documentation and OpenAPI routes. It
+does not add user identity, authorization, or multi-tenant ownership.
+T-065 removes local repository paths from Project API responses and logs legacy
+error-artifact write failures without changing safe exit behavior.
 
 All tasks T-001 through T-032 are completed. Implemented:
 health endpoint, Project persistence API, safe scanning, deterministic technology

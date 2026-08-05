@@ -649,13 +649,12 @@ def _validate_stage_results(
 
 
 _ABSOLUTE_PATH_RE = re.compile(r"(?<!\w)(?:[A-Za-z]:[\\/]|/)[^\s\"']+")
-_SECRET_RE = re.compile(r"(?i)\b(api[_-]?key|token|secret|password)\s*[:=]\s*[^\s,;]+")
 
 
 def _sanitize_artifact_value(value: object) -> object:
     """Remove secrets and absolute filesystem paths before persistence/handoff."""
     if isinstance(value, str):
-        value = _SECRET_RE.sub(r"\1=<redacted>", value)
+        value = final_dlp_scan(value)
         return _ABSOLUTE_PATH_RE.sub("<absolute-path-redacted>", value)
     if isinstance(value, list):
         return [_sanitize_artifact_value(item) for item in value]

@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import secrets
 import socket
 import subprocess
 import sys
@@ -22,6 +23,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 TIMEOUT_SECONDS = 90
+SMOKE_CREDENTIAL = secrets.token_urlsafe(32)
 
 TERMINAL_STATES = frozenset(
     {
@@ -55,6 +57,7 @@ def _http(method: str, url: str, payload: dict | None = None) -> tuple[int, dict
     request = urllib.request.Request(url, data=data, method=method)
     if data is not None:
         request.add_header("Content-Type", "application/json")
+    request.add_header("X-API-Key", SMOKE_CREDENTIAL)
     try:
         with urllib.request.urlopen(request, timeout=10) as response:
             return response.status, json.loads(response.read())
@@ -115,12 +118,15 @@ class Smoke:
 
     def _api(self, work: Path, py: Path, api_dir: Path, repo_dir: Path) -> None:
         port = _free_port()
+        environment = os.environ.copy()
+        environment["SPECFLOW_API_KEY"] = SMOKE_CREDENTIAL
         server = subprocess.Popen(
             [str(py), "-m", "uvicorn", "specflow.main:app", "--port", str(port)],
             cwd=str(api_dir),
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
+            env=environment,
         )
         base = f"http://127.0.0.1:{port}"
         try:

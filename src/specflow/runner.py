@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 from dataclasses import asdict, is_dataclass
 from pathlib import Path
 
@@ -25,11 +26,14 @@ from specflow.policy import DEFAULT_POLICY, ExecutionBudget, ExecutionPolicy, Po
 from specflow.token_budget import BudgetPolicy, TokenBudgetManager
 from specflow.tools import ToolExecutor, ToolRegistry
 from specflow.tools.repository_tools import RepositoryToolSet
+from specflow.tools.sanitization import final_dlp_scan
 from specflow.trace import JsonTraceStorage, TraceRecorder
 from specflow.workers import AnalysisOutput, GenerationOutput, WorkerContext, WorkerStepHandler
 from specflow.workers.analyze import AnalyzeWorker
 from specflow.workers.generate import GenerateWorker
 from specflow.workers.review import ReviewWorker
+
+logger = logging.getLogger(__name__)
 
 
 def run(
@@ -134,7 +138,10 @@ def run(
     )
     fallback = FallbackManager(RetryStrategy(max_retries=1))
 
-    evidence_text = evidence.serialized_context()
+    # This is the last boundary before evidence can enter worker prompts or a
+    # live provider. EvidenceBundle sanitizes its fields too, but the explicit
+    # final pass keeps legacy aligned with the multi-agent pipeline.
+    evidence_text = final_dlp_scan(evidence.serialized_context())
 
     analyze_worker = AnalyzeWorker(
         project_context=project_context,
@@ -415,5 +422,9 @@ def _write_error_artifact(output: Path, run_id: str, started_at: str, error: str
             ),
             encoding="utf-8",
         )
-    except OSError:
-        pass
+    except OSError as error:
+        logger.error(
+            "failed to persist error artifact for run %s: %s",
+            run_id,
+            type(error).__name__,
+        )

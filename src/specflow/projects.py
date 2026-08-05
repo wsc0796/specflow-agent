@@ -24,7 +24,7 @@ class ProjectRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: str
     name: str
-    repository_path: str
+    repository_alias: str
     latest_scan_id: str | None
     context_version: int
     status: str
@@ -67,6 +67,20 @@ class ProjectService:
         return project
 
 
+def _project_read(project: Project) -> ProjectRead:
+    """Build a public Project response without exposing its local path."""
+    return ProjectRead(
+        id=project.id,
+        name=project.name,
+        repository_alias=project.name,
+        latest_scan_id=project.latest_scan_id,
+        context_version=project.context_version,
+        status=project.status,
+        created_at=project.created_at,
+        updated_at=project.updated_at,
+    )
+
+
 def get_session(request: Request) -> Generator[Session, None, None]:
     yield from request.app.state.database.sessions()
 
@@ -80,9 +94,7 @@ def create_project(
 ) -> ProjectRead:
     try:
         request.app.state.security.validate_repository_path(payload.repository_path)
-        return ProjectRead.model_validate(
-            ProjectService(ProjectRepository()).create(session, payload)
-        )
+        return _project_read(ProjectService(ProjectRepository()).create(session, payload))
     except ValueError as error:
         raise HTTPException(409, "A project with this repository_path already exists.") from error
 
@@ -90,8 +102,6 @@ def create_project(
 @router.get("/{project_id}", response_model=ProjectRead)
 def get_project(project_id: str, session: SessionDependency) -> ProjectRead:
     try:
-        return ProjectRead.model_validate(
-            ProjectService(ProjectRepository()).get(session, project_id)
-        )
+        return _project_read(ProjectService(ProjectRepository()).get(session, project_id))
     except LookupError as error:
         raise HTTPException(404, "Project not found.") from error

@@ -1,4 +1,4 @@
-"""Tests for opt-in HTTP hardening: API key, path allowlist, quotas, disposal."""
+"""Tests for fail-closed HTTP security: API key, allowlists, quotas, disposal."""
 
 from pathlib import Path
 from threading import Event, Thread
@@ -11,23 +11,26 @@ from specflow.api_security import (
     DEFAULT_MAX_CONCURRENT_RUNS,
     DEFAULT_MAX_RUNS_PER_MINUTE,
     ApiSecurity,
+    ApiSecurityConfigurationError,
     RunRateLimiter,
 )
 from specflow.main import create_app
 
 
-def _client(tmp_path: Path, **security_kwargs) -> TestClient:
+def _client(tmp_path: Path, *, authenticated: bool = True, **security_kwargs) -> TestClient:
+    api_key = security_kwargs.setdefault("api_key", "test-api-key")
     return TestClient(
         create_app(
             f"sqlite:///{(tmp_path / 'security.db').as_posix()}",
             artifact_root=tmp_path / "artifacts",
             security=ApiSecurity(**security_kwargs),
-        )
+        ),
+        headers={"X-API-Key": api_key} if authenticated else None,
     )
 
 
 def test_api_key_required_when_configured(tmp_path: Path) -> None:
-    with _client(tmp_path, api_key="top-secret-key") as client:
+    with _client(tmp_path, api_key="top-secret-key", authenticated=False) as client:
         assert client.get("/api/v1/projects/nope").status_code == 401
         response = client.get("/api/v1/projects/nope", headers={"X-API-Key": "top-secret-key"})
         assert response.status_code == 404  # authenticated, just not found
@@ -44,16 +47,44 @@ def test_health_endpoint_stays_open_with_api_key(tmp_path: Path) -> None:
         assert client.get("/health").status_code == 200
 
 
+def test_startup_requires_non_empty_ascii_api_key(tmp_path: Path) -> None:
+    for api_key in (None, "", "  ", "中文密钥"):
+        app = create_app(
+            f"sqlite:///{(tmp_path / 'security.db').as_posix()}",
+            artifact_root=tmp_path / "artifacts",
+            security=ApiSecurity(api_key=api_key),
+        )
+        with pytest.raises(ApiSecurityConfigurationError, match="SPECFLOW_API_KEY"):
+            with TestClient(app):
+                pass
+
+
+def test_documentation_and_openapi_routes_require_authentication(tmp_path: Path) -> None:
+    with _client(tmp_path, authenticated=False) as client:
+        for path in ("/docs", "/redoc", "/openapi.json"):
+            assert client.get(path).status_code == 401
+
+    with _client(tmp_path) as client:
+        for path in ("/docs", "/redoc"):
+            assert client.get(path).status_code == 200
+        schema = client.get("/openapi.json")
+        assert schema.status_code == 200
+        security_schemes = schema.json()["components"]["securitySchemes"]
+        assert security_schemes["ApiKeyAuth"]["name"] == "X-API-Key"
+        assert security_schemes["BearerAuth"] == {"type": "http", "scheme": "bearer"}
+
+
 def test_repository_path_allowlist(tmp_path: Path) -> None:
     allowed = tmp_path / "allowed"
     allowed.mkdir()
-    security = ApiSecurity(allowed_repository_roots=(str(allowed),))
+    security = ApiSecurity(api_key="test-api-key", allowed_repository_roots=(str(allowed),))
     with TestClient(
         create_app(
             f"sqlite:///{(tmp_path / 'security.db').as_posix()}",
             artifact_root=tmp_path / "artifacts",
             security=security,
-        )
+        ),
+        headers={"X-API-Key": "test-api-key"},
     ) as client:
         outside = client.post(
             "/api/v1/projects",
@@ -75,15 +106,23 @@ def test_repository_path_allowlist_is_rechecked_before_a_run(tmp_path: Path) -> 
     allowed.mkdir()
     database_url = f"sqlite:///{(tmp_path / 'security.db').as_posix()}"
 
-    with TestClient(create_app(database_url, artifact_root=tmp_path / "artifacts")) as client:
+    with TestClient(
+        create_app(
+            database_url,
+            artifact_root=tmp_path / "artifacts",
+            security=ApiSecurity(api_key="test-api-key"),
+        ),
+        headers={"X-API-Key": "test-api-key"},
+    ) as client:
         project_id = client.post(
             "/api/v1/projects",
             json={"name": "Legacy", "repository_path": str(outside)},
         ).json()["id"]
 
-    security = ApiSecurity(allowed_repository_roots=(str(allowed),))
+    security = ApiSecurity(api_key="test-api-key", allowed_repository_roots=(str(allowed),))
     with TestClient(
-        create_app(database_url, artifact_root=tmp_path / "artifacts", security=security)
+        create_app(database_url, artifact_root=tmp_path / "artifacts", security=security),
+        headers={"X-API-Key": "test-api-key"},
     ) as client:
         response = client.post(
             "/api/v1/runs", json={"project_id": project_id, "requirement": "Check"}
@@ -96,13 +135,14 @@ def test_reviewer_label_allowlist(tmp_path: Path) -> None:
     repository = tmp_path / "repository"
     repository.mkdir()
     (repository / "README.md").write_text("# repo\n", encoding="utf-8")
-    security = ApiSecurity(reviewer_labels=frozenset({"engineering-lead"}))
+    security = ApiSecurity(api_key="test-api-key", reviewer_labels=frozenset({"engineering-lead"}))
     with TestClient(
         create_app(
             f"sqlite:///{(tmp_path / 'security.db').as_posix()}",
             artifact_root=tmp_path / "artifacts",
             security=security,
-        )
+        ),
+        headers={"X-API-Key": "test-api-key"},
     ) as client:
         project_id = client.post(
             "/api/v1/projects",
@@ -165,13 +205,14 @@ def test_http_concurrency_rejection_does_not_consume_run_rate_quota(
         return 0
 
     monkeypatch.setattr("specflow.runs.run_multi_agent", slow_runner)
-    security = ApiSecurity(max_runs_per_minute=2, max_concurrent_runs=1)
+    security = ApiSecurity(api_key="test-api-key", max_runs_per_minute=2, max_concurrent_runs=1)
     with TestClient(
         create_app(
             f"sqlite:///{(tmp_path / 'security.db').as_posix()}",
             artifact_root=tmp_path / "artifacts",
             security=security,
-        )
+        ),
+        headers={"X-API-Key": "test-api-key"},
     ) as client:
         project_id = client.post(
             "/api/v1/projects",
@@ -229,6 +270,7 @@ def test_engine_is_disposed_on_shutdown(tmp_path: Path, monkeypatch) -> None:
     app = main_module.create_app(
         database_url=expected_url,
         artifact_root=tmp_path / "artifacts",
+        security=ApiSecurity(api_key="test-api-key"),
     )
     with TestClient(app):
         assert disposed == []
@@ -237,7 +279,7 @@ def test_engine_is_disposed_on_shutdown(tmp_path: Path, monkeypatch) -> None:
 
 def test_oversized_ascii_api_key_rejects_without_500(tmp_path: Path) -> None:
     """Oversized credentials must be a clean 401, never a 500."""
-    with _client(tmp_path, api_key="top-secret-key") as client:
+    with _client(tmp_path, api_key="top-secret-key", authenticated=False) as client:
         hostile = "x" * 10_000
         via_header = client.get("/api/v1/projects/nope", headers={"X-API-Key": hostile})
         assert via_header.status_code == 401
@@ -279,14 +321,14 @@ def test_require_api_key_non_ascii_configured_key_never_matches() -> None:
 def test_malformed_or_wrong_scheme_authorization_rejects(
     tmp_path: Path, authorization: str
 ) -> None:
-    with _client(tmp_path, api_key="top-secret-key") as client:
+    with _client(tmp_path, api_key="top-secret-key", authenticated=False) as client:
         response = client.get("/api/v1/projects/nope", headers={"Authorization": authorization})
         assert response.status_code == 401
 
 
 @pytest.mark.parametrize("header_value", ["", "   "])
 def test_empty_api_key_header_rejects(tmp_path: Path, header_value: str) -> None:
-    with _client(tmp_path, api_key="top-secret-key") as client:
+    with _client(tmp_path, api_key="top-secret-key", authenticated=False) as client:
         response = client.get("/api/v1/projects/nope", headers={"X-API-Key": header_value})
         assert response.status_code == 401
 
@@ -314,7 +356,7 @@ def test_default_quotas_match_documented_values() -> None:
 
 
 def test_correct_key_works_on_both_headers(tmp_path: Path) -> None:
-    with _client(tmp_path, api_key="top-secret-key") as client:
+    with _client(tmp_path, api_key="top-secret-key", authenticated=False) as client:
         via_header = client.get("/api/v1/projects/nope", headers={"X-API-Key": "top-secret-key"})
         assert via_header.status_code == 404  # authenticated, just not found
         via_bearer = client.get(

@@ -3,7 +3,8 @@
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import Depends, FastAPI
+from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi.responses import JSONResponse
 
 from specflow import __version__
 from specflow.api_security import ApiSecurity
@@ -24,6 +25,7 @@ def create_app(
 
     @asynccontextmanager
     async def lifespan(application: FastAPI):
+        security.validate_configuration()
         application.state.database = database
         application.state.artifact_root = run_artifact_root
         application.state.security = security
@@ -36,6 +38,21 @@ def create_app(
             database.engine.dispose()
 
     application = FastAPI(title="SpecFlow Agent", version=__version__, lifespan=lifespan)
+
+    @application.middleware("http")
+    async def require_authenticated_route(request: Request, call_next):
+        if request.url.path == "/health":
+            return await call_next(request)
+        try:
+            security.require_request(request)
+        except HTTPException as error:
+            return JSONResponse(
+                status_code=error.status_code,
+                content={"detail": error.detail},
+                headers=error.headers,
+            )
+        return await call_next(request)
+
     application.include_router(projects_router, dependencies=[Depends(security.require_api_key)])
     application.include_router(runs_router, dependencies=[Depends(security.require_api_key)])
 
@@ -43,6 +60,24 @@ def create_app(
     def health_check() -> dict[str, str]:
         """Return a minimal liveness response for deployment and smoke tests."""
         return {"status": "ok"}
+
+    original_openapi = application.openapi
+
+    def secured_openapi() -> dict:
+        schema = original_openapi()
+        components = schema.setdefault("components", {})
+        security_schemes = components.setdefault("securitySchemes", {})
+        security_schemes["ApiKeyAuth"] = {
+            "type": "apiKey",
+            "in": "header",
+            "name": "X-API-Key",
+        }
+        security_schemes["BearerAuth"] = {"type": "http", "scheme": "bearer"}
+        schema["security"] = [{"ApiKeyAuth": []}, {"BearerAuth": []}]
+        schema["paths"]["/health"]["get"]["security"] = []
+        return schema
+
+    application.openapi = secured_openapi
 
     return application
 

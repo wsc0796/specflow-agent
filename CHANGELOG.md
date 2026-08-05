@@ -2,6 +2,12 @@
 
 ## v1.1.0 (Unreleased)
 
+- Changed the HTTP boundary from opt-in to fail-closed: API startup now
+  requires a non-empty ASCII `SPECFLOW_API_KEY`, every route except `/health`
+  is authenticated, and `/docs`, `/redoc`, and `/openapi.json` are protected.
+- Project API responses now expose only a display alias instead of local
+  repository paths, and legacy error-artifact write failures are logged with a
+  safe run id and exception type.
 - Security audit remediation: fixed real-provider token accounting (usage is
   read from `LLMResponse.usage`), thread-safe LLM call budgets, bounded stage
   deadline detection with queued-future cancellation and synchronous worker
@@ -11,7 +17,7 @@
   `credentials`, `kubeconfig`), atomic artifact writes with per-file SHA-256
   integrity hashes and a `_COMPLETE` marker, structured error codes for policy
   and scheduler failures, SQLite `busy_timeout`, engine disposal on shutdown,
-  and opt-in HTTP hardening (API key, repository-root allowlist,
+  and the initial opt-in HTTP hardening (API key, repository-root allowlist,
   reviewer-label allowlist, run quotas) documented in the README.
 - Release-realism fixes: `specflow.artifacts` now ships in the wheel (the
   unanchored `artifacts/` gitignore pattern no longer excludes the source
