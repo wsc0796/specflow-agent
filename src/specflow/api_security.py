@@ -44,6 +44,17 @@ def _positive_int(value: str, default: int) -> int:
     return parsed if parsed > 0 else default
 
 
+def _keys_match(provided: str, expected: str) -> bool:
+    """Constant-time compare that treats non-ASCII input as a mismatch.
+
+    ``secrets.compare_digest`` raises TypeError on non-ASCII strings; keys
+    are secret values, so any non-ASCII credential is simply invalid.
+    """
+    if not provided.isascii() or not expected.isascii():
+        return False
+    return secrets.compare_digest(provided, expected)
+
+
 class RunRateLimiter:
     """In-process quotas for the run-creation endpoint.
 
@@ -142,7 +153,7 @@ class ApiSecurity:
         if not self.api_key:
             return
         provided = x_api_key or _bearer_token(authorization)
-        if not provided or not secrets.compare_digest(provided, self.api_key):
+        if not provided or not _keys_match(provided, self.api_key):
             raise HTTPException(
                 status.HTTP_401_UNAUTHORIZED,
                 "Invalid or missing API key.",

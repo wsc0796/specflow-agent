@@ -228,3 +228,81 @@ def test_engine_is_disposed_on_shutdown(tmp_path: Path, monkeypatch) -> None:
     with TestClient(app):
         assert disposed == []
     assert disposed == [True]
+
+
+def test_oversized_ascii_api_key_rejects_without_500(tmp_path: Path) -> None:
+    """Oversized credentials must be a clean 401, never a 500."""
+    with _client(tmp_path, api_key="top-secret-key") as client:
+        hostile = "x" * 10_000
+        via_header = client.get("/api/v1/projects/nope", headers={"X-API-Key": hostile})
+        assert via_header.status_code == 401
+        via_bearer = client.get(
+            "/api/v1/projects/nope", headers={"Authorization": f"Bearer {hostile}"}
+        )
+        assert via_bearer.status_code == 401
+
+
+def test_require_api_key_rejects_non_ascii_input() -> None:
+    """Non-ASCII provided keys must be a 401, never a TypeError (T-062).
+
+    HTTP clients cannot carry non-ASCII headers, so this exercises the
+    security layer directly — the path a non-ASCII configured key hits.
+    """
+    security = ApiSecurity(api_key="top-secret-key")
+    for hostile in ("中文密钥", "🚀✨emoji-key", "éclair-café", "​" * 3):
+        with pytest.raises(HTTPException) as error:
+            security.require_api_key(None, x_api_key=hostile, authorization=None)
+        assert error.value.status_code == 401
+        with pytest.raises(HTTPException) as error:
+            security.require_api_key(None, x_api_key=None, authorization=f"Bearer {hostile}")
+        assert error.value.status_code == 401
+
+
+def test_require_api_key_non_ascii_configured_key_never_matches() -> None:
+    """A non-ASCII configured key matches nothing (T-062)."""
+    security = ApiSecurity(api_key="中文密钥")
+    for attempted in ("中文密钥", "top-secret-key", "ascii-key"):
+        with pytest.raises(HTTPException) as error:
+            security.require_api_key(None, x_api_key=attempted)
+        assert error.value.status_code == 401
+
+
+@pytest.mark.parametrize(
+    "authorization",
+    ["Basic dG9wLXNlY3JldC1rZXk=", "Bearer", "Bearer  "],
+)
+def test_malformed_or_wrong_scheme_authorization_rejects(
+    tmp_path: Path, authorization: str
+) -> None:
+    with _client(tmp_path, api_key="top-secret-key") as client:
+        response = client.get(
+            "/api/v1/projects/nope", headers={"Authorization": authorization}
+        )
+        assert response.status_code == 401
+
+
+@pytest.mark.parametrize("header_value", ["", "   "])
+def test_empty_api_key_header_rejects(tmp_path: Path, header_value: str) -> None:
+    with _client(tmp_path, api_key="top-secret-key") as client:
+        response = client.get(
+            "/api/v1/projects/nope", headers={"X-API-Key": header_value}
+        )
+        assert response.status_code == 401
+
+
+def test_correct_key_works_on_both_headers(tmp_path: Path) -> None:
+    with _client(tmp_path, api_key="top-secret-key") as client:
+        via_header = client.get(
+            "/api/v1/projects/nope", headers={"X-API-Key": "top-secret-key"}
+        )
+        assert via_header.status_code == 404  # authenticated, just not found
+        via_bearer = client.get(
+            "/api/v1/projects/nope",
+            headers={"Authorization": "Bearer top-secret-key"},
+        )
+        assert via_bearer.status_code == 404
+        lowercase = client.get(
+            "/api/v1/projects/nope",
+            headers={"Authorization": "bearer top-secret-key"},
+        )
+        assert lowercase.status_code == 404  # RFC 7235: scheme is case-insensitive
