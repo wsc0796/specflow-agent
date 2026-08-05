@@ -48,9 +48,3 @@ def create_app(
 
 
 app = create_app()
-
-
-@app.get("/health", tags=["system"])
-def health_check() -> dict[str, str]:
-    """Return a minimal liveness response for deployment and smoke tests."""
-    return {"status": "ok"}
