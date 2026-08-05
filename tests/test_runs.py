@@ -1,7 +1,9 @@
 import json
+import os
 import sqlite3
 from pathlib import Path
 
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import inspect
 
@@ -132,6 +134,81 @@ def test_runner_exception_is_a_persisted_safe_runtime_failure(tmp_path: Path, mo
         assert body["error_code"] == "RUNNER_FAILED"
         assert body["artifact_available"] is False
         assert "not-for-api-output" not in json.dumps(body)
+
+
+def test_run_api_exposes_runner_manifest_error_code(tmp_path: Path, monkeypatch) -> None:
+    repository = tmp_path / "repository"
+    repository.mkdir()
+
+    def fail_with_manifest(*, output: Path, **_: object) -> int:
+        run_directory = output / "run-multi-failed"
+        run_directory.mkdir(parents=True)
+        (run_directory / "manifest.json").write_text(
+            json.dumps({"error": "TIME_BUDGET_EXCEEDED"}), encoding="utf-8"
+        )
+        return 3
+
+    monkeypatch.setattr("specflow.runs.run_multi_agent", fail_with_manifest)
+    with client_for(tmp_path) as client:
+        project_id = register_project(client, repository)
+        created = client.post(
+            "/api/v1/runs",
+            json={"project_id": project_id, "requirement": "Add a feature"},
+        )
+
+    assert created.status_code == 201
+    assert created.json()["error_code"] == "TIME_BUDGET_EXCEEDED"
+
+
+def test_run_api_rejects_unsafe_runner_manifest_error(tmp_path: Path, monkeypatch) -> None:
+    repository = tmp_path / "repository"
+    repository.mkdir()
+
+    def fail_with_unsafe_manifest(*, output: Path, **_: object) -> int:
+        run_directory = output / "run-multi-failed"
+        run_directory.mkdir(parents=True)
+        (run_directory / "manifest.json").write_text(
+            json.dumps({"error": "provider password=not-for-api-output"}), encoding="utf-8"
+        )
+        return 3
+
+    monkeypatch.setattr("specflow.runs.run_multi_agent", fail_with_unsafe_manifest)
+    with client_for(tmp_path) as client:
+        project_id = register_project(client, repository)
+        created = client.post(
+            "/api/v1/runs",
+            json={"project_id": project_id, "requirement": "Add a feature"},
+        )
+
+    assert created.status_code == 201
+    assert created.json()["error_code"] == "RUNNER_FAILED"
+
+
+@pytest.mark.skipif(os.name == "nt", reason="symlink creation may require Windows privileges")
+def test_run_api_does_not_read_a_symlinked_failed_manifest(tmp_path: Path, monkeypatch) -> None:
+    repository = tmp_path / "repository"
+    repository.mkdir()
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "manifest.json").write_text(
+        json.dumps({"error": "EXTERNAL_ERROR_CODE"}), encoding="utf-8"
+    )
+
+    def fail_with_symlinked_manifest(*, output: Path, **_: object) -> int:
+        output.mkdir(parents=True)
+        (output / "run-multi-failed").symlink_to(outside, target_is_directory=True)
+        return 3
+
+    monkeypatch.setattr("specflow.runs.run_multi_agent", fail_with_symlinked_manifest)
+    with client_for(tmp_path) as client:
+        project_id = register_project(client, repository)
+        created = client.post(
+            "/api/v1/runs",
+            json={"project_id": project_id, "requirement": "Add a feature"},
+        )
+
+    assert created.status_code == 201
+    assert created.json()["error_code"] == "RUNNER_FAILED"
 
 
 def test_empty_artifact_directory_is_not_exposed_as_a_valid_artifact_index(tmp_path: Path) -> None:

@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import json
+import logging
+import os
 import re
+import tempfile
 import time
 from collections.abc import Callable, Mapping
 from dataclasses import asdict, replace
@@ -22,6 +25,7 @@ from specflow.agents.risk_review import RiskReviewAgent
 from specflow.agents.synthesis import SynthesisAgent
 from specflow.agents.test_strategy import TestStrategyAgent
 from specflow.coordinator.coordinator import Coordinator
+from specflow.coordinator.exceptions import ScheduleExecutionError
 from specflow.coordinator.scheduler import MultiAgentScheduler, StageExecutionResult
 from specflow.coordinator.state_machine import MultiAgentWorkflowState
 from specflow.evaluation.metrics import AgentMetrics, RunMetrics
@@ -30,6 +34,7 @@ from specflow.evidence.models import EvidenceCollectionConfig
 from specflow.handoff.models import AgentHandoff
 from specflow.handoff.validator import HandoffValidator
 from specflow.llm import LLMClient, OpenAICompatibleConfig, OpenAICompatibleLLMClient
+from specflow.llm.mock import MockLLMClient
 from specflow.plan.hash_utils import canonical_json_bytes
 from specflow.policy import (
     DEFAULT_POLICY,
@@ -40,9 +45,12 @@ from specflow.policy import (
 )
 from specflow.tools import ToolExecutor, ToolRegistry
 from specflow.tools.repository_tools import RepositoryToolSet
+from specflow.tools.sanitization import final_dlp_scan
 from specflow.trace.models import AgentTraceSpan
 
 AgentExecutor = Callable[[dict[str, Any]], dict[str, Any]]
+
+logger = logging.getLogger(__name__)
 
 
 def run_multi_agent(
@@ -100,7 +108,7 @@ def run_multi_agent(
             project_summary=_repo_summary(repo),
             technology_stack=(),
         )
-        evidence_text = evidence.serialized_context()
+        evidence_text = final_dlp_scan(evidence.serialized_context())
         tool_call_records = [
             r.as_dict() if hasattr(r, "as_dict") else asdict(r) for r in evidence.tool_call_records
         ]
@@ -110,6 +118,7 @@ def run_multi_agent(
     except Exception:
         # Evidence is a required, untrusted input boundary.  Continuing would
         # let agents produce an ungrounded plan with no audit evidence.
+        logger.exception("run %s failed while collecting repository evidence", run_id)
         return 3
 
     registry = _build_registry()
@@ -120,7 +129,7 @@ def run_multi_agent(
         llm_client = _make_mock_llm_client()
     else:
         try:
-            llm_client = _create_real_llm_client(provider, model)
+            llm_client = _create_real_llm_client(provider, model, policy=policy)
         except Exception:
             import sys
 
@@ -330,7 +339,58 @@ def run_multi_agent(
             MultiAgentWorkflowState.COMPLETED,
             "review passed" if decision == "PASS" else "revision limit reached",
         )
+    except SpecFlowError as error:
+        logger.error(
+            "run %s stopped by policy: code=%s phase=%s",
+            run_id,
+            error.code,
+            coordinator.engine.state.value,
+        )
+        _persist_failed_run(
+            output=output,
+            run_id=run_id,
+            coordinator=coordinator,
+            registry=registry,
+            model=model,
+            stages=stages,
+            plan=plan,
+            discovered_files=discovered_files,
+            guard=guard,
+            error=error.code,
+        )
+        return 3
+    except ScheduleExecutionError as error:
+        if isinstance(error.__cause__, SpecFlowError):
+            error_code = error.__cause__.code
+        elif str(error).startswith("TIME_BUDGET_EXCEEDED"):
+            error_code = "TIME_BUDGET_EXCEEDED"
+        else:
+            error_code = "MULTI_AGENT_RUN_FAILED"
+        logger.error(
+            "run %s scheduler failure: code=%s phase=%s",
+            run_id,
+            error_code,
+            coordinator.engine.state.value,
+        )
+        _persist_failed_run(
+            output=output,
+            run_id=run_id,
+            coordinator=coordinator,
+            registry=registry,
+            model=model,
+            stages=stages,
+            plan=plan,
+            discovered_files=discovered_files,
+            guard=guard,
+            error=error_code,
+        )
+        return 3
     except Exception:
+        logger.exception(
+            "run %s failed with an unexpected error in phase %s",
+            run_id,
+            coordinator.engine.state.value,
+        )
         _persist_failed_run(
             output=output,
             run_id=run_id,
@@ -425,7 +485,12 @@ def run_multi_agent(
         _safe_write(
             run_dir,
             "sources.json",
-            {"evidence": evidence_text, "tool_calls": tool_call_records},
+            {
+                "evidence": evidence_text,
+                "evidence_hash": evidence.evidence_hash,
+                "source_hashes": dict(evidence.source_hashes),
+                "tool_calls": tool_call_records,
+            },
             guard,
         )
     except SpecFlowError:
@@ -449,6 +514,7 @@ def run_multi_agent(
     )
     try:
         _safe_write(run_dir, "metrics.json", metrics.as_dict(), guard)
+        _finalize_run_directory(run_dir, guard)
     except SpecFlowError:
         return 3
     return 0
@@ -490,7 +556,10 @@ def _run_and_accumulate(
         for agent_id in agent_ids
     }
     result = scheduler.execute(
-        (agent_ids,), guarded_executors, {**context, "prior_outputs": dict(prior_outputs)}
+        (agent_ids,),
+        guarded_executors,
+        {**context, "prior_outputs": dict(prior_outputs)},
+        deadline=guard.deadline,
     )[0]
     result = replace(result, stage_index=stage_index)
     _validate_stage_results(result, registry, schema_registry)
@@ -752,26 +821,75 @@ def _safe_write(
     *,
     sort_keys: bool = False,
 ) -> None:
-    """Write artifact with size check before touching disk."""
+    """Write an artifact atomically with a size check before touching disk.
+
+    Content is written to a same-directory temporary file, flushed and fsynced,
+    then atomically replaced onto the final path.  An interrupted write can
+    therefore never leave a truncated JSON artifact behind.
+    """
     content = json.dumps(data, ensure_ascii=False, indent=2, sort_keys=sort_keys)
     guard.check_artifact_size(len(content.encode("utf-8")))
-    (run_dir / filename).write_text(content, encoding="utf-8")
+    target = run_dir / filename
+    descriptor, temp_name = tempfile.mkstemp(
+        dir=run_dir,
+        prefix=f".{filename}.",
+        suffix=".tmp",
+    )
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+            handle.write(content)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temp_name, target)
+    finally:
+        if os.path.exists(temp_name):
+            os.unlink(temp_name)
+
+
+def _finalize_run_directory(run_dir: Path, guard: RuntimeGuard) -> None:
+    """Record artifact hashes and mark the run directory as complete.
+
+    ``artifact-integrity.json`` captures a SHA-256 for every artifact and
+    ``_COMPLETE`` is written last, so readers can distinguish a fully written
+    run from one interrupted mid-write.
+    """
+    hashes: dict[str, str] = {}
+    for path in sorted(run_dir.iterdir()):
+        if (
+            path.is_file()
+            and not path.is_symlink()
+            and path.name not in {"_COMPLETE", "artifact-integrity.json"}
+        ):
+            hashes[path.name] = sha256(path.read_bytes()).hexdigest()
+    _safe_write(
+        run_dir,
+        "artifact-integrity.json",
+        {"artifact_hashes": hashes},
+        guard,
+        sort_keys=True,
+    )
+    _safe_write(
+        run_dir,
+        "_COMPLETE",
+        {"completed_at": datetime.now(UTC).isoformat()},
+        guard,
+        sort_keys=True,
+    )
 
 
 def _make_mock_llm_client() -> object:
-    """Create a deterministic client for mock execution."""
+    """Create a deterministic client that returns a real ``LLMResponse``.
 
-    class MockClient:
-        def complete(self, request) -> object:
-            class MockResponse:
-                content = (
-                    '{"task_description":"mock","analysis_focus":[],"evaluation_hints":[], '
-                    '"repository_scope_hint":""}'
-                )
-
-            return MockResponse()
-
-    return MockClient()
+    Returning the provider-neutral response model (rather than a bare stub)
+    keeps the mock path on the same token-usage contract as the real provider,
+    so budget accounting is exercised end-to-end in mock runs.
+    """
+    return MockLLMClient(
+        response_content=(
+            '{"task_description":"mock","analysis_focus":[],"evaluation_hints":[], '
+            '"repository_scope_hint":""}'
+        )
+    )
 
 
 def _persist_failed_run(
@@ -825,6 +943,7 @@ def _persist_failed_run(
             for aid, result in s.agent_results.items()
         }
         _safe_write(run_dir, "agent-outputs.json", agent_outputs, guard, sort_keys=True)
+        _finalize_run_directory(run_dir, guard)
     except Exception:
         # Artifact persistence is best-effort — don't hide the original error.
         import logging
@@ -979,7 +1098,12 @@ def _repo_summary(repo: Path) -> str:
     return f"Project at {repo.name}"
 
 
-def _create_real_llm_client(provider: str, model: str) -> LLMClient:
-    """Create a real OpenAI-compatible LLM client from env vars."""
+def _create_real_llm_client(provider: str, model: str, *, policy: ExecutionPolicy) -> LLMClient:
+    """Create a real OpenAI-compatible LLM client from env vars.
+
+    The provider timeout is capped at the run's wall-clock budget so a hung
+    provider request can never outlive the run deadline.
+    """
     config = OpenAICompatibleConfig.from_env()
-    return OpenAICompatibleLLMClient(config)
+    capped_timeout = min(config.timeout_seconds, policy.max_wall_time_seconds)
+    return OpenAICompatibleLLMClient(replace(config, timeout_seconds=capped_timeout))

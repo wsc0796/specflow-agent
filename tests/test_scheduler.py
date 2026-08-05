@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from threading import Barrier, Event, Lock, Thread
+import time
+from threading import Barrier, Event, Lock, Thread, Timer
 from typing import Any
 
 import pytest
@@ -163,6 +164,52 @@ class TestMultiAgentScheduler:
 
         with pytest.raises(ScheduleExecutionError, match="execution failed"):
             scheduler.execute(stages, executors, {})
+
+    # ── Wall-clock deadline enforcement ─────────────────────────────
+
+    def test_deadline_waits_for_started_work_before_returning(self) -> None:
+        """Timed-out work must finish before the scheduler returns control."""
+        started = Event()
+        release = Event()
+        finished = Event()
+
+        def slow_executor(context: dict[str, Any]) -> dict[str, Any]:
+            started.set()
+            release.wait(timeout=10)
+            finished.set()
+            return {"agent_id": "slow"}
+
+        scheduler = MultiAgentScheduler(max_parallel_workers=2)
+        timer = Timer(0.1, release.set)
+        timer.start()
+        with pytest.raises(ScheduleExecutionError, match="TIME_BUDGET_EXCEEDED"):
+            scheduler.execute(
+                (("slow",),),
+                {"slow": slow_executor},
+                {},
+                deadline=time.monotonic() + 0.02,
+            )
+        assert started.is_set()
+        assert finished.is_set()
+        timer.join(timeout=1)
+
+    def test_expired_deadline_fails_before_submitting_work(self) -> None:
+        """An already-expired deadline is rejected without running agents."""
+        scheduler = MultiAgentScheduler(max_parallel_workers=2)
+        executed: list[bool] = []
+
+        def executor(context: dict[str, Any]) -> dict[str, Any]:
+            executed.append(True)
+            return {"ok": True}
+
+        with pytest.raises(ScheduleExecutionError, match="TIME_BUDGET_EXCEEDED"):
+            scheduler.execute(
+                (("a",),),
+                {"a": executor},
+                {},
+                deadline=time.monotonic() - 1.0,
+            )
+        assert executed == []
 
     # ── Multiple agents in same stage ───────────────────────────────
 

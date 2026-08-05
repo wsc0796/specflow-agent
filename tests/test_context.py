@@ -290,6 +290,58 @@ def test_redact_secrets_preserves_dependency_specifiers():
     assert result == "fastapi==0.115 pydantic>=2.0"
 
 
+@pytest.mark.parametrize(
+    ("raw", "expected_absent"),
+    [
+        ('AWS_ACCESS_KEY_ID = "AKIAIOSFODNN7EXAMPLE"', "AKIAIOSFODNN7"),
+        (
+            'AWS_SECRET_ACCESS_KEY = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"',
+            "wJalrXUtnFEMI",
+        ),
+        ('GITHUB_TOKEN = "ghp_1234567890abcdefghijklmnopqrstuvwxyz"', "ghp_1234567890"),
+        (
+            'GITLAB_TOKEN = "glpat-abcdefghijklmnopqrstuvwxyz"',
+            "glpat-abcdefghijklmnop",
+        ),
+        ('SLACK_TOKEN = "xoxb-123456789012-123456789012-abcdefghijkl"', "xoxb-123456789012"),
+        ('GOOGLE_API_KEY = "AIzaSyA1234567890abcdefghijklmnopqrstuv"', "AIzaSyA1234567890"),
+        (
+            'conn = "AccountKey=abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789+/="',
+            "AccountKey=abcdefghijklmnopqrstuvwxyz",
+        ),
+        (
+            'PRIVATE_KEY = """-----BEGIN RSA PRIVATE KEY-----\\nMIIEowIBAAKCAQEA\\n'
+            '-----END RSA PRIVATE KEY-----"""',
+            "MIIEowIBAAKCAQEA",
+        ),
+        (
+            'DATABASE_URL = "postgres://user:secretpass@db.example.com:5432/mydb"',
+            "user:secretpass",
+        ),
+        ('REDIS_URL = "redis://:hunter2@cache.internal:6379/0"', "hunter2"),
+        ('PASSWORD = "hunter2"', "hunter2"),
+        ('client_secret = "abc123"', "abc123"),
+        ('{"client_secret": "abc123"}', "abc123"),
+        ('config = {"api_key": "sk-abc"}', "sk-abc"),
+    ],
+)
+def test_redact_secrets_covers_provider_and_assignment_patterns(raw, expected_absent):
+    result = _redact_secrets(raw)
+    assert expected_absent not in result
+    assert "redacted" in result or "<credentials>" in result
+
+
+def test_redact_secrets_keeps_prose_urls_and_versions():
+    """High-entropy redaction must not destroy legitimate evidence text."""
+    for raw in (
+        'MESSAGE = "This is a fairly long description with plenty of words in it."',
+        'URL = "https://example.com/api/v1/items?page=2"',
+        'version = "1.2.3"',
+        'note = "git commit: 7d8f3a2b9c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f"',
+    ):
+        assert _redact_secrets(raw) == raw
+
+
 def test_tainted_evidence_is_redacted_in_full_pipeline(tmp_path: Path) -> None:
     """T-005.2: inject URL credentials, API key, JWT into TechnologyStack.evidence
     and verify the full generate → render pipeline redacts them.

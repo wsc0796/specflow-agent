@@ -50,6 +50,48 @@ class TestMultiAgentRunner:
         assert len(manifest["effective_plan_hash"]) == 64
         assert manifest["enriched"] is True
 
+    def test_artifacts_are_atomic_and_integrity_marked(self, tmp_path: Path) -> None:
+        """Runs must end with a completion marker and per-file SHA-256 hashes."""
+        repo = tmp_path / "test-repo"
+        repo.mkdir()
+        (repo / "README.md").write_text("# Test")
+        output = tmp_path / "output"
+
+        assert run_multi_agent(repo=repo, requirement="Test", output=output, mock=True) == 0
+
+        run_dir = next(output.glob("run-multi-*"))
+        assert (run_dir / "_COMPLETE").is_file()
+        assert not list(run_dir.glob(".*.tmp"))  # no leftover temp files
+
+        integrity = json.loads((run_dir / "artifact-integrity.json").read_text(encoding="utf-8"))
+        assert set(integrity["artifact_hashes"]) >= {
+            "manifest.json",
+            "metrics.json",
+            "agent-outputs.json",
+            "handoffs.json",
+            "traces.json",
+            "sources.json",
+        }
+        for name, digest in integrity["artifact_hashes"].items():
+            assert sha256((run_dir / name).read_bytes()).hexdigest() == digest
+
+    def test_policy_failure_persists_specific_error_code(self, tmp_path: Path) -> None:
+        """Budget violations must be recorded with their exact code, not a blanket error."""
+        repo = tmp_path / "test-repo"
+        repo.mkdir()
+        (repo / "README.md").write_text("# Test")
+        output = tmp_path / "output"
+        policy = ExecutionPolicy(max_llm_calls=1)
+
+        exit_code = run_multi_agent(
+            repo=repo, requirement="Test", output=output, mock=True, policy=policy
+        )
+
+        assert exit_code == 3
+        run_dir = next(output.glob("run-multi-*"))
+        manifest = json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))
+        assert manifest["error"] == "CALL_BUDGET_EXCEEDED"
+
     def test_mock_run_persists_outputs_handoffs_and_traces(self, tmp_path: Path) -> None:
         repo = tmp_path / "test-repo"
         repo.mkdir()

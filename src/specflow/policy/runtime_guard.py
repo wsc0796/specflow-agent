@@ -36,13 +36,15 @@ class RuntimeGuard:
     # ── budget consumption ───────────────────────────────────────
 
     def consume_llm_call(self) -> None:
-        self._llm_calls += 1
-        if self._llm_calls > self._policy.max_llm_calls:
-            raise SpecFlowError(
-                code="CALL_BUDGET_EXCEEDED",
-                safe_message=f"LLM call budget exceeded ({self._policy.max_llm_calls})",
-                retryable=False,
-            )
+        with self._lock:
+            next_value = self._llm_calls + 1
+            if next_value > self._policy.max_llm_calls:
+                raise SpecFlowError(
+                    code="CALL_BUDGET_EXCEEDED",
+                    safe_message=f"LLM call budget exceeded ({self._policy.max_llm_calls})",
+                    retryable=False,
+                )
+            self._llm_calls = next_value
 
     def consume_tokens(
         self, input_tokens: int, output_tokens: int, *, is_retry: bool = False
@@ -143,6 +145,15 @@ class RuntimeGuard:
                 details={"elapsed_seconds": elapsed},
             )
 
+    def remaining_time(self) -> float:
+        """Return the wall-clock budget remaining in seconds (never negative)."""
+        return max(0.0, self.deadline - self._time())
+
+    @property
+    def deadline(self) -> float:
+        """Absolute monotonic deadline for the whole run."""
+        return self._started_at + self._policy.max_wall_time_seconds
+
     # ── artifact size check ──────────────────────────────────────
 
     def check_artifact_size(self, size_bytes: int) -> None:
@@ -173,7 +184,3 @@ class RuntimeGuard:
     @property
     def revision_count(self) -> int:
         return self._revision_count
-
-    @property
-    def agent_count(self) -> int:
-        return self._agent_count

@@ -116,6 +116,7 @@ class AgentRunner:
             except Exception:
                 return _failed_result(self._identity, "SCHEMA_VALIDATION_FAILED")
 
+            usage = response.usage
             return {
                 "agent_id": self.agent_id,
                 "role": self._identity.role.value,
@@ -124,8 +125,8 @@ class AgentRunner:
                 "model": self._model,
                 "schema_validated": True,
                 "usage": {
-                    "input_tokens": getattr(response, "input_tokens", 0),
-                    "output_tokens": getattr(response, "output_tokens", 0),
+                    "input_tokens": usage.input_tokens,
+                    "output_tokens": usage.output_tokens,
                 },
             }
         except json.JSONDecodeError:

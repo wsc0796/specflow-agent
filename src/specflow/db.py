@@ -107,7 +107,10 @@ class Database:
         event.listen(
             self.engine,
             "connect",
-            lambda connection, _: connection.execute("PRAGMA foreign_keys=ON"),
+            lambda connection, _: (
+                connection.execute("PRAGMA foreign_keys=ON"),
+                connection.execute("PRAGMA busy_timeout=5000"),
+            ),
         )
         self.factory = sessionmaker(self.engine, expire_on_commit=False)
 

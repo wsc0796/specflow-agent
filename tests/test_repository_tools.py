@@ -11,6 +11,7 @@ from specflow.tools.repository_policy import (
     RepositoryPolicyLimits,
 )
 from specflow.tools.repository_tools import RepositoryToolSet
+from specflow.tools.sanitization import final_dlp_scan
 
 
 def _executor(root: Path, **limits: int) -> ToolExecutor:
@@ -93,8 +94,25 @@ def test_ignored_and_sensitive_paths_are_not_listed(tmp_path: Path) -> None:
         target = tmp_path / directory
         target.mkdir()
         (target / "hidden.py").write_text("hidden", encoding="utf-8")
-    for name in (".env", ".env.local", "server.pem", "id_rsa", "credentials.json"):
+    for name in (
+        ".env",
+        ".env.local",
+        "server.pem",
+        "id_rsa",
+        "credentials",
+        "credentials.json",
+        "kubeconfig",
+    ):
         (tmp_path / name).write_text("secret", encoding="utf-8")
+    for directory, name in (
+        (".aws", "credentials"),
+        (".ssh", "id_ed25519"),
+        (".kube", "config"),
+        (".docker", "config.json"),
+    ):
+        target = tmp_path / directory
+        target.mkdir(exist_ok=True)
+        (target / name).write_text("secret", encoding="utf-8")
     (tmp_path / "environment.py").write_text("safe", encoding="utf-8")
 
     result = _executor(tmp_path).execute(_call("list_files"))
@@ -117,6 +135,19 @@ def test_search_code_returns_line_numbers_and_sanitized_excerpts(tmp_path: Path)
     assert result.output["matches"][0]["relative_path"] == "orders.py"
     assert "top-secret" not in result.output["matches"][0]["excerpt"]
     assert result.output["match_count"] == 2
+
+
+def test_final_dlp_scan_redacts_but_preserves_line_layout() -> None:
+    """The pre-provider DLP pass must keep evidence layout while redacting."""
+    text = (
+        'GITHUB_TOKEN = "ghp_1234567890abcdefghijklmnopqrstuvwxyz"\n'
+        'URL = "https://example.com/api/v1"\n'
+    )
+    result = final_dlp_scan(text)
+    assert "ghp_1234567890" not in result
+    assert "ghp_<redacted>" in result
+    assert "\n" in result  # layout preserved for the provider prompt
+    assert "https://example.com/api/v1" in result
 
 
 def test_search_code_marks_match_truncation(tmp_path: Path) -> None:

@@ -2,6 +2,17 @@
 
 ## v1.1.0 (Unreleased)
 
+- Security audit remediation: fixed real-provider token accounting (usage is
+  read from `LLMResponse.usage`), thread-safe LLM call budgets, bounded stage
+  deadline detection with queued-future cancellation and synchronous worker
+  draining, expanded DLP redaction (AWS/GitHub/GitLab/Slack/Google/Azure,
+  PEM blocks, DSNs, sensitive-variable assignments) with a final pre-provider
+  scan, sensitive path exclusions (`.aws/`, `.ssh/`, `.kube/`, `.docker/`,
+  `credentials`, `kubeconfig`), atomic artifact writes with per-file SHA-256
+  integrity hashes and a `_COMPLETE` marker, structured error codes for policy
+  and scheduler failures, SQLite `busy_timeout`, engine disposal on shutdown,
+  and opt-in HTTP hardening (API key, repository-root allowlist,
+  reviewer-label allowlist, run quotas) documented in the README.
 - Added a release-truth gate: package metadata now drives the OpenAPI version
   and `specflow --version` CLI output.
 - Added deterministic tests and CI smoke coverage that keep package, runtime,

@@ -70,7 +70,7 @@ copy is in `docs/resume/specflow-resume-v0.md`.
 **M8 independent-review remediation — CLOSED and released to `main` in v1.0.0.** The follow-up T-040
 and T-041 work adds RuntimeGuard budget enforcement and strict inter-agent
 payload schemas. T-061 adds a separately bounded, mock-only reviewer-decision
-record to the Run API. The current v1.1.0 candidate baseline is **674 passed, 2 skipped,
+record to the Run API. The current v1.1.0 candidate baseline is **740 passed, 3 skipped,
 3 known warnings**; the published tag remains v1.0.1 at `a4fc16c`.
 M8 is local mock acceptance and does not claim a new live-provider run. See `docs/reports/T-040-completion-report.md`,
 `docs/reports/T-041-completion-report.md`, and
@@ -236,6 +236,10 @@ uv sync --all-groups
 uv run uvicorn specflow.main:app --reload
 ```
 
+Uvicorn binds to `127.0.0.1` by default; do not expose the API on a public or
+LAN interface unless you have enabled authentication (see
+[Security boundaries](#security-boundaries)).
+
 Open `http://127.0.0.1:8000/health`. Expected response:
 
 ```json
@@ -276,8 +280,10 @@ bounded list of relative filenames: it does not expose an absolute filesystem
 path or arbitrary artifact contents. A completed or completed-degraded Run may
 also expose a bounded review package and append-only reviewer decisions.
 `reviewer_label` is unverified display metadata, not an authenticated identity;
-this single-process/mock-only slice has no user accounts, authorization, queue,
-async execution, or repository write capability.
+this single-process/mock-only slice has no user accounts, queue, async
+execution, or repository write capability. Optional API-key authentication,
+repository-path allowlisting and reviewer-label allowlisting can be enabled
+through environment variables (see below).
 
 To register a project record (this does not scan or validate the path yet):
 
@@ -286,6 +292,42 @@ Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8000/api/v1/projects `
   -ContentType 'application/json' `
   -Body '{"name":"Example API","repository_path":"C:\\projects\\example-api"}'
 ```
+
+## Security boundaries
+
+The service is designed for a single-user, localhost-only deployment. The
+following controls are opt-in via environment variables and change nothing in
+the default portfolio workflow:
+
+| Variable | Effect when set |
+| --- | --- |
+| `SPECFLOW_API_KEY` | Every `/api/v1` request must present the key via `X-API-Key` or `Authorization: Bearer`. `/health` stays open. |
+| `SPECFLOW_ALLOWED_REPOSITORY_ROOTS` | Semicolon-separated roots; `repository_path` must resolve inside one of them. |
+| `SPECFLOW_REVIEWER_LABELS` | Comma-separated approved labels; review decisions must use one of them. |
+| `SPECFLOW_MAX_RUNS_PER_MINUTE` | Run-creation burst cap (default `30`). |
+| `SPECFLOW_MAX_CONCURRENT_RUNS` | Maximum simultaneous runs (default `1`). |
+
+Example for a LAN-exposed deployment:
+
+```powershell
+$env:SPECFLOW_API_KEY = "<random long secret>"
+$env:SPECFLOW_ALLOWED_REPOSITORY_ROOTS = "D:\repos;D:\work\sandbox"
+$env:SPECFLOW_REVIEWER_LABELS = "engineering-lead"
+uv run uvicorn specflow.main:app --host 0.0.0.0
+```
+
+Repository evidence is treated as untrusted data: files are only read through
+bounded, read-only tools; sensitive paths (`.env`, `.aws/`, `.ssh/`, `.kube/`,
+`.docker/`, `credentials`, `kubeconfig`, key/PEM files, ...) are excluded, and
+matched lines pass through a DLP redaction pass covering provider-specific
+tokens, AWS/GitHub/GitLab/Slack/Google/Azure credentials, PEM blocks, DSNs with
+embedded passwords, and sensitive-variable assignments — plus a final scan
+before evidence is sent to a live provider or persisted to `sources.json`.
+
+Even with all controls enabled, this is a single-process service: for a
+multi-user or public deployment add a reverse proxy, per-user ownership and
+authorization, a shared rate limiter, and a job queue instead of synchronous
+in-request execution.
 
 ## Verification
 
