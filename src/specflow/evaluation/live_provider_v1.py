@@ -63,7 +63,10 @@ _SENSITIVE_KEY_RE = re.compile(
     r"client[_-]?secret|access[_-]?token|refresh[_-]?token|id[_-]?token|token)$",
     re.IGNORECASE,
 )
-_BEARER_RE = re.compile(r"(?i)\bbearer\s+[A-Za-z0-9._~+/=-]+")
+_BEARER_RE = re.compile(
+    r"(?i)\bbearer\s+(?!(?:prefix|token|header|scheme|value|auth|authentication|"
+    r"credentials?|type|key|name|jwt)\b)[A-Za-z0-9._~+/=-]{8,}"
+)
 _SENSITIVE_ASSIGNMENT_RE = re.compile(
     r"(?i)\b(api[_-]?key|password|secret|client[_-]?secret|credential|private[_-]?key|token)"
     r"\s*[:=]\s*([^\s,;]+)"

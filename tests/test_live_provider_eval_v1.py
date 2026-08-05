@@ -25,6 +25,13 @@ from specflow.evaluation.live_provider_v1 import (
 from specflow.llm.models import LLMResponse, LLMUsage
 
 
+def test_bearer_regex_ignores_technical_terms() -> None:
+    """Plain prose like "Bearer prefix" is not a credential and must not fail
+    the attempt secret scan."""
+    assert live_eval._BEARER_RE.search("Use the Bearer prefix for authentication") is None
+    assert live_eval._BEARER_RE.search("Authorization: Bearer sk-abcdefghijklmnop123") is not None
+
+
 class FakeLiveClient:
     """Provider-shaped test client that records sanitized response metadata."""
 
