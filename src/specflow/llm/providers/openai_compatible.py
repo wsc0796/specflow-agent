@@ -125,6 +125,12 @@ class OpenAICompatibleLLMClient:
                 else request.response_format
             )
             payload["response_format"] = {"type": response_type}
+        if self._config.model.startswith("deepseek"):
+            # DeepSeek V4 enables thinking mode by default.  In thinking mode
+            # the CoT shares the ``max_tokens`` budget and ``content`` can come
+            # back empty when reasoning exhausts the limit.  Structured agent
+            # output relies on a complete final answer, so opt out explicitly.
+            payload["thinking"] = {"type": "disabled"}
         return payload
 
     def _parse_response(self, payload: Any) -> tuple[str, str, LLMUsage, str]:

@@ -164,6 +164,40 @@ def test_request_uses_configured_model_and_openai_shape() -> None:
     assert captured[0].headers["authorization"] == f"Bearer {_TEST_CREDENTIAL}"
 
 
+def test_deepseek_request_disables_thinking_mode() -> None:
+    """DeepSeek V4 defaults to thinking mode; structured agents need the final
+    answer to be complete, so thinking is explicitly disabled for DeepSeek."""
+    captured: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured.append(request)
+        return _response()
+
+    client = OpenAICompatibleLLMClient(
+        _config(model="deepseek-v4-flash"),
+        transport=httpx.MockTransport(handler),
+    )
+    client.complete(_request(model="deepseek-v4-flash"))
+
+    assert len(captured) == 1
+    payload = captured[0].read().decode("utf-8")
+    assert '"thinking":{"type":"disabled"}' in payload
+
+
+def test_non_deepseek_request_keeps_default_parameters() -> None:
+    captured: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured.append(request)
+        return _response()
+
+    _client(handler).complete(_request())
+
+    assert len(captured) == 1
+    payload = captured[0].read().decode("utf-8")
+    assert "thinking" not in payload
+
+
 def test_timeout_is_mapped_without_raw_error() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         raise httpx.ReadTimeout("server included sensitive body", request=request)
