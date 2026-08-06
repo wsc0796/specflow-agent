@@ -1,6 +1,6 @@
 # SpecFlow Agent — 简历 V0（投递版）
 
-> 当前可引用事实：v1.1.0 未发布候选，671 passed、2 skipped；12-case
+> 当前可引用事实：v1.1.0 未发布候选，757 passed、3 skipped、3 个已知 warnings；12-case
 > mock contract benchmark；CI quality / benchmark / security 门禁。最新已发布
 > tag 仍为 v1.0.1。不要把本页的候选状态写成“已发布生产系统”。
 
@@ -15,14 +15,15 @@
   Schema-validated Handoff 与 RuntimeGuard，约束 LLM 的输入、预算、返工与
   输出边界。
 - 构建 12-case mock artifact-contract benchmark 与 CI 门禁，覆盖仓库理解、
-  变更规划和风险审查；v1.1.0 候选通过 671 项自动化测试，并保留 Trace、
+  变更规划和风险审查；v1.1.0 未发布候选通过 757 项自动化测试（3 skipped、
+  3 个已知 warnings），并保留 Trace、
   Artifact 与安全失败语义作为可复查证据。
 
 ## 精简版（一条）
 
 > 实现受控六 Agent 代码仓库分析系统，以确定性编排、只读证据采集、Schema
 > Handoff 和 RuntimeGuard 降低 LLM 工作流不确定性；通过 12-case mock
-> benchmark、671 项自动化测试和 CI 门禁提供可复现工程证据。
+> benchmark、757 项自动化测试和 CI 门禁提供可复现工程证据。
 
 ## 技术栈
 
@@ -31,7 +32,7 @@ Actions
 
 ## 证据与边界
 
-- 可复验证据：固定六 Agent 拓扑、12-case mock benchmark、671 passed、
+- 可复验证据：固定六 Agent 拓扑、12-case mock benchmark、757 passed、
   artifact/trace/schema contracts、read-only repository access。
 - 不要宣称：生产部署、真实用户流量、模型语义准确率、成本节省或 mock
   benchmark 的 live-model 质量。

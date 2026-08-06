@@ -9,8 +9,8 @@
 - 当前分支：`main`
 - 已发布版本：`v1.0.1`（tag/Release commit `a4fc16c chore(release): reconcile v1.0.1 metadata and CI`）
 - 当前候选：`v1.1.0`（未发布 main；已包含 release truth gate、mock-only 人工变更评审决策闭环及 T-062～T-065 安全边界修复）
-- 当前代码基线：`40db000`（`main` 与 `origin/main` 同步，2026-08-06 核实）
-- 质量证据：`757 passed, 3 skipped, 3 warnings`（2026-08-06 本地复核）；Ruff、build、secret scan、benchmark baseline、installed-wheel smoke 与远端 CI 是候选门禁
+- 当前发布代码基线：`9e0e058`（`main` 与 `origin/main` 同步，2026-08-06 核实）；T-067 只更新当前材料和门禁记录，尚待授权推送。
+- 质量证据：`757 passed, 3 skipped, 3 warnings`（2026-08-06 本地复核）；Ruff、build、secret scan、benchmark baseline、installed-wheel smoke 与远端 CI 是候选门禁。远端 CI 已在发布代码基线 `9e0e058` 成功：`https://github.com/wsc0796/specflow-agent/actions/runs/31062376867`。
 - 工作区：应仅存在可解释的本地文件；不要覆盖或纳入未知 `.claude/` 文件
 - 远程：`origin` 已配置为 GitHub 仓库
 
@@ -86,9 +86,10 @@ passed
 
 ## 当前建议下一步
 
-1. 完成 T-066 的 build、installed-wheel smoke、benchmark baseline 与远端 CI 复核后，获得用户明确授权才可创建 v1.1.0 tag 或 GitHub Release。
-2. 后续增强必须从新的 task spec 开始，不得重开已关闭的 T-040～T-065。
-3. 先用实际开发者/负责人试用验证“变更方案评审”工作流；没有标注数据前，不要宣称风险发现率或节省成本。
+1. 完成 T-067 的最终本地门禁后，Issue #1 已可复核关闭，但关闭、推送、创建 v1.1.0 tag 或 GitHub Release 都必须先获得用户明确授权。
+2. 后续增强必须从新的 task spec 开始，不得重开已关闭的 T-040～T-067。
+3. 发布后应关闭并重建编号冲突、基线漂移的 PR #5 为 T-068；在获得授权的 Provider 凭据、价格规则和只读目标仓库前，不运行 live-provider evaluation。
+4. 先用实际开发者/负责人试用验证“变更方案评审”工作流；没有标注数据前，不要宣称风险发现率或节省成本。
 
 ## 新窗口启动提示词
 
@@ -100,7 +101,7 @@ passed
 - README.md
 - docs/00-SPEC-BASELINE.md
 
-当前分支是 main；已发布版本是 v1.0.1（a4fc16c），当前候选是未发布 v1.1.0，已完成至 T-065，当前代码基线是 40db000。不要假设聊天历史，以上交接文档是当前事实来源。开始任何修改前先执行：
+当前分支是 main；已发布版本是 v1.0.1（a4fc16c），当前候选是未发布 v1.1.0，已完成至 T-067 本地发布收口，当前发布代码基线是 9e0e058。T-067 的文档提交需要获得用户授权后才可推送，并在远端 CI 验证。不要假设聊天历史，以上交接文档是当前事实来源。开始任何修改前先执行：
 
 git status --short --branch
 git log --oneline -8
@@ -110,7 +111,7 @@ git log --oneline -8
 
 ## 交接状态
 
-- stage_state: T-066 locally closed; documentation-only commit and remote CI verification pending; v1.1.0 release-truth candidate remains untagged
-- verdict: v1.0.1 is published; the local T-065 baseline at 40db000 passes 757 tests; v1.1.0 still requires final release-gate/remote-CI evidence and explicit user release authorization; mock benchmark and credential-free demo evidence are ready; live validation is skipped
-- blocking_decision: do not run a live provider without authorized credentials and an approved read-only target repository
-- recommended_next_step: complete the T-066 documentation/release-gate reconciliation, then request explicit user authorization before creating a v1.1.0 tag or GitHub Release; do not start a new product slice without a separately frozen task spec
+- stage_state: T-067 locally closed; release-code CI is green for 9e0e058 and v1.1.0 remains an untagged release candidate
+- verdict: v1.0.1 is published; the current 9e0e058 release-code baseline passes 757 tests; T-067 local gates pass, but its documentation commit still needs explicit push authorization and remote CI before a tag or GitHub Release. Issue #1 also remains open pending explicit closure authorization; mock benchmark and credential-free demo evidence are ready; live validation is not yet performed
+- blocking_decision: do not run a live provider without authorized credentials, a source-dated pricing rule, and an approved read-only target repository
+- recommended_next_step: request explicit authorization to push the T-067 commit, verify its remote CI, close Issue #1, and create the v1.1.0 tag and GitHub Release. After v1.1.0 is released, close and rebuild PR #5 as T-068 rather than merging its conflicting, stale branch.

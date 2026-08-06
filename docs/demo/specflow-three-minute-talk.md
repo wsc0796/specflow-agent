@@ -27,14 +27,15 @@ read 等只读工具，拒绝路径穿越和敏感文件。第二，Agent 之间
 
 “我没有把 benchmark 写成模型效果宣传，而是建立 12 个固定 mock case：4 个仓库
 理解、4 个变更规划、4 个风险审查。它验证 artifact、schema、状态和安全边界能否
-稳定复现。当前 v1.1.0 候选有 671 个自动化测试，并在 CI 中执行 quality、
-benchmark 和 secret-scan 门禁。”
+稳定复现。当前未发布的 v1.1.0 候选有 757 个通过测试、3 个跳过和 3 个已知
+warnings，并在 CI 中执行 quality、benchmark 和 secret-scan 门禁。”
 
 ## 2:25–3:00｜边界与下一步
 
-“它目前不是生产 Agent 平台：没有队列、鉴权、多实例、真实流量或 semantic
-accuracy claim。Run API 也只支持 mock-only 单进程生命周期。历史上 M6 做过一次
-授权的 DeepSeek live-provider 验证，但我不会把它混进当前候选的 benchmark 结论。
+“它目前不是生产 Agent 平台：没有队列、用户身份或授权、多实例、真实流量或
+semantic accuracy claim。HTTP API 采用共享 API key 的失败关闭边界，但这不等于
+多用户身份或权限系统。Run API 也只支持 mock-only 单进程生命周期。历史上 M6
+做过一次授权的 DeepSeek live-provider 验证，但我不会把它混进当前候选的 benchmark 结论。
 如果继续做，我会先从真实使用需求出发，而不是盲目加 RAG、MCP 或更多 Agent。”
 
 ## 讲完后可展示的三个页面
