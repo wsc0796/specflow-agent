@@ -70,8 +70,11 @@ copy is in `docs/resume/specflow-resume-v0.md`.
 **M8 independent-review remediation — CLOSED and released to `main` in v1.0.0.** The follow-up T-040
 and T-041 work adds RuntimeGuard budget enforcement and strict inter-agent
 payload schemas. T-061 adds a separately bounded, mock-only reviewer-decision
-record to the Run API. The current v1.1.0 candidate baseline is **752 passed, 3 skipped,
-3 known warnings**; the published tag remains v1.0.1 at `a4fc16c`.
+record to the Run API. T-062 through T-065 remediate runtime, DLP, HTTP
+authentication, response-disclosure, and local observability boundaries. The
+current v1.1.0 candidate local baseline is **757 passed, 3 skipped, 3 known
+warnings** (verified 2026-08-06); the published tag remains v1.0.1 at
+`a4fc16c`.
 M8 is local mock acceptance and does not claim a new live-provider run. See `docs/reports/T-040-completion-report.md`,
 `docs/reports/T-041-completion-report.md`, and
 `docs/roadmap/2026-07-13-portfolio-release-plan.md`.

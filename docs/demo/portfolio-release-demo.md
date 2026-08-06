@@ -1,8 +1,8 @@
 # SpecFlow Agent Portfolio Demo
 
-> Current evidence baseline: v1.1.0 unreleased main candidate, 674 passed,
-> 2 skipped and 3 known warnings. Latest published release: `v1.0.1` at
-> `a4fc16c`. The benchmark remains mock-only.
+> Current evidence baseline: v1.1.0 unreleased main candidate, 757 passed,
+> 3 skipped and 3 known warnings (local verification on 2026-08-06). Latest
+> published release: `v1.0.1` at `a4fc16c`. The benchmark remains mock-only.
 
 This demo takes 3 to 5 minutes. It uses no provider credential and makes no
 live-provider claim.
@@ -88,4 +88,4 @@ queue, or modify a repository.
 uv run pytest -v
 ```
 
-The expected current result is 674 passed, 2 skipped and 3 known warnings.
+The expected current result is 757 passed, 3 skipped and 3 known warnings.

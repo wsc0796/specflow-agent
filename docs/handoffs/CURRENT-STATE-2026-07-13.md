@@ -8,8 +8,9 @@
 - 本地路径：`D:\Documents\暑假计划\specflow-agent`
 - 当前分支：`main`
 - 已发布版本：`v1.0.1`（tag/Release commit `a4fc16c chore(release): reconcile v1.0.1 metadata and CI`）
-- 当前候选：`v1.1.0`（未发布 main；含 release truth gate 与 mock-only 人工变更评审决策闭环）
-- 质量证据：`674 passed, 2 skipped, 3 warnings`；Ruff、build、secret scan、benchmark baseline 与远端 CI 是候选门禁
+- 当前候选：`v1.1.0`（未发布 main；已包含 release truth gate、mock-only 人工变更评审决策闭环及 T-062～T-065 安全边界修复）
+- 当前代码基线：`40db000`（`main` 与 `origin/main` 同步，2026-08-06 核实）
+- 质量证据：`757 passed, 3 skipped, 3 warnings`（2026-08-06 本地复核）；Ruff、build、secret scan、benchmark baseline、installed-wheel smoke 与远端 CI 是候选门禁
 - 工作区：应仅存在可解释的本地文件；不要覆盖或纳入未知 `.claude/` 文件
 - 远程：`origin` 已配置为 GitHub 仓库
 
@@ -30,6 +31,10 @@ SpecFlow Agent 是一个 spec-driven 的 Python/FastAPI 软件工程助手。它
 - M8 T-040：ExecutionPolicy、Error Taxonomy、RuntimeGuard 与 multi-agent 运行时接线
 - T-041：严格 Agent 输入/输出 payload schema 与 handoff 前验证
 - T-061：completed Run 的 bounded review package 与 append-only `accepted` / `needs_changes` 人工决策记录
+- T-062：持久化仓库路径重校验、运行配额与同步调度器边界修复
+- T-063：legacy 与 multi-agent 管道的最终 DLP 边界一致性
+- T-064：默认失败关闭的 HTTP API key 边界，除 `/health` 外所有路由受保护
+- T-065：Project API 不再返回本地仓库路径，legacy 错误 artifact 写入失败可观测
 
 ## 最近 T-040 修复
 
@@ -47,7 +52,7 @@ SpecFlow Agent 是一个 spec-driven 的 Python/FastAPI 软件工程助手。它
 
 ```text
 uv run pytest -v
-674 passed, 2 skipped, 3 warnings
+757 passed, 3 skipped, 3 warnings
 
 uv run ruff check .
 All checks passed!
@@ -81,8 +86,8 @@ passed
 
 ## 当前建议下一步
 
-1. T-061 的完整本地与远端 CI 门禁已通过；获得用户明确授权后，才创建 v1.1.0 tag 或 GitHub Release。
-2. 后续增强必须从新的 task spec 开始，不得重开已关闭的 T-040～T-061。
+1. 完成 T-066 的 build、installed-wheel smoke、benchmark baseline 与远端 CI 复核后，获得用户明确授权才可创建 v1.1.0 tag 或 GitHub Release。
+2. 后续增强必须从新的 task spec 开始，不得重开已关闭的 T-040～T-065。
 3. 先用实际开发者/负责人试用验证“变更方案评审”工作流；没有标注数据前，不要宣称风险发现率或节省成本。
 
 ## 新窗口启动提示词
@@ -95,7 +100,7 @@ passed
 - README.md
 - docs/00-SPEC-BASELINE.md
 
-当前分支是 main；已发布版本是 v1.0.1（a4fc16c），当前候选是未发布 v1.1.0，含 mock-only 变更方案评审决策闭环。不要假设聊天历史，以上交接文档是当前事实来源。开始任何修改前先执行：
+当前分支是 main；已发布版本是 v1.0.1（a4fc16c），当前候选是未发布 v1.1.0，已完成至 T-065，当前代码基线是 40db000。不要假设聊天历史，以上交接文档是当前事实来源。开始任何修改前先执行：
 
 git status --short --branch
 git log --oneline -8
@@ -105,7 +110,7 @@ git log --oneline -8
 
 ## 交接状态
 
-- stage_state: T-061 closed; v1.1.0 release-truth candidate remains untagged
-- verdict: v1.0.1 is published; T-061 local gates and GitHub Actions CI 29252665568 passed; v1.1.0 still requires explicit user release authorization; mock benchmark and credential-free demo evidence are ready; live validation is skipped
+- stage_state: T-066 locally closed; documentation-only commit and remote CI verification pending; v1.1.0 release-truth candidate remains untagged
+- verdict: v1.0.1 is published; the local T-065 baseline at 40db000 passes 757 tests; v1.1.0 still requires final release-gate/remote-CI evidence and explicit user release authorization; mock benchmark and credential-free demo evidence are ready; live validation is skipped
 - blocking_decision: do not run a live provider without authorized credentials and an approved read-only target repository
-- recommended_next_step: request explicit user authorization before creating a v1.1.0 tag or GitHub Release; do not start a new product slice without a separately frozen task spec
+- recommended_next_step: complete the T-066 documentation/release-gate reconciliation, then request explicit user authorization before creating a v1.1.0 tag or GitHub Release; do not start a new product slice without a separately frozen task spec

@@ -1,7 +1,7 @@
 # SpecFlow Agent — Current Resume Evidence
 
 > Current evidence baseline: v1.1.0 unreleased main candidate, checked on
-> 2026-07-13. The latest published release remains `v1.0.1` at `a4fc16c`.
+> 2026-08-06. The latest published release remains `v1.0.1` at `a4fc16c`.
 
 ## Verifiable facts
 
@@ -15,17 +15,21 @@
   interrupted persisted runs as `failed_runtime` with `INTERRUPTED` on the next
   single-process startup. T-061 adds an append-only human review-decision record
   to completed Run packages. It is not a queue, retry, resume, or deployment claim.
-- Quality evidence for the v1.1.0 candidate: 674 passed, 2 skipped, 3 known
-  warnings; Ruff, package build, secret scan, benchmark baseline and CI are
-  required release-truth gates.
+- T-062 through T-065 additionally enforce persisted-path revalidation and
+  scheduler draining, DLP parity, fail-closed API authentication, and
+  path-safe Project API responses with local error-write observability.
+- Quality evidence for the v1.1.0 candidate: 757 passed, 3 skipped, 3 known
+  warnings (local verification on 2026-08-06); Ruff, package build, secret
+  scan, benchmark baseline and CI are required release-truth gates.
 
 ## Current resume bullet
 
 > Designed and implemented a controlled multi-agent repository-analysis system
 > with deterministic orchestration, schema contracts, runtime guardrails,
 > auditable artifacts, a reproducible 12-case benchmark, and a mock-only
-> FastAPI/SQLite change-review lifecycle slice; validated the current `main`
-> baseline with 674 passing automated tests and CI-backed quality gates.
+> FastAPI/SQLite change-review lifecycle slice; hardened its DLP and HTTP
+> boundaries; validated the current `main` baseline with 757 passing automated
+> tests and release-quality gates.
 
 The concise, application-ready version is
 [specflow-resume-v0.md](specflow-resume-v0.md).
