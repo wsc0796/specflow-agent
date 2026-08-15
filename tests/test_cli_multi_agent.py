@@ -20,10 +20,10 @@ from specflow.schema import build_schema_registry
 class TestMultiAgentRunner:
     def test_artifact_sanitization_uses_full_dlp_ruleset(self) -> None:
         raw_values = {
-            "openai": "sk-abc123def456ghi789jkl012mno345pqr678stu",
-            "github": "ghp_1234567890abcdefghijklmnopqrstuvwxyz",
+            "openai": "sk-" + "abc123def456ghi789jkl012mno345pqr678stu",
+            "github": "ghp_" + "1234567890abcdefghijklmnopqrstuvwxyz",
             "jwt": "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.signature",
-            "assignment": 'client_secret = "artifact-secret"',
+            "assignment": 'client_secret = "artifact-' + 'secret"',
             "path": "C:/sensitive/repository/config.py",
         }
 
@@ -31,8 +31,8 @@ class TestMultiAgentRunner:
         serialized = json.dumps(sanitized)
 
         for secret in (
-            "sk-abc123def456ghi789jkl012mno345pqr678stu",
-            "ghp_1234567890abcdefghijklmnopqrstuvwxyz",
+            "sk-" + "abc123def456ghi789jkl012mno345pqr678stu",
+            "ghp_" + "1234567890abcdefghijklmnopqrstuvwxyz",
             "eyJhbGciOiJIUzI1NiJ9",
             "artifact-secret",
             "C:/sensitive/repository/config.py",

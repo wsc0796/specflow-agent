@@ -186,7 +186,7 @@ def test_evidence_bundle_hash_is_stable(tmp_path: Path) -> None:
 
 
 def test_tool_call_record_summaries_are_sanitized(tmp_path: Path) -> None:
-    (tmp_path / "app.py").write_text("api_key=sk-secret-value", encoding="utf-8")
+    (tmp_path / "app.py").write_text("api_key=sk-" + "secret-value", encoding="utf-8")
 
     bundle = _collector(tmp_path).collect(run_id="run", requirement="api_key")
 

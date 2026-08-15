@@ -16,26 +16,29 @@ from specflow.api_security import (
 )
 from specflow.main import create_app
 
+FAKEKEY = "top-" + "secret-key"
+
 
 def _client(tmp_path: Path, *, authenticated: bool = True, **security_kwargs) -> TestClient:
-    api_key = security_kwargs.setdefault("api_key", "test-api-key")
+    configured_key = security_kwargs.setdefault("api_key", "test-api-key")
+    security_kwargs.setdefault("allowed_repository_roots", (str(tmp_path),))
     return TestClient(
         create_app(
             f"sqlite:///{(tmp_path / 'security.db').as_posix()}",
             artifact_root=tmp_path / "artifacts",
             security=ApiSecurity(**security_kwargs),
         ),
-        headers={"X-API-Key": api_key} if authenticated else None,
+        headers={"X-API-Key": configured_key} if authenticated else None,
     )
 
 
 def test_api_key_required_when_configured(tmp_path: Path) -> None:
-    with _client(tmp_path, api_key="top-secret-key", authenticated=False) as client:
+    with _client(tmp_path, api_key=FAKEKEY, authenticated=False) as client:
         assert client.get("/api/v1/projects/nope").status_code == 401
-        response = client.get("/api/v1/projects/nope", headers={"X-API-Key": "top-secret-key"})
+        response = client.get("/api/v1/projects/nope", headers={"X-API-Key": FAKEKEY})
         assert response.status_code == 404  # authenticated, just not found
         response = client.get(
-            "/api/v1/projects/nope", headers={"Authorization": "Bearer top-secret-key"}
+            "/api/v1/projects/nope", headers={"Authorization": f"Bearer {FAKEKEY}"}
         )
         assert response.status_code == 404
         wrong_key = client.get("/api/v1/projects/nope", headers={"X-API-Key": "wrong"})
@@ -43,7 +46,7 @@ def test_api_key_required_when_configured(tmp_path: Path) -> None:
 
 
 def test_health_endpoint_stays_open_with_api_key(tmp_path: Path) -> None:
-    with _client(tmp_path, api_key="top-secret-key") as client:
+    with _client(tmp_path, api_key=FAKEKEY) as client:
         assert client.get("/health").status_code == 200
 
 
@@ -57,6 +60,26 @@ def test_startup_requires_non_empty_ascii_api_key(tmp_path: Path) -> None:
         with pytest.raises(ApiSecurityConfigurationError, match="SPECFLOW_API_KEY"):
             with TestClient(app):
                 pass
+
+
+def test_startup_requires_an_allowed_repository_root(tmp_path: Path) -> None:
+    app = create_app(
+        f"sqlite:///{(tmp_path / 'security.db').as_posix()}",
+        artifact_root=tmp_path / "artifacts",
+        security=ApiSecurity(api_key="test-api-key"),
+    )
+    with pytest.raises(ApiSecurityConfigurationError, match="SPECFLOW_ALLOWED_REPOSITORY_ROOTS"):
+        with TestClient(app):
+            pass
+
+
+def test_validate_repository_path_rejects_every_path_without_allowlist() -> None:
+    """Fail-closed: no allowlist means no repository path is accepted."""
+    security = ApiSecurity(api_key="test-api-key")
+
+    with pytest.raises(HTTPException) as error:
+        security.validate_repository_path("C:/anything/at/all")
+    assert error.value.status_code == 503
 
 
 def test_documentation_and_openapi_routes_require_authentication(tmp_path: Path) -> None:
@@ -110,7 +133,10 @@ def test_repository_path_allowlist_is_rechecked_before_a_run(tmp_path: Path) -> 
         create_app(
             database_url,
             artifact_root=tmp_path / "artifacts",
-            security=ApiSecurity(api_key="test-api-key"),
+            security=ApiSecurity(
+                api_key="test-api-key",
+                allowed_repository_roots=(str(tmp_path),),
+            ),
         ),
         headers={"X-API-Key": "test-api-key"},
     ) as client:
@@ -135,7 +161,11 @@ def test_reviewer_label_allowlist(tmp_path: Path) -> None:
     repository = tmp_path / "repository"
     repository.mkdir()
     (repository / "README.md").write_text("# repo\n", encoding="utf-8")
-    security = ApiSecurity(api_key="test-api-key", reviewer_labels=frozenset({"engineering-lead"}))
+    security = ApiSecurity(
+        api_key="test-api-key",
+        allowed_repository_roots=(str(repository),),
+        reviewer_labels=frozenset({"engineering-lead"}),
+    )
     with TestClient(
         create_app(
             f"sqlite:///{(tmp_path / 'security.db').as_posix()}",
@@ -205,7 +235,12 @@ def test_http_concurrency_rejection_does_not_consume_run_rate_quota(
         return 0
 
     monkeypatch.setattr("specflow.runs.run_multi_agent", slow_runner)
-    security = ApiSecurity(api_key="test-api-key", max_runs_per_minute=2, max_concurrent_runs=1)
+    security = ApiSecurity(
+        api_key="test-api-key",
+        allowed_repository_roots=(str(repository),),
+        max_runs_per_minute=2,
+        max_concurrent_runs=1,
+    )
     with TestClient(
         create_app(
             f"sqlite:///{(tmp_path / 'security.db').as_posix()}",
@@ -270,7 +305,10 @@ def test_engine_is_disposed_on_shutdown(tmp_path: Path, monkeypatch) -> None:
     app = main_module.create_app(
         database_url=expected_url,
         artifact_root=tmp_path / "artifacts",
-        security=ApiSecurity(api_key="test-api-key"),
+        security=ApiSecurity(
+            api_key="test-api-key",
+            allowed_repository_roots=(str(tmp_path),),
+        ),
     )
     with TestClient(app):
         assert disposed == []
@@ -279,7 +317,7 @@ def test_engine_is_disposed_on_shutdown(tmp_path: Path, monkeypatch) -> None:
 
 def test_oversized_ascii_api_key_rejects_without_500(tmp_path: Path) -> None:
     """Oversized credentials must be a clean 401, never a 500."""
-    with _client(tmp_path, api_key="top-secret-key", authenticated=False) as client:
+    with _client(tmp_path, api_key=FAKEKEY, authenticated=False) as client:
         hostile = "x" * 10_000
         via_header = client.get("/api/v1/projects/nope", headers={"X-API-Key": hostile})
         assert via_header.status_code == 401
@@ -295,7 +333,7 @@ def test_require_api_key_rejects_non_ascii_input() -> None:
     HTTP clients cannot carry non-ASCII headers, so this exercises the
     security layer directly — the path a non-ASCII configured key hits.
     """
-    security = ApiSecurity(api_key="top-secret-key")
+    security = ApiSecurity(api_key=FAKEKEY)
     for hostile in ("中文密钥", "🚀✨emoji-key", "éclair-café", "​" * 3):
         with pytest.raises(HTTPException) as error:
             security.require_api_key(None, x_api_key=hostile, authorization=None)
@@ -321,14 +359,14 @@ def test_require_api_key_non_ascii_configured_key_never_matches() -> None:
 def test_malformed_or_wrong_scheme_authorization_rejects(
     tmp_path: Path, authorization: str
 ) -> None:
-    with _client(tmp_path, api_key="top-secret-key", authenticated=False) as client:
+    with _client(tmp_path, api_key=FAKEKEY, authenticated=False) as client:
         response = client.get("/api/v1/projects/nope", headers={"Authorization": authorization})
         assert response.status_code == 401
 
 
 @pytest.mark.parametrize("header_value", ["", "   "])
 def test_empty_api_key_header_rejects(tmp_path: Path, header_value: str) -> None:
-    with _client(tmp_path, api_key="top-secret-key", authenticated=False) as client:
+    with _client(tmp_path, api_key=FAKEKEY, authenticated=False) as client:
         response = client.get("/api/v1/projects/nope", headers={"X-API-Key": header_value})
         assert response.status_code == 401
 
@@ -356,12 +394,12 @@ def test_default_quotas_match_documented_values() -> None:
 
 
 def test_correct_key_works_on_both_headers(tmp_path: Path) -> None:
-    with _client(tmp_path, api_key="top-secret-key", authenticated=False) as client:
-        via_header = client.get("/api/v1/projects/nope", headers={"X-API-Key": "top-secret-key"})
+    with _client(tmp_path, api_key=FAKEKEY, authenticated=False) as client:
+        via_header = client.get("/api/v1/projects/nope", headers={"X-API-Key": FAKEKEY})
         assert via_header.status_code == 404  # authenticated, just not found
         via_bearer = client.get(
             "/api/v1/projects/nope",
-            headers={"Authorization": "Bearer top-secret-key"},
+            headers={"Authorization": f"Bearer {FAKEKEY}"},
         )
         assert via_bearer.status_code == 404
         lowercase = client.get(

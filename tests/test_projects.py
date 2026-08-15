@@ -14,7 +14,10 @@ def client_for(tmp_path: Path) -> TestClient:
     return TestClient(
         create_app(
             f"sqlite:///{(tmp_path / 'test.db').as_posix()}",
-            security=ApiSecurity(api_key=TEST_API_KEY),
+            security=ApiSecurity(
+                api_key=TEST_API_KEY,
+                allowed_repository_roots=("C:/demo",),
+            ),
         ),
         headers={"X-API-Key": TEST_API_KEY},
     )
@@ -66,7 +69,10 @@ def test_project_input_errors(tmp_path: Path) -> None:
 def test_core_persistence_tables_and_relationships(tmp_path: Path) -> None:
     app = create_app(
         f"sqlite:///{(tmp_path / 'test.db').as_posix()}",
-        security=ApiSecurity(api_key=TEST_API_KEY),
+        security=ApiSecurity(
+            api_key=TEST_API_KEY,
+            allowed_repository_roots=(str(tmp_path),),
+        ),
     )
     with TestClient(app):
         database = app.state.database

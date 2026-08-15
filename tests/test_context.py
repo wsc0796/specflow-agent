@@ -272,8 +272,8 @@ def test_path_escape_is_rejected(tmp_path: Path, bad_id: str) -> None:
             "https://<credentials>@example.com",
             "user:pass",
         ),
-        ("sk-abc123def456ghi789jkl012mno345pqr678stu", "sk-<redacted>", "abc123def"),
-        ("token=ghp_abcdef123456789", "token=<redacted>", "ghp_abcdef"),
+        ("sk-" + "abc123def456ghi789jkl012mno345pqr678stu", "sk-<redacted>", "abc123def"),
+        ("token=ghp_" + "abcdef123456789", "token=<redacted>", "ghp_abcdef"),
         ("api_key=secret123", "api_key=<redacted>", "secret123"),
         ("eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dozjgNryP4", "<jwt>", "eyJhbGci"),
     ],
@@ -293,18 +293,18 @@ def test_redact_secrets_preserves_dependency_specifiers():
 @pytest.mark.parametrize(
     ("raw", "expected_absent"),
     [
-        ('AWS_ACCESS_KEY_ID = "AKIAIOSFODNN7EXAMPLE"', "AKIAIOSFODNN7"),
+        ('AWS_ACCESS_KEY_ID = "AKIA' + 'IOSFODNN7EXAMPLE"', "AKIAIOSFODNN7"),
         (
             'AWS_SECRET_ACCESS_KEY = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"',
             "wJalrXUtnFEMI",
         ),
-        ('GITHUB_TOKEN = "ghp_1234567890abcdefghijklmnopqrstuvwxyz"', "ghp_1234567890"),
+        ('GITHUB_TOKEN = "ghp_' + '1234567890abcdefghijklmnopqrstuvwxyz"', "ghp_1234567890"),
         (
-            'GITLAB_TOKEN = "glpat-abcdefghijklmnopqrstuvwxyz"',
+            'GITLAB_TOKEN = "glpat-' + 'abcdefghijklmnopqrstuvwxyz"',
             "glpat-abcdefghijklmnop",
         ),
-        ('SLACK_TOKEN = "xoxb-123456789012-123456789012-abcdefghijkl"', "xoxb-123456789012"),
-        ('GOOGLE_API_KEY = "AIzaSyA1234567890abcdefghijklmnopqrstuv"', "AIzaSyA1234567890"),
+        ('SLACK_TOKEN = "xoxb-' + '123456789012-123456789012-abcdefghijkl"', "xoxb-123456789012"),
+        ('GOOGLE_API_KEY = "AIza' + 'SyA1234567890abcdefghijklmnopqrstuv"', "AIzaSyA1234567890"),
         (
             'conn = "AccountKey=abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789+/="',
             "AccountKey=abcdefghijklmnopqrstuvwxyz",
@@ -365,7 +365,7 @@ def test_tainted_evidence_is_redacted_in_full_pipeline(tmp_path: Path) -> None:
             ),
             Evidence(
                 file="config.ini",
-                matched="api_key=sk-proj-abc123def456ghi789jkl",
+                matched="api_key=sk-proj-" + "abc123def456ghi789jkl",
             ),
             Evidence(
                 file="auth.py",

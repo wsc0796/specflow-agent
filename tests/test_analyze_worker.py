@@ -246,7 +246,9 @@ def test_trace_run_id_is_filename_safe(tmp_path) -> None:
 
 
 def test_trace_does_not_store_sensitive_body(tmp_path) -> None:
-    _worker(tmp_path).execute(_context("Add endpoint with api_key=sk-abc123def456ghi789jkl012"))
+    _worker(tmp_path).execute(
+        _context("Add endpoint with api_key=sk-" + "abc123def456ghi789jkl012")
+    )
 
     raw = (tmp_path / "run-015-analyze.json").read_text(encoding="utf-8")
     assert "api_key" not in raw

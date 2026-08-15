@@ -1,9 +1,10 @@
 # SpecFlow Agent
 
-**Current release candidate: v1.1.0 (unreleased).** The latest published release
+**Current release candidate: v1.1.1 (unreleased).** The latest published release
 remains **v1.0.1** at `a4fc16c` (metadata and CI reconciliation following the
-merged v1.0.0 portfolio release). The v1.1.0 candidate adds release-truth
-verification and a mock-only, human-in-the-loop change-review decision slice.
+merged v1.0.0 portfolio release). The v1.1.1 candidate adds release-truth
+verification, a mock-only human-in-the-loop change-review decision slice, and
+the T-069 security-boundary remediation.
 See [CHANGELOG.md](CHANGELOG.md) and [current resume evidence](docs/resume/current-resume-evidence.md).
 
 A controlled multi-agent repository-analysis system for local Python projects.
@@ -23,7 +24,7 @@ The orchestration is built from scratch without LangGraph or agent frameworks.
 - **Agent-level trace topology** — stage timing, parent/child spans, submission/completion timestamps
 - **Dual pipeline** — legacy linear (Analyze→Generate→Review) preserved as A/B baseline
 - **Historical M6 live-provider validation** — a separately documented DeepSeek
-  run on sky-takeout-python (6/6 agents, 7 handoffs); it is not v1.1.0 candidate
+  run on sky-takeout-python (6/6 agents, 7 handoffs); it is not v1.1.1 candidate
   or mock-benchmark evidence
 - **Reproducible benchmark** — 12 committed mock cases with a normalized artifact-contract baseline
 - **Change-review decision loop** — a reviewer can inspect a bounded completed-Run package and append an unverified `accepted` or `needs_changes` rationale without changing execution state
@@ -72,8 +73,8 @@ and T-041 work adds RuntimeGuard budget enforcement and strict inter-agent
 payload schemas. T-061 adds a separately bounded, mock-only reviewer-decision
 record to the Run API. T-062 through T-065 remediate runtime, DLP, HTTP
 authentication, response-disclosure, and local observability boundaries. The
-current v1.1.0 candidate local baseline is **757 passed, 3 skipped, 3 known
-warnings** (verified 2026-08-06); the published tag remains v1.0.1 at
+current v1.1.1 candidate local baseline is **771 passed, 3 skipped, 3 known
+warnings** (verified 2026-08-14); the published tag remains v1.0.1 at
 `a4fc16c`.
 M8 is local mock acceptance and does not claim a new live-provider run. See `docs/reports/T-040-completion-report.md`,
 `docs/reports/T-041-completion-report.md`, and
@@ -240,7 +241,10 @@ $env:SPECFLOW_API_KEY = "<random long ASCII secret>"
 uv run uvicorn specflow.main:app --reload
 ```
 
-The API refuses to start unless `SPECFLOW_API_KEY` is a non-empty ASCII value.
+The API refuses to start unless `SPECFLOW_API_KEY` is a non-empty ASCII value
+and `SPECFLOW_ALLOWED_REPOSITORY_ROOTS` configures at least one repository
+root. Without an allowlist every `repository_path` is rejected (fail-closed),
+so a missing variable can never silently allow an arbitrary path.
 Uvicorn binds to `127.0.0.1` by default; use a reverse proxy and the additional
 deployment controls below before exposing it beyond localhost.
 
@@ -290,8 +294,13 @@ also expose a bounded review package and append-only reviewer decisions.
 `reviewer_label` is unverified display metadata, not an authenticated identity;
 this single-process/mock-only slice has no user accounts, queue, async
 execution, or repository write capability. API-key authentication is required;
-repository-path and reviewer-label allowlists can also be configured through
-environment variables (see below).
+the repository-root allowlist is required and the reviewer-label allowlist can
+also be configured through environment variables (see below).
+
+Run creation is synchronous: the request blocks until the deterministic mock
+workflow finishes, with no hard timeout enforced in-process. Put the API behind
+a reverse-proxy request timeout (for example 360s) so a stalled worker cannot
+hold a connection open indefinitely.
 
 To register a project record (this does not scan or validate the path yet):
 
@@ -315,7 +324,7 @@ environment variables:
 | Variable | Effect |
 | --- | --- |
 | `SPECFLOW_API_KEY` | Required non-empty ASCII credential. Every route except `/health`, including `/docs`, `/redoc`, and `/openapi.json`, must present it via `X-API-Key` or `Authorization: Bearer`. |
-| `SPECFLOW_ALLOWED_REPOSITORY_ROOTS` | Semicolon-separated roots; `repository_path` must resolve inside one of them. |
+| `SPECFLOW_ALLOWED_REPOSITORY_ROOTS` | Required in API mode. Semicolon-separated roots; `repository_path` must resolve inside one of them. The API refuses to start without at least one root, and every `repository_path` is rejected when the allowlist is missing. |
 | `SPECFLOW_REVIEWER_LABELS` | Comma-separated approved labels; review decisions must use one of them. |
 | `SPECFLOW_MAX_RUNS_PER_MINUTE` | Run-creation burst cap (default `30`). |
 | `SPECFLOW_MAX_CONCURRENT_RUNS` | Maximum simultaneous runs (default `1`). |

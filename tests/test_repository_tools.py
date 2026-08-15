@@ -140,7 +140,7 @@ def test_search_code_returns_line_numbers_and_sanitized_excerpts(tmp_path: Path)
 def test_final_dlp_scan_redacts_but_preserves_line_layout() -> None:
     """The pre-provider DLP pass must keep evidence layout while redacting."""
     text = (
-        'GITHUB_TOKEN = "ghp_1234567890abcdefghijklmnopqrstuvwxyz"\n'
+        'GITHUB_TOKEN = "ghp_' + '1234567890abcdefghijklmnopqrstuvwxyz"\n'
         'URL = "https://example.com/api/v1"\n'
     )
     result = final_dlp_scan(text)

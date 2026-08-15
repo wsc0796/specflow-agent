@@ -4,8 +4,10 @@ The API requires an ASCII ``SPECFLOW_API_KEY`` at startup. Every HTTP route
 except the liveness endpoint requires that key through ``X-API-Key`` or an
 ``Authorization: Bearer`` header.
 
-- ``SPECFLOW_ALLOWED_REPOSITORY_ROOTS``: when set (``;``-separated paths),
-  registered ``repository_path`` values must resolve inside one of them.
+- ``SPECFLOW_ALLOWED_REPOSITORY_ROOTS``: required in API mode (``;``-separated
+  paths). Registered ``repository_path`` values must resolve inside one of
+  them; without at least one root the API refuses to start and every path is
+  rejected at the execution boundary (fail-closed).
 - ``SPECFLOW_REVIEWER_LABELS``: when set (comma-separated), review decisions
   must use one of these labels.
 - ``SPECFLOW_MAX_RUNS_PER_MINUTE`` and ``SPECFLOW_MAX_CONCURRENT_RUNS``:
@@ -157,7 +159,13 @@ class ApiSecurity:
         )
 
     def validate_configuration(self) -> None:
-        """Reject startup unless the process has a usable API credential."""
+        """Reject startup unless the process has a usable API configuration.
+
+        The API key is mandatory. The repository-root allowlist is mandatory
+        too: without it every repository path would be silently allowed, so
+        the API refuses to start in that state. The CLI and MCP entry points
+        never construct ``ApiSecurity`` and are unaffected by this check.
+        """
         if (
             not isinstance(self.api_key, str)
             or not self.api_key
@@ -166,6 +174,11 @@ class ApiSecurity:
         ):
             raise ApiSecurityConfigurationError(
                 "SPECFLOW_API_KEY must be a non-empty ASCII value before starting the API."
+            )
+        if not self._allowed_roots:
+            raise ApiSecurityConfigurationError(
+                "SPECFLOW_ALLOWED_REPOSITORY_ROOTS must configure at least one "
+                "repository root before starting the API."
             )
 
     # ── dependency hooks ─────────────────────────────────────────
@@ -199,10 +212,18 @@ class ApiSecurity:
         )
 
     def validate_repository_path(self, repository_path: str) -> Path:
-        """Return the resolved path, or reject it outside the allowlist."""
+        """Return the resolved path, or reject it outside the allowlist.
+
+        Fail-closed: when no allowlist is configured every path is rejected,
+        so a missing ``SPECFLOW_ALLOWED_REPOSITORY_ROOTS`` can never silently
+        allow an arbitrary repository to be registered or executed.
+        """
         candidate = Path(repository_path).expanduser().resolve()
         if not self._allowed_roots:
-            return candidate
+            raise HTTPException(
+                status.HTTP_503_SERVICE_UNAVAILABLE,
+                "No allowed repository roots are configured.",
+            )
         if not any(self._is_within(candidate, root) for root in self._allowed_roots):
             raise HTTPException(
                 status.HTTP_403_FORBIDDEN,

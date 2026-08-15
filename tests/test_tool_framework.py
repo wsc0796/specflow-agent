@@ -47,7 +47,7 @@ class FakeFailureTool(FakeEchoTool):
 
     def execute(self, call: ToolCall) -> ToolResult:
         self.calls += 1
-        raise RuntimeError("api_key=sk-abc123def456ghi789jkl012 password=hunter2")
+        raise RuntimeError("api_key=sk-" + "abc123def456ghi789jkl012 password=hunter2")
 
 
 class FakeInvalidResultTool(FakeEchoTool):

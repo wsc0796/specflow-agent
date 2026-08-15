@@ -11,7 +11,7 @@ strict payload-schema follow-up work:
 - M6: Multi-Agent Orchestration (Live Provider validated)
 - M7: Evaluation, Demo & Resume (portfolio-ready)
 
-757 passing tests, 3 skipped, 3 known warnings after T-065.
+771 passing tests, 3 skipped, 3 known warnings after T-069.
 M8 production hardening remains limited to the implemented policy, schema,
 fallback, evidence, and artifact boundaries; it does not claim a new
 live-provider validation or deployment work. T-056 adds a separately specified
@@ -51,6 +51,7 @@ unchanged as the T-029 A/B baseline. Multi-agent mode is accessed via
 `--mode multi-agent`.
 
 v1.0.0 is merged to `main` and v1.0.1 reconciles release metadata and CI.
+The current local candidate is v1.1.1; it remains untagged and unpublished.
 Future work requires a separately frozen task specification.
 Future task IDs are not permission to implement future features.
 

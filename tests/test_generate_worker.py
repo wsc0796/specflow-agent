@@ -262,7 +262,7 @@ def test_sensitive_data_not_in_output_or_trace(tmp_path) -> None:
     analysis = _analysis()
     response = _generation_json(
         analysis,
-        risks=["api_key=sk-abc123def456ghi789jkl012"],
+        risks=["api_key=sk-" + "abc123def456ghi789jkl012"],
     )
 
     result = _worker(tmp_path, analysis=analysis, response=response).execute(_context(analysis))

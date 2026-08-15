@@ -1,6 +1,20 @@
 # Changelog
 
-## v1.1.0 (Unreleased)
+## v1.1.1 (Unreleased)
+
+- Made repository scanning reparse-point aware on Windows, including junction
+  escape protection and case-insensitive ignored-directory matching.
+- Isolated repository-derived prompt content as untrusted data in legacy
+  prompts and runtime system messages.
+- Changed HTTP repository-root configuration to fail closed when no allowlist
+  is configured, while preserving the CLI and MCP boundaries.
+- Hardened the tracked-file credential scan to include documentation and tests,
+  detect additional assignment and cloud-key patterns, and keep DLP fixtures
+  effective without committing scanner-matching credential literals.
+- Documented the synchronous HTTP execution boundary and reverse-proxy timeout
+  expectation.
+
+## v1.1.0 (Superseded before release)
 
 - Changed the HTTP boundary from opt-in to fail-closed: API startup now
   requires a non-empty ASCII `SPECFLOW_API_KEY`, every route except `/health`

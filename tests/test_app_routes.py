@@ -1,5 +1,7 @@
 """Route-structure regression tests for the module-level application."""
 
+from pathlib import Path
+
 from fastapi.routing import APIRoute
 from fastapi.testclient import TestClient
 
@@ -10,7 +12,12 @@ TEST_API_KEY = "test-api-key"
 
 
 def _secured_app():
-    return create_app(security=ApiSecurity(api_key=TEST_API_KEY))
+    return create_app(
+        security=ApiSecurity(
+            api_key=TEST_API_KEY,
+            allowed_repository_roots=(str(Path(__file__).resolve().parent),),
+        )
+    )
 
 
 def _health_routes(application) -> list[APIRoute]:

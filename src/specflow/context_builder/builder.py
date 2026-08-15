@@ -10,12 +10,13 @@ from specflow.context_builder.exceptions import ContextBuildError
 from specflow.context_builder.models import BuiltContext, ContextSource
 from specflow.context_builder.serializer import ProjectContextSerializer
 from specflow.prompts.models import PromptDefinition
+from specflow.prompts.security import UNTRUSTED_REPOSITORY_EVIDENCE_WARNING
 
 _SYSTEM_MESSAGE = (
     "You are SpecFlow Agent, a local spec-driven engineering assistant. "
     "Use only the provided project context, prompt instructions, and user requirement. "
-    "Do not claim to inspect files, call tools, or execute code."
-)
+    "Do not claim to inspect files, call tools, or execute code. "
+) + UNTRUSTED_REPOSITORY_EVIDENCE_WARNING
 
 _RAW_SECRET_PATTERNS = [
     re.compile(r"https?://[^/\s:@]+:[^/\s:@]+@"),

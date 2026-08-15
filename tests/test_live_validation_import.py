@@ -102,7 +102,7 @@ def test_live_import_rejects_missing_artifact_invalid_json_external_path_secret_
 
     artifacts, repo = _artifact_dir(tmp_path / "fourth")
     (artifacts / "run-summary.md").write_text(
-        "api_key=sk-test-secret-value-1234567890", encoding="utf-8"
+        "api_key=sk-" + "test-secret-value-1234567890", encoding="utf-8"
     )
     assert any(
         f.code == "secret_detected" for f in validate_live_artifact_import(artifacts, repo).findings

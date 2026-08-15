@@ -1,7 +1,30 @@
 """Safe, metadata-only repository traversal for T-003."""
 
+import stat
 from dataclasses import dataclass
 from pathlib import Path
+
+# Windows-aware link detection aligned with the repository Tools policy:
+# implementation mirrors RepositoryAccessPolicy._is_link_or_reparse_point in
+# src/specflow/tools/repository_policy.py so the scanner and the Tools share
+# the same escape-vector definition.
+
+
+def _is_link_or_reparse_point(path: Path) -> bool:
+    """Return whether *path* is a symlink or a Windows reparse point.
+
+    Directory junctions (``mklink /J``) are reparse points but report
+    ``Path.is_symlink() is False`` on Windows, so symlink-only checks miss
+    them. Reparse points are treated as links: they can point outside the
+    repository root and must never be traversed or recorded.
+    """
+    if path.is_symlink():
+        return True
+    try:
+        attributes = path.lstat().st_file_attributes
+    except (AttributeError, OSError):
+        return False
+    return bool(attributes & stat.FILE_ATTRIBUTE_REPARSE_POINT)
 
 
 class ScanError(Exception):
@@ -60,22 +83,26 @@ class RepositoryScanner:
             safe_dirs = []
             for name in directory_names:
                 candidate = current / name
-                if candidate.is_symlink() and not self._is_within(candidate.resolve(), root):
+                if _is_link_or_reparse_point(candidate) and not self._is_within(
+                    candidate.resolve(), root
+                ):
                     continue
                 safe_dirs.append(name)
                 directories.append((relative_current / name).as_posix())
             ignored.extend(
                 (relative_current / name).as_posix()
                 for name in directory_names
-                if name in self.ignored_directory_names
+                if self._is_ignored_directory(name)
             )
             directory_names[:] = [
-                name for name in safe_dirs if name not in self.ignored_directory_names
+                name for name in safe_dirs if not self._is_ignored_directory(name)
             ]
 
             for name in file_names:
                 candidate = current / name
-                if candidate.is_symlink() and not self._is_within(candidate.resolve(), root):
+                if _is_link_or_reparse_point(candidate) and not self._is_within(
+                    candidate.resolve(), root
+                ):
                     continue
                 files.append(
                     FileMetadata(
@@ -104,7 +131,19 @@ class RepositoryScanner:
             self._is_within(root, allowed) for allowed in self.allowed_roots
         ):
             raise InvalidRepositoryPathError("Repository path is outside allowed roots.")
+        if any(
+            self._is_ignored_directory(part)
+            for allowed in self.allowed_roots
+            if self._is_within(root, allowed)
+            for part in root.relative_to(allowed).parts
+        ):
+            raise InvalidRepositoryPathError("Repository path enters an ignored directory.")
         return root
+
+    @classmethod
+    def _is_ignored_directory(cls, name: str) -> bool:
+        """Match ignored directory names case-insensitively (e.g. ``.GIT``)."""
+        return name.casefold() in cls.ignored_directory_names
 
     @staticmethod
     def _is_within(candidate: Path, root: Path) -> bool:

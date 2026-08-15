@@ -20,7 +20,11 @@ def app_for(database_url: str, artifact_root: Path) -> FastAPI:
     return create_app(
         database_url,
         artifact_root=artifact_root,
-        security=ApiSecurity(api_key=TEST_API_KEY),
+        security=ApiSecurity(
+            api_key=TEST_API_KEY,
+            # Test repositories live under the same temp root as the artifacts.
+            allowed_repository_roots=(str(artifact_root.parent.resolve()),),
+        ),
     )
 
 
@@ -131,7 +135,7 @@ def test_runner_exception_is_a_persisted_safe_runtime_failure(tmp_path: Path, mo
     repository.mkdir()
 
     def raise_runner_error(**_: object) -> int:
-        raise RuntimeError("provider password=not-for-api-output")
+        raise RuntimeError("provider password=not-" + "for-api-output")
 
     monkeypatch.setattr("specflow.runs.run_multi_agent", raise_runner_error)
     with client_for(tmp_path) as client:
@@ -181,7 +185,7 @@ def test_run_api_rejects_unsafe_runner_manifest_error(tmp_path: Path, monkeypatc
         run_directory = output / "run-multi-failed"
         run_directory.mkdir(parents=True)
         (run_directory / "manifest.json").write_text(
-            json.dumps({"error": "provider password=not-for-api-output"}), encoding="utf-8"
+            json.dumps({"error": "provider password=not-" + "for-api-output"}), encoding="utf-8"
         )
         return 3
 

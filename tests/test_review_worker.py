@@ -371,7 +371,7 @@ def test_sensitive_data_is_sanitized(tmp_path) -> None:
     response = _review_json(
         analysis,
         generation,
-        risk_findings=["api_key=sk-abc123def456ghi789jkl012"],
+        risk_findings=["api_key=sk-" + "abc123def456ghi789jkl012"],
     )
 
     result = _worker(tmp_path, analysis, generation, response=response).execute(

@@ -122,7 +122,7 @@ def test_api_key_never_appears_in_cli_output_or_artifacts(monkeypatch, tmp_path:
     repo.mkdir()
     (repo / "app.py").write_text("x = 1", encoding="utf-8")
     output = tmp_path / "artifacts"
-    secret = "sk-test-secret-value-1234567890"
+    secret = "sk-" + "test-secret-value-1234567890"
     monkeypatch.setenv("SPECFLOW_LLM_API_KEY", secret)
     exit_code = _run_cli_mock(repo, output, "test requirement")
 

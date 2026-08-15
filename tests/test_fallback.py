@@ -83,7 +83,7 @@ def test_invalid_json_uses_rule_baseline() -> None:
 
 def test_sensitive_data_is_redacted_from_fallback_result() -> None:
     result = FallbackManager().execute(
-        lambda: "api_key=sk-abc123def456ghi789jkl012 token=raw-secret password=hunter2"
+        lambda: "api_key=sk-" + "abc123def456ghi789jkl012 token=raw-secret password=hunter2"
     )
 
     assert "sk-abc123" not in result.content

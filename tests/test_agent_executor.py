@@ -257,7 +257,7 @@ def test_sensitive_error_message_is_redacted() -> None:
             analyze=FailingHandler(
                 RuntimeError(
                     "failed with api_key=secret123 token=raw-secret password=hunter2 "
-                    "sk-abc123def456ghi789jkl012mno345pqr678"
+                    "sk-" + "abc123def456ghi789jkl012mno345pqr678"
                 )
             )
         )

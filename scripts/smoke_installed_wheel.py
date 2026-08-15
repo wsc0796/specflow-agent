@@ -2,7 +2,7 @@
 
 Usage:
     python scripts/smoke_installed_wheel.py
-    python scripts/smoke_installed_wheel.py --wheel dist/specflow_agent-1.1.0-py3-none-any.whl
+    python scripts/smoke_installed_wheel.py --wheel dist/specflow_agent-1.1.1-py3-none-any.whl
 """
 
 from __future__ import annotations
@@ -24,6 +24,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 TIMEOUT_SECONDS = 90
 SMOKE_CREDENTIAL = secrets.token_urlsafe(32)
+LOOPBACK_OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 
 TERMINAL_STATES = frozenset(
     {
@@ -52,6 +53,14 @@ def _free_port() -> int:
         return sock.getsockname()[1]
 
 
+def _server_environment(allowed_repository_root: Path) -> dict[str, str]:
+    """Build a fail-closed API environment scoped to the smoke fixture."""
+    environment = os.environ.copy()
+    environment["SPECFLOW_API_KEY"] = SMOKE_CREDENTIAL
+    environment["SPECFLOW_ALLOWED_REPOSITORY_ROOTS"] = str(allowed_repository_root)
+    return environment
+
+
 def _http(method: str, url: str, payload: dict | None = None) -> tuple[int, dict]:
     data = json.dumps(payload).encode() if payload is not None else None
     request = urllib.request.Request(url, data=data, method=method)
@@ -59,7 +68,9 @@ def _http(method: str, url: str, payload: dict | None = None) -> tuple[int, dict
         request.add_header("Content-Type", "application/json")
     request.add_header("X-API-Key", SMOKE_CREDENTIAL)
     try:
-        with urllib.request.urlopen(request, timeout=10) as response:
+        # The smoke server is always loopback-only. Ambient corporate/developer
+        # proxies must not turn a local readiness probe into an external request.
+        with LOOPBACK_OPENER.open(request, timeout=10) as response:
             return response.status, json.loads(response.read())
     except urllib.error.HTTPError as error:
         body = error.read().decode(errors="replace")
@@ -114,12 +125,11 @@ class Smoke:
     def _version(self, py: Path) -> None:
         entry = py.parent / ("specflow.exe" if os.name == "nt" else "specflow")
         output = _run([str(entry), "--version"])
-        assert "1.1.0" in output, f"unexpected version output: {output!r}"
+        assert "1.1.1" in output, f"unexpected version output: {output!r}"
 
     def _api(self, work: Path, py: Path, api_dir: Path, repo_dir: Path) -> None:
         port = _free_port()
-        environment = os.environ.copy()
-        environment["SPECFLOW_API_KEY"] = SMOKE_CREDENTIAL
+        environment = _server_environment(api_dir)
         server = subprocess.Popen(
             [str(py), "-m", "uvicorn", "specflow.main:app", "--port", str(port)],
             cwd=str(api_dir),
