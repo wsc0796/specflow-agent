@@ -55,6 +55,79 @@ The current local candidate is v1.1.1; it remains untagged and unpublished.
 Future work requires a separately frozen task specification.
 Future task IDs are not permission to implement future features.
 
+## V5.1 learning contract
+
+This repository is also the sole implementation track for the 30-day AI Agent
+engineering study plan in `docs/study/ROADMAP_V5_1.md`. The objective is learner
+ownership, not maximum feature throughput.
+
+### Source of truth
+
+Before each study task, read:
+
+1. this file and `docs/00-SPEC-BASELINE.md`;
+2. `docs/study/ROADMAP_V5_1.md`;
+3. `docs/study/CURRENT.md`;
+4. the relevant source, tests, task specification, and existing evidence.
+
+For current implementation facts, source and tests override roadmap assumptions.
+For allowed changes, the frozen baseline and mandatory workflow remain binding.
+State discrepancies explicitly and mark claims that cannot be proven from the
+repository as `unknown`.
+
+### Learning modes
+
+The active mode comes from `docs/study/CURRENT.md`. Do not infer a transition or
+run several modes in one response.
+
+- `SURVEY`: read-only source discovery. Report entry points, key symbols,
+  inputs/outputs, state changes, dependencies, and exact file/symbol evidence.
+  Do not supply a finished architecture conclusion; stop so the learner can
+  trace and draw it.
+- `TUTOR`: explain only concepts required for the current task and bind every
+  explanation to this repository. State the problem solved, where it appears,
+  common failure modes, and when not to use it.
+- `FAULT`: design 3–5 safe, reproducible faults. Give only the trigger, what the
+  learner should predict, legal terminal states, and Test/Trace/Log observation
+  points. Do not reveal root cause or repair before the learner records a
+  prediction.
+- `PATCH`: enter only after the learner explicitly approves a proposed solution.
+  Product-code changes additionally require a frozen task specification. List
+  files first, make the smallest patch, avoid unrelated refactors, summarize the
+  diff, give verification commands, and state remaining evidence gaps.
+- `REVIEW`: remain read-only and seek counterexamples across correctness, state,
+  failure semantics, retry/idempotency, permission, security, tests, evals, and
+  observability. Running code is not sufficient proof of correctness.
+
+`SURVEY`, `TUTOR`, `FAULT`, and `REVIEW` do not permit Codex to edit files.
+Updating `CURRENT.md`, evidence cards, or ADRs is an administrative study change:
+it requires an explicit user request and does not by itself enter `PATCH`.
+
+### Ownership and evidence
+
+Codex-generated diagrams, answers, bulk code, and unexplained patches do not
+count as learner ownership. Ownership evidence must come from the learner's own
+call-chain drawing, prediction, reproduced and located fault, design decision,
+review of the critical diff, interpretation of Test/Eval results, or closed-note
+explanation. Record that evidence under `docs/study/evidence/`.
+
+Preserve these hard boundaries:
+
+- agent-skeleton: at most 4 hours; diet-agent: at most 3 hours; cms-flow: at
+  most 3 hours. They never become additional implementation tracks.
+- Evaluation data is fixed at 20 Dev + 10 Holdout cases. Do not inspect or tune
+  against Holdout before Day 21; after freezing the strategy, run Holdout once
+  and do not tune from its result.
+- Deterministic Fake Embedding proves only engineering contracts. Semantic
+  retrieval claims require a real embedding provider; final end-to-end claims
+  require the separately recorded live boundary.
+- Thresholds are hypotheses tied to provider/index versions: record T0 on Day 8,
+  calibrate only on Dev during Days 15–20, and freeze before Day 21 Holdout.
+
+At the end of each mode, stop and wait for the learner's answer or explicit
+transition. Codex may point to evidence and challenge the learner's work, but it
+must not replace the act of understanding.
+
 ## Mandatory workflow
 
 1. Read `docs/00-SPEC-BASELINE.md`, this file, and the active task spec before editing.
