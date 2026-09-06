@@ -2,54 +2,43 @@
 
 - Roadmap: [ROADMAP_V5_3.md](ROADMAP_V5_3.md)
 - Roadmap version: V5.3
-- Study status: READY
-- Day: 1
-- Current mode: SURVEY
+- Study status: D2 REMEDIATION COMPLETE — AWAITING NEXT DECISION
+- Day: 1 closeout
+- Current mode: REVIEW
 - Updated on: 2026-09-06
 
 ## Today's only objective
 
-Take ownership of the current SpecFlow baseline without adding a feature. Day 1
-starts only when the learner explicitly says: “开始 Day 1，读取教学合同和
-CURRENT，严格按当前模式推进。”
+Review the completed T-072 no-evidence fail-closed change and stop. Do not start
+D13 or Day 2 without an explicit user transition.
 
 ## Gate
 
-Before Day 1 closes, the learner must have personally obtained and explained:
-
-- branch, commit, and `git status`;
-- pytest, Ruff, formatting, and benchmark baselines;
-- a first-draft main call-chain diagram;
-- the entry points for CLI/API, Evidence, Context, Coordinator, Handoff,
-  Workflow, Eval, and Artifact.
-- the existing hooks, if any, for Tool schema, permission, approval, loop guard,
-  checkpoint, and trace; missing hooks must be recorded as `unknown`.
+- A focused test must fail for the expected reason before production code is
+  edited.
+- Zero evidence must stop before Agent execution and persist
+  `EVIDENCE_NOT_FOUND` safely.
+- Existing evidence-backed runs must not regress.
+- Full tests, Ruff, format, secret scan, and diff checks must pass.
 
 ## Current mode contract
 
-`SURVEY` is read-only. Codex may locate files and symbols, describe inputs and
-outputs, and ask tracing questions. It must not modify files or give the learner
-a finished architecture diagram. It must not invent a component merely because
-V5.3 asks the learner to look for it.
+`REVIEW` is read-only. T-072 implementation and validation are complete; seek
+counterexamples only within its frozen contract and do not edit product code.
 
 ## Forbidden today
 
-- Do not modify product code.
-- Do not start Repository RAG implementation.
-- Do not implement missing permission, approval, loop-guard, checkpoint, or
-  tracing hooks during discovery.
-- Do not begin FAULT or PATCH before the learner completes and submits the first
-  call-chain drawing.
-- Do not turn unknowns into inferred architecture facts.
+- Do not modify D13 Artifact consumer behavior.
+- Do not fix D1, D3-D12, or perform unrelated refactors.
+- Do not add dependencies, RAG, permission/HITL, retry, resume, or new Agent
+  behavior.
 
 ## Stop condition
 
-Stop after identifying source entry points, reporting the new V5.3 hook inventory
-as confirmed or `unknown`, and asking the learner five questions that require
-reading the code. Wait for the learner's own diagram or written call chain before
-entering `REVIEW`.
+Stop after reporting T-072 evidence and remaining limits. Do not start D13
+without a separate explicit request.
 
 ## Next action
 
-The learner starts Day 1 explicitly. Codex then performs only the baseline
-`SURVEY` described above.
+The repository owner chooses whether to start a separately frozen D13 task or
+continue to Day 2.

@@ -38,6 +38,7 @@ from specflow.llm.mock import MockLLMClient
 from specflow.plan.hash_utils import canonical_json_bytes
 from specflow.policy import (
     DEFAULT_POLICY,
+    ErrorCode,
     ExecutionPolicy,
     PolicyValidator,
     RuntimeGuard,
@@ -119,6 +120,20 @@ def run_multi_agent(
         # Evidence is a required, untrusted input boundary.  Continuing would
         # let agents produce an ungrounded plan with no audit evidence.
         logger.exception("run %s failed while collecting repository evidence", run_id)
+        return 3
+
+    if not evidence.excerpts:
+        _persist_pre_execution_failure(
+            output=output,
+            run_id=run_id,
+            started_at=started_at,
+            guard=guard,
+            error=ErrorCode.EVIDENCE_NOT_FOUND.value,
+            discovered_files=discovered_files,
+            selected_file_count=selected_file_count,
+            referenced_file_count=referenced_file_count,
+            tool_call_count=len(tool_call_records),
+        )
         return 3
 
     registry = _build_registry()
@@ -889,6 +904,40 @@ def _make_mock_llm_client() -> object:
             '"repository_scope_hint":""}'
         )
     )
+
+
+def _persist_pre_execution_failure(
+    *,
+    output: Path,
+    run_id: str,
+    started_at: str,
+    guard: RuntimeGuard,
+    error: str,
+    discovered_files: int,
+    selected_file_count: int,
+    referenced_file_count: int,
+    tool_call_count: int,
+) -> None:
+    """Persist a classified failure before Coordinator planning or Agent execution."""
+    try:
+        run_dir = output / run_id
+        run_dir.mkdir(parents=True, exist_ok=False)
+        manifest = {
+            "run_id": run_id,
+            "started_at": started_at,
+            "workflow_state": "failed",
+            "workflow_history": [],
+            "error": error,
+            "stages_completed": 0,
+            "discovered_files": discovered_files,
+            "selected_file_count": selected_file_count,
+            "referenced_file_count": referenced_file_count,
+            "tool_call_count": tool_call_count,
+        }
+        _safe_write(run_dir, "manifest.json", manifest, guard)
+        _finalize_run_directory(run_dir, guard)
+    except Exception:
+        logger.exception("run %s failed to persist pre-execution failure artifacts", run_id)
 
 
 def _persist_failed_run(

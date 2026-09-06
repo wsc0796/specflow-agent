@@ -64,10 +64,16 @@ class TestMultiAgentEvaluation:
         repo = tmp_path / "test-repo"
         repo.mkdir()
         (repo / "README.md").write_text("# Test Repo")
+        (repo / "feature.py").write_text("# authentication search\n", encoding="utf-8")
         from specflow.runner_multi import run_multi_agent
 
         output = tmp_path / "multi-output"
-        exit_code = run_multi_agent(repo=repo, requirement="Add X", output=output, mock=True)
+        exit_code = run_multi_agent(
+            repo=repo,
+            requirement="Implement authentication search",
+            output=output,
+            mock=True,
+        )
         assert exit_code == 0
         manifest = json.loads((next(output.glob("run-multi-*")) / "manifest.json").read_text())
         assert len(manifest["stages"]) == 4

@@ -51,6 +51,7 @@ def test_create_get_and_list_mock_run_artifacts(tmp_path: Path) -> None:
     repository = tmp_path / "repository"
     repository.mkdir()
     (repository / "README.md").write_text("# Fixture repository\n", encoding="utf-8")
+    (repository / "orders.py").write_text("# Add an order search endpoint\n", encoding="utf-8")
 
     with client_for(tmp_path) as client:
         project_id = register_project(client, repository)
@@ -80,6 +81,30 @@ def test_create_get_and_list_mock_run_artifacts(tmp_path: Path) -> None:
         assert artifacts.json()["run_id"] == body["id"]
         assert "manifest.json" in artifacts.json()["files"]
         assert all("/" not in name and "\\" not in name for name in artifacts.json()["files"])
+
+
+def test_run_api_persists_no_evidence_failure(tmp_path: Path) -> None:
+    repository = tmp_path / "repository"
+    repository.mkdir()
+    (repository / "app.py").write_text("def existing_feature():\n    return True\n")
+
+    with client_for(tmp_path) as client:
+        project_id = register_project(client, repository)
+        created = client.post(
+            "/api/v1/runs",
+            json={
+                "project_id": project_id,
+                "requirement": "totally_missing_symbol_xyz_74219",
+            },
+        )
+
+        assert created.status_code == 201
+        body = created.json()
+        assert body["status"] == "failed_runtime"
+        assert body["result_status"] == "failed_runtime"
+        assert body["error_code"] == "EVIDENCE_NOT_FOUND"
+        assert body["artifact_available"] is True
+        assert repository.resolve().as_posix() not in json.dumps(body)
 
 
 def test_run_api_rejects_invalid_resources_and_non_mock_execution(tmp_path: Path) -> None:
@@ -265,6 +290,7 @@ def test_completed_run_exposes_review_package_and_append_only_decisions(tmp_path
     repository = tmp_path / "repository"
     repository.mkdir()
     (repository / "README.md").write_text("# Fixture repository\n", encoding="utf-8")
+    (repository / "orders.py").write_text("# Add an order search endpoint\n", encoding="utf-8")
 
     with client_for(tmp_path) as client:
         project_id = register_project(client, repository)
