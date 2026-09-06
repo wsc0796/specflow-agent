@@ -2,7 +2,9 @@
 
 Use this directory for decisions that affect the 30-day learning track, such as
 the Repository RAG contract, vector storage, no-answer policy, provider/index
-version binding, and whether benchmark evidence justifies Hybrid or Rerank.
+version binding, Tool Runtime Safety, Behavior Suite contracts, minimal
+checkpoint/resume semantics, external-reference selection, and whether benchmark
+evidence justifies Hybrid or Rerank.
 
 ## Naming
 
@@ -23,3 +25,10 @@ Do not present an initial hypothesis as a validated decision. In particular,
 the Day 8 no-answer rule is `T0` until calibrated on the Dev set. Holdout data
 must remain sealed until the Day 21 strategy freeze, and a Holdout result must
 never be used to tune the frozen version.
+
+For Runtime Safety, record which decisions are deterministic allow/deny rules,
+which require Human Approval, and what audit/idempotency evidence is required.
+A model Reviewer cannot be the only boundary for sensitive or irreversible
+actions. For external frameworks, record the current SpecFlow failure or gap,
+the official source checked, and why a bounded experiment is preferable to
+migration. Version-sensitive ecosystem claims must be revalidated when used.

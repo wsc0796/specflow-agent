@@ -55,10 +55,10 @@ The current local candidate is v1.1.1; it remains untagged and unpublished.
 Future work requires a separately frozen task specification.
 Future task IDs are not permission to implement future features.
 
-## V5.1 learning contract
+## V5.3 learning contract
 
 This repository is also the sole implementation track for the 30-day AI Agent
-engineering study plan in `docs/study/ROADMAP_V5_1.md`. The objective is learner
+engineering study plan in `docs/study/ROADMAP_V5_3.md`. The objective is learner
 ownership, not maximum feature throughput.
 
 ### Source of truth
@@ -66,7 +66,7 @@ ownership, not maximum feature throughput.
 Before each study task, read:
 
 1. this file and `docs/00-SPEC-BASELINE.md`;
-2. `docs/study/ROADMAP_V5_1.md`;
+2. `docs/study/ROADMAP_V5_3.md`;
 3. `docs/study/CURRENT.md`;
 4. the relevant source, tests, task specification, and existing evidence.
 
@@ -114,15 +114,35 @@ explanation. Record that evidence under `docs/study/evidence/`.
 Preserve these hard boundaries:
 
 - agent-skeleton: at most 4 hours; diet-agent: at most 3 hours; cms-flow: at
-  most 3 hours. They never become additional implementation tracks.
-- Evaluation data is fixed at 20 Dev + 10 Holdout cases. Do not inspect or tune
-  against Holdout before Day 21; after freezing the strategy, run Holdout once
-  and do not tune from its result.
+  most 2.5 hours. A durability micro-lab is at most 2 hours and is allowed only
+  when SpecFlow has no usable checkpoint hook. None becomes another
+  implementation track.
+- Repository RAG evaluation is fixed at 20 Dev + 10 Holdout cases. Do not
+  inspect or tune against Holdout before Day 21; after freezing the strategy,
+  run Holdout once and do not tune from its result.
+- Keep a separate 8–10 case Agent Behavior Suite for Tool choice, arguments,
+  bounded retry, termination, permission, and legal terminal states. Do not use
+  it as retrieval-tuning data or expand it into a second large benchmark.
 - Deterministic Fake Embedding proves only engineering contracts. Semantic
   retrieval claims require a real embedding provider; final end-to-end claims
   require the separately recorded live boundary.
 - Thresholds are hypotheses tied to provider/index versions: record T0 on Day 8,
   calibrate only on Dev during Days 15–20, and freeze before Day 21 Holdout.
+- Runtime Safety uses deterministic L0–L3 policy: validate schema/path/version
+  for safe reads; bound low-risk reversible actions; require Human Approval plus
+  idempotency/preview for irreversible or external side effects; hard-deny
+  sensitive, unauthorized, or explicitly forbidden actions. A model Reviewer
+  cannot override hard deny or serve as the only high-risk boundary.
+- Complete only one bounded crash → checkpoint → resume experiment. Prefer an
+  existing SpecFlow hook; otherwise use a LangGraph micro-lab of at most 2 hours.
+  Do not build a persistence or durable-workflow engine merely to satisfy the
+  roadmap. Prove that completed steps and external side effects do not repeat.
+- Choose external references by capability: OpenAI Agents SDK for Agent Runtime,
+  LangGraph for stateful Agent Workflow, PydanticAI for typed/eval comparison,
+  Temporal for Durability, and Spring AI only when a Java Agent target requires
+  it. Revalidate version-sensitive claims against official sources before they
+  drive work. Migrate nothing unless a current SpecFlow failure or gap requires
+  it and a bounded experiment can produce evidence within 2 hours.
 
 At the end of each mode, stop and wait for the learner's answer or explicit
 transition. Codex may point to evidence and challenge the learner's work, but it

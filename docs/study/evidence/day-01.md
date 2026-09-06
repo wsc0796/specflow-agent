@@ -1,7 +1,7 @@
 # Day 01 Evidence Card
 
 - Status: NOT STARTED
-- Roadmap: [V5.1 Day 1](../ROADMAP_V5_1.md#5-第一周接管-specflow--三次短校准)
+- Roadmap: [V5.3 Day 1](../ROADMAP_V5_3.md#5-第一周接管-specflow--三次短校准)
 - Study state: [CURRENT.md](../CURRENT.md)
 
 > Fill in `My prediction` before asking Codex for a root cause, correction, or
@@ -28,6 +28,20 @@
 | Claim | File | Symbol / line | Confirmed or unknown |
 | --- | --- | --- | --- |
 |  |  |  |  |
+
+## Tool/runtime hook inventory
+
+Record `unknown` when the repository does not prove that a hook exists. Do not
+turn a roadmap target into an implementation claim.
+
+| Hook | File | Symbol / line | Confirmed behavior or unknown |
+| --- | --- | --- | --- |
+| Tool schema |  |  |  |
+| Permission / policy |  |  |  |
+| Human approval |  |  |  |
+| Loop guard / termination |  |  |  |
+| Checkpoint / resume |  |  |  |
+| Trace |  |  |  |
 
 ## Failure I created
 
@@ -63,6 +77,8 @@
 
 - [ ] I can draw the main chain without opening documentation.
 - [ ] I can distinguish confirmed repository facts from assumptions.
+- [ ] I can identify where Tool permission should be enforced without claiming
+  that an absent hook already exists.
 - [ ] I can explain at least one failure mode and its legal terminal state.
 
 ## Next action
