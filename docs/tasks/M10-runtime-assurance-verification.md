@@ -94,12 +94,18 @@ established.
   `undetermined`. Fixing the contradiction is out of scope for M10 and becomes a
   separate proposal.
 
-- **REQ-M10-6 — Traceable citation.** Every external declaration cited by M10 or
-  by a task under it must be reproducible from the frozen base commit. Where the
-  cited material is not present in the repository at that commit, the citation
-  must be reproduced in Appendix A with its exact wording and its source
-  identifier. Referencing material that a reviewer cannot read is a
-  specification defect.
+- **REQ-M10-6 — Traceable, readable citation.** Every external declaration cited
+  by M10 or by a task under it must be readable by a reviewer **without leaving
+  the repository, the branch, or the pull request.** This is satisfied when the
+  cited source is present on this branch or on a merged ancestor of it. A
+  citation that resolves only through branch history the reviewer cannot reach is
+  a specification defect. Where material is legitimately not on this branch, its
+  exact wording and source identifier must be reproduced in Appendix A.
+
+  Resolution note (revision 3): the cited M9 clauses are present on this branch
+  at `docs/tasks/M9-runtime-resilience-efficiency.md`, and the corresponding
+  specification is published on branch `docs/m9-runtime-resilience-specs`.
+  Appendix A remains the within-document copy of record.
 
 ### Injection and observability constraints
 
@@ -154,7 +160,7 @@ established.
 
   | Order | Task | Dependency gate | Gate evidence required |
   | --- | --- | --- | --- |
-  | 1 | T-077 — Guarantee Boundary Ledger and Declaration Registry | M10 spec freeze; M9 clause sources reproducible per REQ-M10-6 | Freeze commit hash; the Appendix A citations resolving at the frozen base commit |
+  | 1 | T-077 — Guarantee Boundary Ledger and Declaration Registry | M10 spec freeze; M9 clause sources readable per REQ-M10-6 | Freeze commit hash; docs/tasks/M9-runtime-resilience-efficiency.md present on this branch |
   | 2 | T-078 — Deterministic Failpoint Interface and Interrupt Matrix (Batch 1) | T-077 closed | T-077 completion report path and its commit hash |
   | 3 | T-080 — Evidence and Artifact Integrity Contract Audit | T-078 closed | T-078 completion report path and its commit hash |
   | 4 | T-079 — Run-Local and Project-Level Assurance Reporting | T-078 and T-080 closed | Both completion report paths and commit hashes |
@@ -207,8 +213,8 @@ The following are explicit milestone non-goals:
   revision at the level of scope, entry points, and judgement criteria, with
   field-level detail deferred to their own freeze after their predecessor
   closes, as permitted by REQ-M10-12.
-- **AC-M10-2:** Every verified guarantee traces to a declaration that a reviewer
-  can reproduce from the frozen base commit, per REQ-M10-6.
+- **AC-M10-2:** Every verified guarantee traces to a declaration a reviewer can read on
+  this branch, per REQ-M10-6.
 - **AC-M10-3:** The ledger distinguishes `verified`, `declared`, `refuted`, and
   `not_applicable`, and the milestone permits closing a task while declarations
   remain `declared` or `refuted` under REQ-M10-5.
@@ -232,9 +238,11 @@ The following are explicit milestone non-goals:
 ## Appendix A — Cited M9 clauses (reproduced for traceability)
 
 Source: `docs/tasks/M9-runtime-resilience-efficiency.md`, milestone specification
-frozen in commit `02c1d3fe9bcd8c95d6bb7cf3959328844598e473`. **That commit is not
-reachable from `origin/main` at the M10 frozen base; these clauses are reproduced
-here so the dependency is readable without branch history.** Verbatim text:
+frozen in commit `02c1d3fe9bcd8c95d6bb7cf3959328844598e473`, now present on this
+branch and published on branch `docs/m9-runtime-resilience-specs` (remote
+`02c1d3f`). These clauses are reproduced here as the within-document copy of
+record, so the dependency can be read and diffed without leaving the pull
+request. Verbatim text:
 
 > **REQ-M9-4 — Use explicit failure semantics.** Duplicate ownership, open
 > circuits, saturated lanes, invalid cache entries, and preflight failures must

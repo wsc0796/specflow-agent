@@ -1,6 +1,7 @@
 # Review request — M10 Runtime Assurance Verification (specification draft, revision 2)
 
-**Revision 2 addresses the review of revision 1.** The disposition of every
+**Revision 3 addresses the review of revision 1 and completes the dependency-visibility fix.**
+**Revision 2 addressed the review of revision 1.** The disposition of every
 finding is in §2. A finding the author declined to accept is listed as such with
 its reason; nothing was silently dropped.
 
@@ -41,7 +42,7 @@ with §6.
 
 | ID | Finding | Disposition | Where |
 | --- | --- | --- | --- |
-| B1 | M9 sources not traceable on the remote; T-077's gate inconsistent with the order table | **Accepted, with a scope judgment.** Gates now require readable gate evidence. Appendix A reproduces the cited M9 clauses verbatim so a reviewer without branch history can read them. **Not accepted as written:** the review's implied fix — make M9 sources available first — is a repository-visibility decision for the owner, not something this specification can perform. Appendix A removes the reviewability blocker; the underlying visibility gap is recorded as R-M10-1 and flagged to the owner. | REQ-M10-6, REQ-M10-12, Appendix A, freeze report R-M10-1 |
+| B1 | M9 sources not traceable on the remote; T-077's gate inconsistent with the order table | **Accepted, with a scope judgment.** Gates now require readable gate evidence. Appendix A reproduces the cited M9 clauses verbatim so a reviewer without branch history can read them. **Resolved in full at revision 3.** The implied fix — make the M9 sources readable — was a repository-visibility decision, and the owner took it: branch `docs/m9-runtime-resilience-specs` is published (remote `02c1d3f`) and the M9 specifications are merged into this branch, so a reviewer can read the cited clauses from the pull request itself. Appendix A remains the within-document copy of record. R-M10-1 now records only that T-070 through T-076 remain unimplemented, not an unreadable citation. | REQ-M10-6, REQ-M10-12, Appendix A, freeze report R-M10-1 |
 | B2 | "Reference resolves" is insufficient for `verified` | **Accepted.** REQ-M10-2 lists four conditions; REQ-077-4 gives a row-by-row table where a resolvable-but-unexecuted reference, a version mismatch, and a skipped test each yield `declared`. AC-077-2 tests each row. `refuted` was added as a distinct state. | REQ-M10-2, REQ-M10-3, REQ-077-4, AC-077-2 |
 | B3 | "May close unverified" conflicts with "every interruption must be proven safe" | **Accepted.** REQ-M10-4 separates the three verdicts; REQ-M10-5 defines what closure with `refuted` requires; REQ-M10-8 narrows the run-level clause and states that agent-level completion status is what REQ-M10-9 classifies. | REQ-M10-4, REQ-M10-5, REQ-M10-8, REQ-078-6, REQ-078-7 |
 | B4 | Source excerpt requirement conflicts literally with the content prohibition | **Accepted.** REQ-077-3 defines an explicit allowlist (this repository's own `docs/`, reports, README, CHANGELOG), a configured length bound, and mandatory sanitization; excerpts from analyzed target repositories, `EvidenceBundle` content, tool output, prompts, and provider responses are forbidden. AC-077-4 tests both directions. | REQ-077-3, AC-077-4 |
