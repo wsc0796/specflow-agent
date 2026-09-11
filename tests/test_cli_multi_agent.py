@@ -1,11 +1,13 @@
 """Tests for multi-agent runner and CLI --mode multi-agent."""
 
 import json
+from copy import deepcopy
 from hashlib import sha256
 from pathlib import Path
 
 import pytest
 
+from specflow.handoff.validator import HandoffValidator
 from specflow.plan.hash_utils import canonical_json_bytes
 from specflow.policy.models import ExecutionPolicy
 from specflow.runner_multi import (
@@ -250,6 +252,70 @@ class TestMultiAgentRunner:
         assert metrics["referenced_file_count"] > 0
         assert str(repo.resolve()) not in serialized_artifacts
         assert "api_key=secret" not in serialized_artifacts
+
+    def test_handoff_integrity_failure_stops_receiver_and_persists_context(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Post-hash tampering must fail closed with bounded handoff diagnostics."""
+        repo = tmp_path / "test-repo"
+        repo.mkdir()
+        _write_matching_evidence(repo, "Test handoff integrity")
+        output = tmp_path / "output"
+        receiver_called = False
+        tampered_value = "tampered-payload-sentinel"
+        original_validate_payload = HandoffValidator.validate_payload
+
+        def validate_tampered_payload(self, handoff, sender, payloads):
+            tampered_payloads = deepcopy(payloads)
+            payload_key = handoff.payload_ref.removeprefix("agent-outputs.json#")
+            tampered_payloads[payload_key]["output"]["summary"] = tampered_value
+            return original_validate_payload(self, handoff, sender, tampered_payloads)
+
+        def receiver_must_not_run(_: dict[str, object]) -> dict[str, object]:
+            nonlocal receiver_called
+            receiver_called = True
+            return {}
+
+        monkeypatch.setattr(HandoffValidator, "validate_payload", validate_tampered_payload)
+
+        exit_code = run_multi_agent(
+            repo=repo,
+            requirement="Test handoff integrity",
+            output=output,
+            mock=True,
+            _executor_overrides={"design-agent-v1": receiver_must_not_run},
+        )
+
+        assert exit_code == 3
+        assert receiver_called is False
+        run_dir = next(output.glob("run-multi-*"))
+        manifest = json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))
+        traces = json.loads((run_dir / "traces.json").read_text(encoding="utf-8"))
+        expected_context = {
+            "from_agent_id": "repository-analyst-agent-v1",
+            "to_agent_id": "design-agent-v1",
+            "payload_ref": "agent-outputs.json#stage-0/repository-analyst-agent-v1",
+        }
+
+        assert manifest["workflow_state"] == "failed"
+        assert manifest["error"] == "HANDOFF_INTEGRITY_FAILED"
+        assert manifest["failure_context"].pop("handoff_id").startswith("handoff-")
+        assert manifest["failure_context"] == expected_context
+        for trace in traces:
+            if trace.get("kind") in {"run", "coordinator"}:
+                assert trace["error_code"] == "HANDOFF_INTEGRITY_FAILED"
+                assert trace["failure_context"]["handoff_id"].startswith("handoff-")
+                assert {
+                    key: trace["failure_context"][key] for key in expected_context
+                } == expected_context
+
+        serialized_failure = "\n".join(
+            path.read_text(encoding="utf-8") for path in run_dir.iterdir() if path.is_file()
+        )
+        assert tampered_value not in serialized_failure
+        assert str(repo.resolve()) not in serialized_failure
+        assert "expected_hash" not in serialized_failure
+        assert "actual_hash" not in serialized_failure
 
     def test_reject_runs_one_revision_then_completes_when_limit_is_exhausted(
         self, tmp_path: Path

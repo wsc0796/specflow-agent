@@ -31,6 +31,7 @@ from specflow.coordinator.state_machine import MultiAgentWorkflowState
 from specflow.evaluation.metrics import AgentMetrics, RunMetrics
 from specflow.evidence import EvidenceCollector
 from specflow.evidence.models import EvidenceCollectionConfig
+from specflow.handoff.exceptions import HandoffIntegrityError
 from specflow.handoff.models import AgentHandoff
 from specflow.handoff.validator import HandoffValidator
 from specflow.llm import LLMClient, OpenAICompatibleConfig, OpenAICompatibleLLMClient
@@ -354,6 +355,29 @@ def run_multi_agent(
             MultiAgentWorkflowState.COMPLETED,
             "review passed" if decision == "PASS" else "revision limit reached",
         )
+    except HandoffIntegrityError as error:
+        error_code = ErrorCode.HANDOFF_INTEGRITY_FAILED.value
+        logger.error(
+            "run %s stopped by handoff integrity failure: code=%s phase=%s handoff_id=%s",
+            run_id,
+            error_code,
+            coordinator.engine.state.value,
+            error.audit_context["handoff_id"],
+        )
+        _persist_failed_run(
+            output=output,
+            run_id=run_id,
+            coordinator=coordinator,
+            registry=registry,
+            model=model,
+            stages=stages,
+            plan=plan,
+            discovered_files=discovered_files,
+            guard=guard,
+            error=error_code,
+            failure_context=error.audit_context,
+        )
+        return 3
     except SpecFlowError as error:
         logger.error(
             "run %s stopped by policy: code=%s phase=%s",
@@ -765,10 +789,22 @@ def _output_ref(stage_index: int, agent_id: str) -> str:
 
 
 def _build_trace_tree(
-    stages, registry, run_id: str, model: str, status: str
+    stages,
+    registry,
+    run_id: str,
+    model: str,
+    status: str,
+    *,
+    error_code: str | None = None,
+    failure_context: Mapping[str, str] | None = None,
 ) -> list[dict[str, object]]:
     root_id = f"run-{uuid4().hex}"
     coordinator_id = f"coordinator-{uuid4().hex}"
+    failure_fields: dict[str, object] = {}
+    if error_code is not None:
+        failure_fields["error_code"] = error_code
+    if failure_context is not None:
+        failure_fields["failure_context"] = dict(failure_context)
     traces: list[dict[str, object]] = [
         {
             "span_id": root_id,
@@ -776,6 +812,7 @@ def _build_trace_tree(
             "kind": "run",
             "run_id": run_id,
             "status": status,
+            **failure_fields,
         },
         {
             "span_id": coordinator_id,
@@ -783,6 +820,7 @@ def _build_trace_tree(
             "kind": "coordinator",
             "run_id": run_id,
             "status": status,
+            **failure_fields,
         },
     ]
     revision_span_id = (
@@ -951,6 +989,7 @@ def _persist_failed_run(
     discovered_files: int,
     guard: RuntimeGuard,
     error: str,
+    failure_context: Mapping[str, str] | None = None,
 ) -> None:
     """Persist FAILED manifest, state history, and partial traces for audit."""
     try:
@@ -972,7 +1011,15 @@ def _persist_failed_run(
     try:
         run_dir = output / run_id
         run_dir.mkdir(parents=True, exist_ok=True)
-        traces = _build_trace_tree(stages, registry, run_id, model, "failed")
+        traces = _build_trace_tree(
+            stages,
+            registry,
+            run_id,
+            model,
+            "failed",
+            error_code=error if failure_context is not None else None,
+            failure_context=failure_context,
+        )
         failed_manifest = {
             "run_id": run_id,
             "plan_id": getattr(plan, "plan_id", "unknown"),
@@ -982,6 +1029,8 @@ def _persist_failed_run(
             "stages_completed": len(stages),
             "discovered_files": discovered_files,
         }
+        if failure_context is not None:
+            failed_manifest["failure_context"] = dict(failure_context)
         _safe_write(run_dir, "manifest.json", failed_manifest, guard)
         _safe_write(run_dir, "traces.json", traces, guard)
         # Persist partial agent outputs for debugging

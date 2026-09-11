@@ -13,7 +13,7 @@ from collections.abc import Mapping
 from hashlib import sha256
 
 from specflow.agents.models import AgentIdentity
-from specflow.handoff.exceptions import HandoffValidationError
+from specflow.handoff.exceptions import HandoffIntegrityError, HandoffValidationError
 from specflow.handoff.models import AgentHandoff
 from specflow.plan.hash_utils import canonical_json_bytes
 
@@ -81,4 +81,10 @@ class HandoffValidator:
             raise HandoffValidationError("Handoff payload does not match the agent output envelope")
         expected_hash = sha256(canonical_json_bytes(dict(payload))).hexdigest()
         if handoff.output_hash != expected_hash:
-            raise HandoffValidationError("Handoff output_hash does not match payload")
+            raise HandoffIntegrityError(
+                "Handoff output_hash does not match payload",
+                handoff_id=handoff.handoff_id,
+                from_agent_id=handoff.from_agent_id,
+                to_agent_id=handoff.to_agent_id,
+                payload_ref=handoff.payload_ref,
+            )
