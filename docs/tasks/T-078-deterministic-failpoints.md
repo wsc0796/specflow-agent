@@ -1,6 +1,6 @@
 # T-078 — Deterministic Failpoint Interface and Interrupt Matrix (Batch 1)
 
-**Status:** DRAFT FOR FREEZE — REVISION 2. Implementation requires T-077 closed
+**Status:** DRAFT FOR FREEZE — REVISION 4. Implementation requires T-077 closed
 with a readable completion report at a named commit, plus a new focused session.
 
 ## Goal
@@ -11,17 +11,19 @@ points always lands the run inside the existing classified outcome set, with no
 silent discard, no partial artifact presented as complete, and no unclassifiable
 hanging state.
 
-## Verified baseline facts
+## Source-code baseline observations
 
-These were read from `origin/main` at the frozen base commit and constrain what
-the cases may assert. Each is a source-code observation, not an executed result.
+These were read at `START_HEAD=9adcddb46f2977ea122966c1167e48fe2592d8be`
+(the cited code is unchanged from PR_BASE `1b44127`). Each is a source-code
+observation, not an executed fault experiment. Future cases must separately bind
+their declaration-source version and actual tested-code commit/configuration.
 
 | Fact | Location | Consequence for this task |
 | --- | --- | --- |
-| `_finalize_run_directory` writes `artifact-integrity.json` (per-file SHA-256) and then `_COMPLETE` last, via `_safe_write` (`temp` + `fsync` + `os.replace`) | `runner_multi.py:848-876` | A write completed through `os.replace` is observable; a file that never got that far is absent, not partial |
+| `_finalize_run_directory` writes `artifact-integrity.json` (per-file SHA-256) and then `_COMPLETE` last, via `_safe_write` (`temp` + `fsync` + `os.replace`) | `runner_multi.py:815-876` | Before replacement a new final target is absent, but an existing target may retain its old contents; temporary files are not final artifacts |
 | `_finalize_run_directory` is called on the **success** path | `runner_multi.py:517`, followed by `return 0` | `_COMPLETE` present is consistent with a successful run |
-| `_finalize_run_directory` is **also** called on the **failed** path after writing `manifest.json`, `traces.json`, and `agent-outputs.json` | `runner_multi.py:924-945` | **`_COMPLETE` present does not mean the run succeeded.** It means the run directory finished being written. No case may treat `_COMPLETE` as a success indicator |
-| Legacy persistence is `ArtifactStore.write_run`, which writes nine files with `path.write_text` and removes the directory in an `except` block | `artifacts/store.py:24-88` | Legacy persistence is not per-file atomic and has no integrity file or completion marker; its cleanup does not cover process termination. Removing the interruption matrix's reliance on "the pipeline is atomic" |
+| `_finalize_run_directory` is **also** called on the **failed** path after writing `manifest.json`, `traces.json`, and `agent-outputs.json` | `runner_multi.py:924-945` | **`_COMPLETE` present does not mean the run succeeded.** It records completion-marker publication, not current file-set completeness or business success |
+| Legacy persistence is `ArtifactStore.write_run`, whose success path writes ten files with `path.write_text` and whose `except Exception` block removes the directory | `artifacts/store.py:24-87` (ten writes at `:43-58`) | Legacy has no per-file atomic replacement, integrity file, or completion marker. Its cleanup is an exception path, not a process-termination guarantee; atomicity remains an experimental audit target |
 | `recover_interrupted_runs` lives in the Run API startup path | `main.py:13`, `main.py:34`, implemented at `runs.py:267` | The CLI does not exercise it. A CLI case cannot claim coverage of the API lifecycle contract |
 | Policy/persistence failures return exit code `3`; the success path returns `0` | `runner_multi.py:497`, `:519`, `:520` | Exit code is part of the recordable observable |
 
@@ -31,17 +33,17 @@ the cases may assert. Each is a source-code observation, not an executed result.
 
 - **REQ-078-1 — Every case is fully specified before it runs.** A case may not be
   authored by choosing an interruption point and observing what happens. Each
-  case declares, in the test specification, all six of the following. A case
+  case declares, in the test specification, all seven of the following. A case
   missing any row is not executable.
 
   | Row | Content |
   | --- | --- |
-  | Interruption location | The named failpoint and the exact point it interrupts |
+  | Interruption location | The expected failpoint ID, exact point it interrupts, and preset expected hit count |
   | Injected fault type | The mechanism used, chosen from the closed set in REQ-078-3 |
   | Real entry point | Which of the entry points in REQ-078-5 the case actually traverses |
   | Expected lifecycle classification | The expected workflow state or lifecycle record |
   | Expected exit code | The expected process exit code, and `n/a` with a reason where the entry point has none |
-  | Expected artifact state | Which artifact files are expected present or absent, plus the expected `_COMPLETE` and `artifact-integrity.json` state |
+  | Expected artifact state | Initial directory/file state, expected final artifact names and contents/hashes, `_COMPLETE` and `artifact-integrity.json` state, and whether a later finalize is possible; REQ-078-4 governs |
   | Targeted declaration | The declaration ID this case produces evidence for, and the boundary this case does **not** cover |
 
 - **REQ-078-2 — The Batch 1 interruption set is fixed and limited.** Batch 1
@@ -65,15 +67,26 @@ the cases may assert. Each is a source-code observation, not an executed result.
   assertion, and the two may not be collapsed into one case.
 
 - **REQ-078-4 — `_COMPLETE` is an integrity indicator, not a success
-  indicator.** Because both the success and the failed path call
-  `_finalize_run_directory`, the assertion for interruption point 4 is:
+  indicator.** Both success and failure paths may call
+  `_finalize_run_directory`. The missing-marker assertion for interruption
+  point 4 applies only to an isolated test directory with no initially published
+  completion marker, a fault before this publication, and no later completed
+  finalize in the case:
 
-  > After an interruption before the completion marker is written, `_COMPLETE`
-  > must be **absent**, and any artifact present must be individually complete or
-  > absent — never partially written under a name that reads as complete.
+  > Under these preconditions, `_COMPLETE` must be **absent**. Each formal
+  > artifact target is complete or absent, never a partially replaced file.
+  > This assertion concerns final artifact paths, not temporary files. If a
+  > target already existed, interruption before replacement may leave the old
+  > complete file; it does not imply that the target is absent.
 
   A case that asserts "`_COMPLETE` present therefore the run succeeded" is
-  invalid and must be rejected in review.
+  invalid and must be rejected in review. A finalized failed run remains failed
+  according to its business/runtime state. Do not generalize point 4 to all
+  failed or interrupted runs: a subsequent failure-path finalize may publish
+  the marker. Marker absence is not evidence that a failpoint was hit; actual
+  hit evidence is required by REQ-078-12. Marker presence does not replace
+  checking the expected file set, per-file hashes, and run state, and the marker
+  does not automatically detect later modification or deletion of files.
 
 ### Entry points and coverage honesty
 
@@ -98,19 +111,28 @@ the cases may assert. Each is a source-code observation, not an executed result.
   mechanism behaved as designed, whether the targeted declaration held, and
   whether the task may close. A correct `violated` result is a working mechanism
   and a failed or contradicted declaration; it must not be presented as an
-  assurance pass.
+  assurance pass. A missing hit, wrong location, wrong hit count or fault type,
+  unexecuted case, or incomplete record fails the mechanism and supports neither
+  `consistent` nor `violated`. Actual hits must be checked against the preset
+  using REQ-078-12, independently of artifact similarity. Audit discovery and
+  reporting may complete with a valid counterexample recorded as `refuted`, but
+  a violation of the required safety boundaries in AC-078-6 fails M10 assurance
+  acceptance. Repair requires separate authorization.
 
-- **REQ-078-7 — Three-valued conclusions are decided before execution.** Per
-  REQ-M10-9:
+- **REQ-078-7 — Expectations and contract gaps are fixed before execution.**
+  Per REQ-M10-9, the claim verdict follows a valid experiment:
 
   | Conclusion | Meaning | When it may be assigned |
   | --- | --- | --- |
-  | `consistent` | Observed behavior matches the declared guarantee | After execution |
-  | `violated` | Observed behavior contradicts a declaration | After execution; routed to the ledger as `refuted`; never reclassified |
+  | `consistent` | Valid observed behavior supports the guarantee within the case's coverage | After execution with matching versions and verified actual injection |
+  | `violated` | Valid observed behavior contradicts a declaration | After execution with matching versions and verified actual injection; routed to the ledger as `refuted`; never reclassified |
   | `undetermined` | The existing contract does not define the behavior here | **Before execution**, from reading the contract; never assigned after seeing an unexpected result |
 
-  A case that could not be executed reports not-verified, never `consistent`.
-  `undetermined` entries are listed explicitly and consumed by the T-077 ledger.
+  A skipped, unexecuted, version-mismatched, or mechanism-failed case reports
+  not-verified, never `consistent` or `verified`; it cannot refute the target
+  declaration either. `undetermined` entries are listed explicitly as project
+  contract gaps and consumed by the T-077 ledger, never as verified claims or
+  automatic run-local unresolved items.
 
 ### Failpoint interface
 
@@ -139,10 +161,22 @@ the cases may assert. Each is a source-code observation, not an executed result.
   resume, retry, or compensation. A missing recovery capability is recorded in
   the report and the unresolved list, and becomes a proposal after M10.
 
-- **REQ-078-12 — Audit records are bounded and safe.** Each case records the
-  interruption-point ID, injected fault type, entry point, expected and observed
-  classification, conclusion, targeted declaration, and bounded evidence
-  references. It must not contain prompts, requirement text, content read from an
+- **REQ-078-12 — Audit records include actual test-side hit evidence.** Each
+  case saves and checks the preset failpoint ID and hit count against the ID
+  actually reached on the real execution path, actual hit count, actual injected
+  fault type, and real entry point. The actual-hit record is generated only when
+  execution reaches the injection point; pre-filling actual hits with expected
+  values before execution is forbidden. Test-side recording is allowed without
+  adding production manifest, log, or business-state fields. Similar artifacts
+  from different faults do not waive actual-hit verification.
+
+  The bounded case record also includes post-injection exit code (`n/a` with
+  reason where appropriate), state and artifacts, expected/observed
+  classification, mechanism/claim/closure verdicts, targeted declaration, source
+  commit, tested-code commit/configuration, and bounded evidence references.
+  No hit, wrong point, or unexpected count is mechanism failure, not evidence
+  supporting or refuting a declaration. Records must not contain prompts,
+  requirement text, content read from an
   analyzed target repository, absolute paths, credentials, or provider data.
 
 - **REQ-078-13 — Expected implementation surface.** Expected production files are
@@ -173,6 +207,9 @@ The following are explicit non-goals for T-078:
   against the declaration, and do not fold `undetermined` or `violated` into
   `consistent`.
 - Do not treat the completion marker as a success indicator; REQ-078-4 governs.
+- Do not add production manifest, log, or business-state fields to identify an
+  interruption. Actual-hit evidence belongs to the test mechanism. This revision
+  specifies that future mechanism; it implements no failpoint or new test.
 
 ## Acceptance
 
@@ -183,20 +220,34 @@ The following are explicit non-goals for T-078:
   exception, on `SystemExit`, and on `KeyboardInterrupt`, and that one case's
   registration cannot affect another case, including under concurrent execution.
 - **AC-078-3:** Each of the four Batch 1 interruption points has a case, and each
-  case carries all six REQ-078-1 rows before execution.
-- **AC-078-4:** A test proves that after an interruption before the completion
-  marker is written, `_COMPLETE` is absent and no artifact is present in a
-  partially written form under a complete-sounding name.
+  case carries all seven REQ-078-1 rows before execution. Tests check actual
+  hit ID, count, fault type, entry point, and post-injection observables per
+  REQ-078-12. No-hit, wrong-location, and wrong-count cases fail the mechanism
+  and cannot yield `consistent` or refute a declaration.
+- **AC-078-4:** A test proves the missing-marker assertion only under the
+  isolated-directory, initial-state, and no-later-finalize preconditions in
+  REQ-078-4. Final artifact targets are complete or absent; a pre-existing target
+  can retain its old complete contents before replacement. Temporary files are
+  not treated as final artifacts, and marker absence is not hit evidence.
 - **AC-078-5:** A test proves that `_COMPLETE` present is not treated as success:
   a failed-path run that reached `_finalize_run_directory` is classified as
-  failed, not as completed.
+  failed, not as completed. The expected file set, hashes, and run state are
+  checked separately; marker presence is not an automatic post-finalize
+  modification/deletion detector.
 - **AC-078-6:** Tests prove that after any interruption the outcome falls inside
   the existing classified outcome set, with no silent discard, no partial
   artifact reported as complete, and no unclassifiable hanging state.
+  These existing safety boundaries remain required for every valid Batch 1
+  case; pre-recording an undefined agent-level outcome does not waive them.
+  A valid counterexample is retained as `violated` / `refuted` and fails the
+  affected guarantee and M10 assurance acceptance, even if its audit is complete.
 - **AC-078-7:** Output distinguishes mechanism verdict, claim verdict, and
   closure verdict; distinguishes `consistent`, `violated`, and `undetermined`;
   and lists `undetermined` and `violated` entries separately in a form the T-077
-  ledger consumes.
+  ledger consumes. Output cannot hide `refuted` in `declared`, generic issue
+  counts, or a success summary. Tests distinguish completed audit delivery from
+  failed assurance acceptance; invalid mechanism evidence decides neither claim
+  support nor refutation.
 - **AC-078-8:** Each case records its entry point per REQ-078-5, and the
   completion report states explicitly which declarations Batch 1 did **not**
   cover, including the API lifecycle declaration where CLI-only coverage applies.
@@ -208,7 +259,8 @@ The following are explicit non-goals for T-078:
   `uv run ruff check .`, `uv run ruff format --check .`, and
   `git diff --check`.
 - **AC-078-12:** `docs/reports/T-078-completion-report.md` records the
-  interruption-point list, the six REQ-078-1 rows per case, the expected and
+  interruption-point list, the seven REQ-078-1 rows per case, actual-hit evidence
+  per REQ-078-12, the expected and
   observed outcome for each, the mechanism/claim/closure verdicts, every
   `undetermined` and `violated` entry with its reason, an explicit statement of
   which entry points were and were not exercised, and an explicit statement that

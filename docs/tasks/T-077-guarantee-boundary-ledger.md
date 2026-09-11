@@ -1,10 +1,16 @@
 # T-077 — Guarantee Boundary Ledger and Declaration Registry
 
-**Status:** DRAFT FOR FREEZE — REVISION 2. Implementation requires the M10
-specification freeze **and** that the declaration sources named in REQ-M10-6 are
-reproducible at the frozen base commit. If a cited declaration cannot be
-reproduced at that commit, stop and amend the specification; do not reconstruct
-it from memory, from a chat transcript, or by guessing.
+**Status:** DRAFT FOR FREEZE — REVISION 4. Implementation is blocked until the
+full REQ-M10-12 gate is satisfied: independently approved M10 specification
+freeze (decision and commit), readable declaration sources at their named source
+commits, and a readable completion report plus implementation commit for **each
+of T-070 through T-075**. At START_HEAD the sources are readable, but those six
+implementation dependencies are not satisfied and revision 4 freeze approval is
+pending. T-076 is not required by this scope. If a source or dependency cannot
+be established, record the specific gap and keep the entry blocked; do not guess.
+Source readability and document freeze do not substitute for implementation
+completion or authorize an implementation start. This gate does not block the
+current documentation revision and submission for independent review.
 
 ## Goal
 
@@ -20,8 +26,9 @@ and "contradicted" become distinguishable by machine.
 
 - **REQ-077-1 — Extract, do not invent.** Every ledger entry carries a
   declaration source reference (file path plus section or identifier) and the
-  declaration's own bounded identifier. A declaration with no reproducible
-  source must not be added.
+  declaration's own bounded identifier and declaration-source commit, separate
+  from the tested-code commit/configuration and revision START_HEAD. A
+  declaration with no reproducible source must not be added.
 
 - **REQ-077-2 — Stable declaration identity.** Each declaration has a stable ID,
   a bounded category (security, boundary, failure semantics, integrity,
@@ -44,7 +51,8 @@ and "contradicted" become distinguishable by machine.
 - **REQ-077-4 — Evidence references must resolve to produced evidence.** An
   evidence reference points at a concrete test node, report path, or command
   **together with a recorded execution outcome and the commit or version it was
-  produced against**. Applying REQ-M10-2:
+  produced against, including its effective configuration**. The execution
+  binding is separate from the declaration-source version. Applying REQ-M10-2:
 
   | Situation | Required state |
   | --- | --- |
@@ -53,7 +61,7 @@ and "contradicted" become distinguishable by machine.
   | Test node or command name exists but no recorded execution outcome | `declared` — never `verified` |
   | Evidence was produced against a different commit or configuration | `declared` — never `verified` |
   | Evidence is a skipped or conditionally disabled test | `declared` — never `verified` |
-  | A recorded observation contradicts the declaration | `refuted` |
+  | Valid recorded evidence contradicts the declaration (fault cases satisfy REQ-M10-4; static audit candidates follow REQ-080-4) | `refuted` |
   | Declaration does not apply to the verified configuration | `not_applicable` |
 
 - **REQ-077-5 — Judgement and justification are separate fields.** The ledger

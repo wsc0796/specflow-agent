@@ -1,6 +1,6 @@
 # T-079 — Run-Local and Project-Level Assurance Reporting
 
-**Status:** DRAFT FOR FREEZE — REVISION 2. Implementation requires T-078 and
+**Status:** DRAFT FOR FREEZE — REVISION 4. Implementation requires T-078 and
 T-080 closed with readable completion reports at named commits, plus a new
 focused session.
 
@@ -14,38 +14,48 @@ declaration.
 ## Goal
 
 Report two separate dimensions — what a finished run leaves unresolved, and which
-declarations the project has not verified or has refuted — and combine them only
-through an explicit, reviewable rule rather than an implicit one.
+declarations the project has not verified or has refuted — using explicit,
+reviewable rules within each dimension, without a combined score.
 
 ## Two dimensions, reported separately
 
 - **Dimension A — Run-local unresolved items.** Work this run left behind. Sourced
-  from what the runtime already records or can derive deterministically:
+  from facts bound to an actual run that the runtime already records or can
+  derive deterministically. Potential inputs, subject to REQ-079-1, include
   degraded outcomes, `fallback_used`, exhausted revision budget, failed or
   unvalidated schema checks, pending human review decisions, cache `invalid` or
-  `write_failed` states, and the `undetermined` conclusions from T-078.
+  `write_failed` states. None is an unresolved item merely by appearing in this
+  list; an explicit rule must bind it to unfinished delivery/use obligations
+  for that run.
 
 - **Dimension B — Project-level declaration states.** The ledger state of each
   declaration: `verified`, `declared`, `refuted`, `not_applicable`. Applying
   REQ-077-6, every `refuted` entry is reported individually and is never merged
-  into a count or bucket that hides it.
+  into a count or bucket that hides it. T-078's undefined contracts and project
+  verification gaps belong here; `undetermined` is a recorded gap, not a fifth
+  ledger state or a generic Dimension A source.
 
-The two dimensions are reported side by side. No summary field may combine them
-without a stated rule.
+The two dimensions are reported side by side. No combined score or health
+summary merges their subjects.
 
 ## Requirements
 
 - **REQ-079-1 — Business outcomes are not unresolved items by default.** A
   business `REJECT`, a business-rule-permitted degradation, or a documented
-  fallback does not become a Dimension A item unless an explicit rule in this
-  specification defines it as one. The rule set is enumerated in the
+  fallback, or missing optional review opinion does not become a Dimension A
+  item by default. A pending human decision is an item only when the existing
+  contract requires that decision before this run's deliverable can be completed
+  or used. The rule must name the actual run, business fact, required decision,
+  and unmet obligation; a project-level gap alone is insufficient. The rule set
+  is enumerated in the
   specification and covered by tests; "flag anything that is not a clean
   success" is not an acceptable rule.
 
 - **REQ-079-2 — Dimension B must not leak into Dimension A.** A run that leaves
   no unresolved work is reported as having no unresolved work, even when the
-  project carries `declared` or `refuted` declarations. A combined summary is
-  permitted only through an explicit rule that names both inputs.
+  project carries `declared` or `refuted` declarations or T-078 contract gaps.
+  Project states remain visible in Dimension B and never automatically change a
+  normal run's Dimension A result. No combined score is introduced.
 
 - **REQ-079-3 — Reporting observes; it does not gate.** The report changes no run
   outcome, does not block, fail, retry, admit, or reject anything, and is not an
@@ -69,14 +79,13 @@ without a stated rule.
   metrics backend, endpoint, exporter, or dependency, stop and amend the
   specification.
 
-## Open decisions for the reviewer
+## Decisions applied in revision 4
 
-1. Is there any legitimate case where a Dimension A item and a Dimension B state
-   should be combined into one number, and if so what rule?
-2. Should a `refuted` declaration appear in a run-level report at all, or only in
-   the project-level section?
-3. Is a pending human review decision always a Dimension A item, or only when the
-   decision is required before the run's work can be considered usable?
+1. Keep the dimensions separate; do not introduce a combined number or score.
+2. Report project `refuted` declarations individually in Dimension B, without
+   converting them into run-local unresolved items.
+3. Include an unfinished human decision in Dimension A only under the existing
+   delivery/use obligation rule in REQ-079-1. Optional opinions do not qualify.
 
 ## Boundaries
 
@@ -89,7 +98,7 @@ The following are explicit non-goals for T-079:
   results.
 - Do not add recovery, reconciliation, or compensation capability.
 - Do not convert a `refuted` state into a generic issue count.
-- Do not combine the two dimensions without a stated rule.
+- Do not combine the two dimensions or add a composite score.
 
 ## Acceptance
 
@@ -97,7 +106,10 @@ The following are explicit non-goals for T-079:
   run with no unresolved work is not reported as unhealthy solely because the
   project carries `declared` or `refuted` declarations.
 - **AC-079-2:** Tests prove each enumerated REQ-079-1 rule, and prove that an
-  undefined business outcome does not silently become a Dimension A item.
+  undefined business outcome or T-078 project gap does not silently become a
+  Dimension A item. Business `REJECT`, permitted degradation, and missing
+  optional opinions do not qualify by default; a contract-required pending
+  human decision does qualify when tied to the actual run and unmet obligation.
 - **AC-079-3:** Tests prove a `refuted` declaration is listed by ID and cannot be
   absorbed into any aggregate category.
 - **AC-079-4:** Tests prove the report changes no run outcome and is not consumed
@@ -110,6 +122,6 @@ The following are explicit non-goals for T-079:
   `uv run ruff check .`, `uv run ruff format --check .`, and
   `git diff --check`.
 - **AC-079-8:** `docs/reports/T-079-completion-report.md` records the rule set,
-  the two-dimension report shape, the decisions taken on the three open decisions
-  above, and known limits. One focused commit is created, then work stops for the
+  the two-dimension report shape, the three decisions applied above, and known
+  limits. One focused commit is created, then work stops for the
   milestone assurance review.
