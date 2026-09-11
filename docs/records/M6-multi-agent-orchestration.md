@@ -1,5 +1,13 @@
 # M6 Multi-Agent Orchestration
 
+> Correction (2026-09-11): two distinct local artifact sets share the run_id below.
+> Both contain nonempty business outputs, but five of six have schema_validated=false.
+> Their seven handoffs validate identity/envelope/hash under the historical contract,
+> not current business payload validity. Source/target commits and original exit codes
+> are absent from the artifacts. The original record is preserved below; it is not
+> a new experiment or independent approval of T-081. See the
+> [field-level evidence and provenance limits](../reports/T-081-evidence-correction.md).
+
 **Date:** 2026-07-12
 **Status:** CLOSED
 **Previous milestone:** M5 Product Vertical Slice (v0.1.0)

@@ -35,7 +35,8 @@ warnings，并在 CI 中执行 quality、benchmark 和 secret-scan 门禁。”
 “它目前不是生产 Agent 平台：没有队列、用户身份或授权、多实例、真实流量或
 semantic accuracy claim。HTTP API 采用共享 API key 的失败关闭边界，但这不等于
 多用户身份或权限系统。Run API 也只支持 mock-only 单进程生命周期。历史上 M6
-做过一次授权的 DeepSeek live-provider 验证，但我不会把它混进当前候选的 benchmark 结论。
+留有旧版 best-effort 的 DeepSeek 执行记录，其中五个角色输出未通过 schema；它不能证明
+当前严格契约的 live 成功或 benchmark 质量。见[日期更正](../reports/T-081-evidence-correction.md)。
 如果继续做，我会先从真实使用需求出发，而不是盲目加 RAG、MCP 或更多 Agent。”
 
 ## 讲完后可展示的三个页面

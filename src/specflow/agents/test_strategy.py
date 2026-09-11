@@ -37,5 +37,10 @@ class TestStrategyAgent:
         return {
             "agent_id": self.agent_id,
             "role": self.role.value,
-            "output": {"summary": "Deterministic mock test strategy."},
+            "output": {
+                "summary": "Deterministic mock test strategy.",
+                "test_scenarios": [
+                    "Mock check: exercise valid/invalid route input and check the responses."
+                ],
+            },
         }

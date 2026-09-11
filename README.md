@@ -23,9 +23,9 @@ The orchestration is built from scratch without LangGraph or agent frameworks.
 - **Execution policy** — bounded LLM calls, revisions, wall time, evidence/tool limits, and classified retry behavior
 - **Agent-level trace topology** — stage timing, parent/child spans, submission/completion timestamps
 - **Dual pipeline** — legacy linear (Analyze→Generate→Review) preserved as A/B baseline
-- **Historical M6 live-provider validation** — a separately documented DeepSeek
-  run on sky-takeout-python (6/6 agents, 7 handoffs); it is not v1.1.1 candidate
-  or mock-benchmark evidence
+- **Historical M6 execution records** — DeepSeek outputs under the old best-effort
+  contract: five of six outputs were not schema-validated. They do not validate
+  the current strict contract; see the [dated evidence correction](docs/reports/T-081-evidence-correction.md).
 - **Reproducible benchmark** — 12 committed mock cases with a normalized artifact-contract baseline
 - **Change-review decision loop** — a reviewer can inspect a bounded completed-Run package and append an unverified `accepted` or `needs_changes` rationale without changing execution state
 
@@ -62,7 +62,7 @@ portfolio baseline.
 
 For a credential-free walkthrough, read
 `docs/demo/portfolio-release-demo.md`. It distinguishes mock contract evidence
-from the separately documented M6 live-provider validation. For an interview
+from the separately documented M6 execution records and their schema limits. For an interview
 walkthrough, use `docs/demo/specflow-three-minute-talk.md`; the current resume
 copy is in `docs/resume/specflow-resume-v0.md`.
 
@@ -80,8 +80,9 @@ M8 is local mock acceptance and does not claim a new live-provider run. See `doc
 `docs/reports/T-041-completion-report.md`, and
 `docs/roadmap/2026-07-13-portfolio-release-plan.md`.
 
-M6 remains the latest live-provider validation milestone. M8 validation in this
-repository is local mock acceptance; it does not add a new live-provider claim.
+M6 retains historical execution evidence under its old best-effort contract.
+Current validation is offline contract testing; no new live-provider quality or
+legacy-versus-multi-agent speed advantage has been established.
 
 M1–M5 milestones (project scanning, technology detection, prompt/context/token
 infrastructure, LLM client, trace/fallback, workflow state machine, worker

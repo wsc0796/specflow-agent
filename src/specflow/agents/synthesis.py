@@ -37,5 +37,10 @@ class SynthesisAgent:
         return {
             "agent_id": self.agent_id,
             "role": self.role.value,
-            "output": {"summary": "Deterministic mock synthesis."},
+            "output": {
+                "summary": "Deterministic mock synthesis.",
+                "consolidated_design": (
+                    "Mock synthesis: describe the requested route change and verify its responses."
+                ),
+            },
         }

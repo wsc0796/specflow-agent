@@ -57,6 +57,13 @@ class AgentRunner:
         Merges *context* into the user message and expects JSON back.
         On any failure returns a degraded result — never raises.
         """
+        if self._schema_registry is None:
+            return _failed_result(self._identity, "SCHEMA_REGISTRY_UNAVAILABLE")
+        try:
+            output_model = self._schema_registry.get(self._identity.output_schema_id)
+        except Exception:
+            return _failed_result(self._identity, "SCHEMA_NOT_FOUND")
+
         validated_input = context.get("validated_input", context)
         requirement = validated_input.get("requirement", "")
         prior_outputs = {
@@ -73,6 +80,13 @@ class AgentRunner:
             requirement=requirement,
             prior_outputs=prior_outputs,
             evidence=evidence,
+        )
+        user_message += (
+            "\n\n## Required business output contract\n"
+            "Return the business object only, without an execution envelope. "
+            "All summaries must contain non-whitespace text. "
+            "Follow the role's minimum content requirements and JSON Schema:\n"
+            + json.dumps(output_model.model_json_schema(), ensure_ascii=False, sort_keys=True)
         )
 
         messages: list[LLMMessage] = []
@@ -102,14 +116,6 @@ class AgentRunner:
 
         try:
             data = json.loads(response.content)
-
-            if self._schema_registry is None:
-                return _failed_result(self._identity, "SCHEMA_REGISTRY_UNAVAILABLE")
-
-            try:
-                output_model = self._schema_registry.get(self._identity.output_schema_id)
-            except Exception:
-                return _failed_result(self._identity, "SCHEMA_NOT_FOUND")
 
             try:
                 validated = output_model.model_validate(data)

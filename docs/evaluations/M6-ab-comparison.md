@@ -1,5 +1,13 @@
 # M6 A/B Comparison — Legacy vs Multi-Agent
 
+> Correction (2026-09-11): this is a historical mock architectural comparison,
+> not evidence of live speed or quality superiority. The mock enrichment count
+> below conflicts with the M6 milestone record and has not been matched to its
+> original mock artifacts. The cited live runs used best-effort pass-through:
+> five of six outputs were unvalidated. The failed legacy run remains part of
+> the historical outcome, so there is no successful live A/B pair here.
+> See [field-level evidence and source identities](../reports/T-081-evidence-correction.md).
+
 **Date:** 2026-07-12
 **Repository:** sky-takeout-python
 **Requirement:** 为订单增加超时自动取消功能
@@ -30,7 +38,7 @@
 ### What Multi-Agent adds
 
 1. **Parallel specialist execution.** Design, Test Strategy, and Risk Review run concurrently,
-   reducing end-to-end latency when using real providers.
+   permitting overlap; this mock comparison does not measure live latency improvement.
 
 2. **Structured handoffs.** 7 explicit agent-to-agent messages with schema validation
    (`source_output_schema_id` / `target_input_schema_id`) and canonical JSON hashing.
@@ -54,8 +62,8 @@
 
 ## Live Provider note
 
-A Live Provider multi-agent run was independently validated on the same repository
-with DeepSeek v4-flash: 6/6 agents executed, 7 handoffs, 52 files discovered, PASS.
+A historical document records a DeepSeek v4-flash multi-agent execution on the same
+repository: 6/6 agents executed, 7 handoffs, 52 files discovered, PASS under the old contract.
 See `docs/records/M6-multi-agent-orchestration.md` for details.
 
 The Live Provider legacy run on this repository encountered a worker execution failure

@@ -157,11 +157,12 @@ cat .\demo-output\run-multi-*\handoffs.json | python -m json.tool
 如果不想实时等待 API 调用，使用已准备好的 Artifact 目录：
 
 ```powershell
-# 展示已有的一次成功运行
+# 展示历史 best-effort 工件：五个角色输出未通过 schema，不代表当前严格契约的 live 成功。
 ls .\artifacts-live-multi\run-multi-e5b97497dfd5\
 ```
 
-这样可以立即展示 6 个文件的内容，跳过等待时间。
+这样可以展示历史的 5 个文件。身份与校验限制见
+[2026-09-11 更正](../reports/T-081-evidence-correction.md)。
 
 ## Demo Checklist
 

@@ -2,6 +2,11 @@
 
 ## v1.1.1 (Unreleased)
 
+- T-081 rejects blank role summaries, missing design/test/synthesis content and
+  explicit schema failures before handoff. Provider requests now include the
+  registered output schema. Historical M6 claims are limited to their observed
+  best-effort contract; no new live evaluation or quality advantage is claimed.
+
 - Made repository scanning reparse-point aware on Windows, including junction
   escape protection and case-insensitive ignored-directory matching.
 - Isolated repository-derived prompt content as untrusted data in legacy
