@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+from collections.abc import Callable
 from dataclasses import asdict, is_dataclass
 from pathlib import Path
 
@@ -22,7 +23,22 @@ from specflow.llm import (
     OpenAICompatibleConfig,
     OpenAICompatibleLLMClient,
 )
-from specflow.policy import DEFAULT_POLICY, ExecutionBudget, ExecutionPolicy, PolicyValidator
+from specflow.policy import (
+    DEFAULT_POLICY,
+    ExecutionBudget,
+    ExecutionPolicy,
+    PolicyValidator,
+    SpecFlowError,
+)
+from specflow.single_flight import (
+    DEFAULT_COORDINATOR,
+    Flight,
+    RunResult,
+    SingleFlightCoordinator,
+    artifact_result,
+    execute_owned,
+    prepare_run,
+)
 from specflow.token_budget import BudgetPolicy, TokenBudgetManager
 from specflow.tools import ToolExecutor, ToolRegistry
 from specflow.tools.repository_tools import RepositoryToolSet
@@ -46,6 +62,66 @@ def run(
     mock: bool = False,
     max_files: int = 5,
     policy: ExecutionPolicy = DEFAULT_POLICY,
+    _coordinator: SingleFlightCoordinator = DEFAULT_COORDINATOR,
+    _on_join: Callable[[dict[str, str]], None] | None = None,
+) -> int:
+    """Use the shared ownership contract without changing legacy CLI exits."""
+    PolicyValidator().validate(policy)
+    arguments = dict(
+        repo=repo,
+        requirement=requirement,
+        output=output,
+        provider=provider,
+        model=model,
+        mock=mock,
+        max_files=max_files,
+        policy=policy,
+    )
+    if not requirement.strip() or max_files <= 0 or not repo.is_dir():
+        return _run_owned(**arguments)
+    run_id = _generate_run_id(repo, requirement)
+    try:
+        prepared = prepare_run(
+            repo=repo,
+            requirement=requirement,
+            mode="legacy",
+            mock=mock,
+            provider=provider,
+            model=model,
+            policy=policy,
+            extra={"max_files": max_files},
+        )
+    except SpecFlowError as error:
+        _write_error_artifact(output, run_id, _now_iso(), error.code)
+        return RunResult(2, error_code=error.code)
+
+    def work(flight: Flight) -> RunResult:
+        directory = output / run_id
+        existed = directory.exists()
+        code = _run_owned(**arguments, _provider_config=flight.prepared.provider_config)
+        return artifact_result(code, directory, existed=existed)
+
+    return execute_owned(
+        prepared=prepared,
+        run_id=run_id,
+        work=work,
+        timeout=policy.max_wall_time_seconds,
+        coordinator=_coordinator,
+        on_join=_on_join,
+    )
+
+
+def _run_owned(
+    *,
+    repo: Path,
+    requirement: str,
+    output: Path,
+    provider: str = "mock",
+    model: str = "",
+    mock: bool = False,
+    max_files: int = 5,
+    policy: ExecutionPolicy = DEFAULT_POLICY,
+    _provider_config: OpenAICompatibleConfig | None = None,
 ) -> int:
     """Run the complete specification generation pipeline. Returns exit code."""
     started_at = _now_iso()
@@ -69,7 +145,11 @@ def run(
         review_client = mock_clients["review"]
     else:
         try:
-            real_client = _create_llm_client(provider, model, use_mock)
+            real_client = (
+                OpenAICompatibleLLMClient(_provider_config)
+                if _provider_config is not None
+                else _create_llm_client(provider, model, use_mock)
+            )
         except LLMConfigurationError:
             _write_error_artifact(output, run_id, started_at, "PROVIDER_CONFIGURATION_FAILED")
             return 2

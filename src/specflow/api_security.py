@@ -21,7 +21,7 @@ import secrets
 import threading
 import time
 from collections import deque
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from pathlib import Path
 
 from fastapi import Header, HTTPException, Request, status
@@ -88,18 +88,25 @@ class RunRateLimiter:
                 "Another run is already in progress.",
             )
 
+        try:
+            self.count_request()
+        except BaseException:
+            self._semaphore.release()
+            raise
+        return RunPermit(self)
+
+    def count_request(self) -> None:
+        """Count a follower without taking a second execution permit."""
         now = time.monotonic()
         with self._lock:
             while self._window and now - self._window[0] > 60.0:
                 self._window.popleft()
             if len(self._window) >= self._per_minute:
-                self._semaphore.release()
                 raise HTTPException(
                     status.HTTP_429_TOO_MANY_REQUESTS,
                     "Run rate limit exceeded. Try again later.",
                 )
             self._window.append(now)
-        return RunPermit(self)
 
 
 class RunPermit:
@@ -242,6 +249,13 @@ class ApiSecurity:
     def rate_limit_create_run(self) -> RunPermit:
         """Acquire a run slot; raises HTTP 429 when quotas are exhausted."""
         return self._rate_limiter.acquire()
+
+    def admit_single_flight(self, owner: bool) -> Callable[[], None] | None:
+        """Called atomically with ownership registration, after authentication."""
+        if owner:
+            return self.rate_limit_create_run().release
+        self._rate_limiter.count_request()
+        return None
 
     @staticmethod
     def _is_within(candidate: Path, root: Path) -> bool:
