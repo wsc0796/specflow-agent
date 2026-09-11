@@ -1,17 +1,30 @@
-# Review request — M10 Runtime Assurance Verification (specification draft, revision 4)
+# Review record — M10 Runtime Assurance Verification (specification frozen, revision 4)
 
-**Revision 4 applies R1/R2/R3, C1, and S1/S2/S3 from the re-review.** §2 records
-the dispositions and their remaining validation gates. Revision 2 addressed the
-first review; revision 3 made M9 sources readable. Those historical revisions
-did not satisfy the M9 implementation gate or independently approve M10 freeze.
+**Revision 4 specification freeze is registered.** The user-transferred ChatGPT
+AI-assisted static re-review passed the fixed REVIEWED_HEAD below and recommended
+freeze approval; the user authorized this registration. R1/R2/R3, C1, and
+S1/S2/S3 are closed as specification findings on that basis. The executor records
+the decision and does not claim a new independent review. See the
+[freeze report §8](docs/reports/M10-specification-freeze-report.md#8-revision-4-freeze-registration)
+for the quoted source, freeze scope, and current quality checks.
+
+T-077/T-078 specifications are frozen. T-079/T-080 scope, entry points, and
+judgement criteria are frozen; field-level refinement and their own freeze after
+predecessor closure remain required by AC-M10-1 / REQ-M10-12. M10 implementation
+remains blocked; neither M9/M10 implementation completion nor M10 assurance
+acceptance is declared. This is not GitHub APPROVE, a merge, or renewed approval
+of the M9 documents carried by this PR. Historical review records remain below.
 
 **This branch contains documentation only.** It adds no runtime implementation,
 no test, no benchmark fixture, no dependency, and no generated artifact. Verify
 with §6.
 
 **Branch:** `docs/m10-runtime-assurance-spec`
-**START_HEAD / REVIEWED_HEAD:** `9adcddb46f2977ea122966c1167e48fe2592d8be`
+**START_HEAD / REVIEWED_HEAD:** `826d3a7257ad903bc09b0d2d6635a3449576a3ce`
 **PR_BASE:** `1b44127747a7f7b8bfd9118eb56006d867986b39` (`main`)
+**Historical revision 4 preparation START_HEAD:** `9adcddb46f2977ea122966c1167e48fe2592d8be`.
+In the historical §2 disposition table, START_HEAD and the pending statuses refer
+to that preparation and its submission, before the current freeze registration.
 **Declaration-source version:** M9 `02c1d3fe9bcd8c95d6bb7cf3959328844598e473`;
 other declarations retain their own path/clause/source-commit bindings.
 **Tested-code version:** future M10 evidence must identify its actual code commit
@@ -45,7 +58,7 @@ in the freeze report, not as M10 runtime verification.
 
 ## 2. Disposition of every review finding
 
-### Revision 4 re-review dispositions
+### Historical revision 4 executor dispositions at submission
 
 | Item | Decision this round | Changed files / sections | Self-check basis | Current status |
 | --- | --- | --- | --- | --- |
@@ -95,10 +108,12 @@ result.
 | A2 | The legacy and multi-agent pipelines do not provide the same artifact integrity guarantee, so a single "artifact integrity" ledger declaration would be wrong. T-077 requires two separate declarations. | REQ-077-11 |
 | A3 | Different interruptions may produce similar persisted artifacts. Revision 4 requires actual test-side hit ID/count/fault/entry evidence generated when the execution reaches the injection point. Neither expected hits nor missing `_COMPLETE` proves injection. No production manifest/log/business-state fields are added; the future test mechanism must reject missing or mismatched hits. | T-078 REQ-078-6/-12, AC-078-3; freeze report R-M10-6 |
 
-## 3. What to check in revision 4
+## 3. Historical revision 4 re-review checklist
 
-Please report findings as `blocking` / `should-fix` / `observation`, each with a
-file and section. A finding without a location is not actionable.
+The following checklist was submitted for revision 4 re-review, with findings
+requested as `blocking` / `should-fix` / `observation`, each with a file and
+section. Its specification review is now settled by the quoted review in the
+freeze report §8; future runtime validation remains required.
 
 1. **Is REQ-M10-2 airtight?** Given the four conditions, name a route by which a
    declaration could still reach `verified` without evidence that actually
@@ -144,9 +159,10 @@ consistent application; they are no longer open implementation choices.
    log, or business-state interruption field (T-078 REQ-078-12).
 
 The remaining gates are concrete: T-070..T-075 implementation completion
-evidence is not satisfied; revision 4 awaits independent review and freeze
-approval; all newly specified failpoint/audit/reporting behavior awaits future
-authorized implementation and validation. None blocks this docs-only submission.
+evidence is not satisfied. Revision 4 specification freeze is now registered;
+all newly specified failpoint/audit/reporting behavior awaits future authorized
+implementation and validation under REQ-M10-12, including T-079/T-080's later
+field-level freeze. None blocks this documentation-only registration.
 
 ## 5. Out of scope for this review
 
@@ -160,14 +176,14 @@ authorized implementation and validation. None blocks this docs-only submission.
 ## 6. Verifying the documentation-only claim
 
 ```powershell
-git diff --stat 9adcddb46f2977ea122966c1167e48fe2592d8be HEAD
-git diff --name-only 9adcddb46f2977ea122966c1167e48fe2592d8be HEAD
+git diff --stat 826d3a7257ad903bc09b0d2d6635a3449576a3ce HEAD
+git diff --name-only 826d3a7257ad903bc09b0d2d6635a3449576a3ce HEAD
 git diff --stat 1b44127747a7f7b8bfd9118eb56006d867986b39 HEAD
 git diff --name-only 1b44127747a7f7b8bfd9118eb56006d867986b39 HEAD
 ```
 
-The first pair is this round: exactly the seven existing M10/review documents
-listed in the freeze report. The second pair is the cumulative PR: those seven
+The first pair is this freeze registration: the seven existing M10/review documents
+listed in the freeze report §8. The second pair is the cumulative PR: those seven
 plus nine previously merged M9 specification files. This round changes no M9
 file. Every cumulative path is under `docs/` plus `REVIEW-REQUEST.md`. If any path under
 `src/`, `tests/`, `benchmarks/`, `scripts/`, `prompts/`, or `evaluation/` appears,

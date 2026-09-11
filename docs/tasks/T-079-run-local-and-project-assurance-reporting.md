@@ -1,8 +1,12 @@
 # T-079 — Run-Local and Project-Level Assurance Reporting
 
-**Status:** DRAFT FOR FREEZE — REVISION 4. Implementation requires T-078 and
-T-080 closed with readable completion reports at named commits, plus a new
-focused session.
+**Status:** SCOPE, ENTRY POINTS, AND JUDGEMENT CRITERIA FROZEN — REVISION 4;
+see the [freeze report §8](../reports/M10-specification-freeze-report.md#8-revision-4-freeze-registration).
+Field-level detail remains deferred to this task's own refinement and freeze
+after its predecessors close, as required by AC-M10-1 / REQ-M10-12. Implementation
+requires T-078 and T-080 closed with readable completion reports at named commits,
+that field-level specification freeze, and a new focused session. This
+registration does not declare all details complete or authorize implementation.
 
 **Revision note:** revision 1 aggregated run-local unresolved items and
 project-level unverified declarations into one health conclusion. Those are

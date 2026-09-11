@@ -1,7 +1,12 @@
 # T-080 — Evidence and Artifact Integrity Contract Audit
 
-**Status:** DRAFT FOR FREEZE — REVISION 4. Execution requires T-078 closed
-with a readable completion report at a named commit, plus a new focused session.
+**Status:** SCOPE, ENTRY POINTS, AND JUDGEMENT CRITERIA FROZEN — REVISION 4;
+see the [freeze report §8](../reports/M10-specification-freeze-report.md#8-revision-4-freeze-registration).
+Field-level detail remains deferred to this task's own refinement and freeze
+after its predecessor closes, as required by AC-M10-1 / REQ-M10-12. Execution
+requires T-078 closed with a readable completion report at a named commit, that
+field-level specification freeze, and a new focused session. This registration
+does not declare all details complete or authorize execution.
 
 **Ordering note:** this task now precedes T-079. Revision 1 chained it after
 T-079, which was unnecessary; the audit constrains what T-079 may report and

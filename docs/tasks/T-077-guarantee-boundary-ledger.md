@@ -1,16 +1,20 @@
 # T-077 — Guarantee Boundary Ledger and Declaration Registry
 
-**Status:** DRAFT FOR FREEZE — REVISION 4. Implementation is blocked until the
+**Status:** SPECIFICATION FROZEN — REVISION 4. Implementation is blocked until the
 full REQ-M10-12 gate is satisfied: independently approved M10 specification
 freeze (decision and commit), readable declaration sources at their named source
 commits, and a readable completion report plus implementation commit for **each
-of T-070 through T-075**. At START_HEAD the sources are readable, but those six
-implementation dependencies are not satisfied and revision 4 freeze approval is
-pending. T-076 is not required by this scope. If a source or dependency cannot
+of T-070 through T-075**. At the freeze-registration START_HEAD the sources are
+readable, but those six implementation dependencies remain not satisfied.
+Revision 4's specification freeze is registered using the user-transferred
+ChatGPT AI-assisted static re-review in the
+[freeze report §8](../reports/M10-specification-freeze-report.md#8-revision-4-freeze-registration).
+T-076 is not required by this scope. If a source or dependency cannot
 be established, record the specific gap and keep the entry blocked; do not guess.
 Source readability and document freeze do not substitute for implementation
 completion or authorize an implementation start. This gate does not block the
-current documentation revision and submission for independent review.
+current documentation-only freeze registration. Execution requires a new focused
+session after the full gate is satisfied.
 
 ## Goal
 

@@ -1,6 +1,9 @@
 # T-078 — Deterministic Failpoint Interface and Interrupt Matrix (Batch 1)
 
-**Status:** DRAFT FOR FREEZE — REVISION 4. Implementation requires T-077 closed
+**Status:** SPECIFICATION FROZEN — REVISION 4; see the user-transferred AI-assisted
+static re-review registration in the
+[freeze report §8](../reports/M10-specification-freeze-report.md#8-revision-4-freeze-registration).
+Implementation remains subject to REQ-M10-12 and requires T-077 closed
 with a readable completion report at a named commit, plus a new focused session.
 
 ## Goal

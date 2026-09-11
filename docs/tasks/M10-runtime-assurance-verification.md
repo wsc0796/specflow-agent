@@ -1,9 +1,12 @@
 # M10 — Runtime Assurance Verification
 
-**Status:** DRAFT FOR FREEZE — REVISION 4 (addresses the re-review of PR #6).
-Implementation is not authorized. Freezing this document is a separate,
-documentation-only commit that must confirm no runtime implementation, benchmark
-fixture, dependency, or generated artifact was added (AC-M10-7).
+**Status:** SPECIFICATION FROZEN — REVISION 4. The user-transferred ChatGPT
+AI-assisted static re-review and the user's freeze decision are registered in
+the [freeze report §8](../reports/M10-specification-freeze-report.md#8-revision-4-freeze-registration).
+This freezes the specification at the detail levels defined by AC-M10-1;
+implementation remains blocked by REQ-M10-12. The separate documentation-only
+registration adds no runtime implementation, benchmark fixture, dependency, or
+generated artifact (AC-M10-7), and does not establish M10 assurance acceptance.
 
 **Reader precondition:** this document cites M9 boundary clauses. Those clauses
 are reproduced in Appendix A so that a reviewer or implementer without this
@@ -210,10 +213,10 @@ established.
   determined, name the unresolved item and keep the entry blocked.
 
   Source readability, M9 implementation completion, M10 document freeze, and
-  permission to begin M10 implementation are four separate facts. Revision 4 may
-  be revised and submitted for review now; its independent freeze approval is
-  pending and the required M9 implementation evidence is not satisfied, so M10
-  implementation remains blocked.
+  permission to begin M10 implementation are four separate facts. Revision 4's
+  specification freeze is registered in the freeze report §8 using the
+  user-transferred AI-assisted static re-review. The required M9 implementation
+  evidence remains not satisfied, so M10 implementation remains blocked.
 
 - **REQ-M10-13 — Preserve existing contracts.** The six-agent topology, stage
   dependencies, deterministic orchestration, handoff schemas, bounded revision,

@@ -1,22 +1,27 @@
 # M10 specification freeze report
 
-**Status:** DRAFT FOR FREEZE — REVISION 4, awaiting independent re-review.
+**Status:** SPECIFICATION FROZEN — REVISION 4; registration and review source in §8.
 **Date:** 2026-09-11
 **Branch:** `docs/m10-runtime-assurance-spec`
-**START_HEAD:** `9adcddb46f2977ea122966c1167e48fe2592d8be`
-**REVIEWED_HEAD:** `9adcddb46f2977ea122966c1167e48fe2592d8be`
+**START_HEAD:** `826d3a7257ad903bc09b0d2d6635a3449576a3ce`
+**REVIEWED_HEAD:** `826d3a7257ad903bc09b0d2d6635a3449576a3ce`
 **PR_BASE:** `1b44127747a7f7b8bfd9118eb56006d867986b39` (`main`)
 **Predecessor milestone:** M9 — Runtime Resilience & Efficiency, specification frozen in `02c1d3f` on branch `docs/m9-runtime-resilience-specs` (published to the remote at revision 3) and merged into this branch
 
-The revision starts at the actual PR head, equal to the reviewed reference.
+The freeze registration starts at the actual PR head, equal to REVIEWED_HEAD.
+Historical revision 4 preparation used
+`R4_START_HEAD=9adcddb46f2977ea122966c1167e48fe2592d8be`. Sections 1 and 5 retain
+that preparation's file/validation records: their START_HEAD and "this round"
+refer to R4_START_HEAD, not the current registration. Historical results are not
+reused as current evidence; §8 records the new decision and checks.
 M9 declaration-source version is `02c1d3fe9bcd8c95d6bb7cf3959328844598e473`;
 other declarations retain their path/clause/source-commit bindings. Source-code
-observations below were read at START_HEAD. Future M10 execution evidence must
+observations below were read at R4_START_HEAD. Future M10 execution evidence must
 separately name its actual tested-code commit and effective configuration after
 the implementation dependencies are met. START_HEAD identifies this revision's
-starting point, not a universal source or runtime-verification version.
+registration starting point, not a universal source or runtime-verification version.
 
-## 1. Files modified in revision 4
+## 1. Historical files modified while preparing revision 4
 
 | File | Purpose | Revision 4 + / - lines |
 | --- | --- | --- |
@@ -119,14 +124,15 @@ The required M9 dependencies are identical to REQ-M10-12 and T-077 Status:
 Only their specifications and the M9 specification-freeze report are present;
 the required task completion reports and implementation commits are not
 available on this PR baseline. No missing report path or SHA is fabricated.
-Readability is satisfied; implementation completion is not satisfied; revision 4
-independent freeze approval is pending; M10 implementation is therefore blocked.
+Readability is satisfied; implementation completion remains not satisfied.
+Revision 4 specification freeze is registered in §8 using the user-transferred
+AI-assisted static re-review; M10 implementation remains blocked by REQ-M10-12.
 Unknown or missing dependency evidence must remain explicitly blocked. T-076
 Java/Maven is unrelated to this verification scope and is not a gate.
 
 The order remains T-077 → T-078 → T-080 → T-079 → milestone assurance review.
 T-080 moved before T-079 in revision 2 and T-081 remains excluded. The current
-docs-only revision and review submission may proceed despite the missing future
+documentation-only freeze registration may proceed despite the missing future
 implementation prerequisites; no T-077 or M9 implementation starts here.
 
 ## 4. Unresolved risks
@@ -136,8 +142,8 @@ implementation prerequisites; no T-077 or M9 implementation starts here.
   completion report and implementation commit under §3 / REQ-M10-12. T-077
   also requires independently approved M10 freeze. Neither readable source
   files nor this report meets the implementation gate; T-076 is not required.
-  Revision 4 corrects the gate text and may be submitted for review now. It does
-  not implement automatic enforcement or authorize an implementation start.
+  The specification freeze is now registered in §8. This does not implement
+  automatic enforcement or authorize an implementation start.
 - **R-M10-2 — Baseline observations were read, not executed.** T-078 and T-080
   depend on source-code observations about `_calculate_hash`,
   `_finalize_run_directory`, and `ArtifactStore.write_run`. Both tasks require
@@ -159,10 +165,9 @@ implementation prerequisites; no T-077 or M9 implementation starts here.
   define them. Recording those gaps is acceptable audit delivery, not proof of
   required guarantees or permission to mark M10 assurance acceptance passed.
 - **R-M10-6 — Interruption points may not be distinguishable in persisted
-  artifacts (author finding A3).** The failed path writes the same
-  `manifest.json` / `traces.json` / `agent-outputs.json` set and calls
-  `_finalize_run_directory` regardless of which point was interrupted, so
-  post-hoc artifact inspection is insufficient to identify the injection point.
+  artifacts (author finding A3).** Different interruption cases may leave
+  similar artifacts, so artifact shape alone must not be used to infer the actual
+  injection point; actual test-side hit evidence is required.
   Revision 4 requires test-side actual-hit ID/count/fault/entry evidence,
   generated when the real execution reaches injection, and comparison with the
   preset (REQ-078-12). No hit, wrong point, or wrong count fails the mechanism
@@ -175,7 +180,7 @@ implementation prerequisites; no T-077 or M9 implementation starts here.
   merge exists solely to make M10's cited clauses readable. A reviewer who treats
   the M9 files as proposed changes would be reviewing the wrong artifact.
 
-## 5. Validation evidence for this branch
+## 5. Historical validation evidence for revision 4 preparation
 
 Revision 4 local checks are run in an isolated checkout at START_HEAD plus only
 the seven document edits. Python 3.12 and the existing `uv.lock` are used with
@@ -233,10 +238,94 @@ documents under `docs/` and nothing else.
 | 1 | `0ee6046` | Initial draft: milestone plus T-077 and T-078 full specs, boundary-only T-079 through T-081 |
 | 2 | `010b024` | Addresses the PR #6 review: four-condition verification semantics, four ledger states with `refuted` preserved, three separate verdicts, pre-execution `undetermined`, evidence-backed dependency gates, Appendix A citation reproduction, excerpt allowlist, boundary-separated read-only rule, normalized determinism, corrected `_COMPLETE` semantics, entry-point coverage table, closed fault set, failpoint registration isolation, T-079 dimension separation, T-080 narrowing and reordering, T-081 removal |
 | 3 | `5df7462`, `ab14b9a`, `9adcddb` | Made M9 sources readable: the branch was published, the M9 specifications merged, and REQ-M10-6 / row-1 citation evidence revised. The separate implementation gate still required the revision 4 correction |
-| 4 | One focused revision commit after START_HEAD; exact SHA in the PR body and disposition comment | Align implementation gates and source/code/revision bindings; distinguish audit delivery from assurance acceptance; require actual test-side hits; scope marker assertions; separate reporting dimensions; close audit runtime-change permissions; apply resolved decisions and factual corrections |
+| 4 | `826d3a7257ad903bc09b0d2d6635a3449576a3ce` | Align implementation gates and source/code/revision bindings; distinguish audit delivery from assurance acceptance; require actual test-side hits; scope marker assertions; separate reporting dimensions; close audit runtime-change permissions; apply resolved decisions and factual corrections |
+| 4 freeze registration (2026-09-11) | One focused registration commit after REVIEWED_HEAD; its SHA is recorded in the PR body and registration comment | Register the user-transferred ChatGPT AI-assisted static re-review and user's freeze decision; synchronize status while preserving implementation gates; narrow R-M10-6's artifact-shape observation |
 
 Revision 3 comprised merge `5df7462`, text revision `ab14b9a`, and provenance
-update `9adcddb` (this round's START_HEAD). Revision 4 makes Appendix A a reading
+update `9adcddb` (R4_START_HEAD). Revision 4 makes Appendix A a reading
 copy and separately requires implementation completion; it does not rewrite a
 historical review verdict. The new revision commit's own SHA is
 recorded after commit in the PR, without an extra provenance-only commit.
+
+## 8. Revision 4 freeze registration
+
+### 评审依据与登记决定（2026-09-11）
+
+- 被审规范提交（REVIEWED_HEAD）：`826d3a7257ad903bc09b0d2d6635a3449576a3ce`。
+- 本次登记起点（START_HEAD）：`826d3a7257ad903bc09b0d2d6635a3449576a3ce`；开始时 PR #6 为 OPEN，远端 head 未超出被审提交。
+- PR_BASE：`1b44127747a7f7b8bfd9118eb56006d867986b39`（`main`）。
+- 评审来源与性质：用户转交的 ChatGPT AI 辅助静态复审意见，针对上述固定提交；本执行者负责登记，不声称又完成了一次独立评审，也不冒充人类评审人。
+
+用户转交的结论原文：
+
+> 针对固定提交 826d3a7257ad903bc09b0d2d6635a3449576a3ce，revision 4 通过 AI 辅助静态复审，建议批准 M10 规范冻结。R1/R2/R3、C1、S1/S2/S3 的规范问题可以关闭。该结论不代表 M9/M10 实现已完成，不代表 M10 保障验收通过，也不代表 GitHub 正式 APPROVE 或 PR 已合并。
+
+依据该复审意见及用户本次明确授权，登记 revision 4 规范冻结。仓库规则与
+REQ-M10-12 的实现门槛保持不变；所读取规则未规定额外的指定评审身份或 GitHub 正式
+APPROVE 才能登记规范冻结。本次不执行 GitHub APPROVE、合并或自动合并，
+不将此次评审扩展为对 PR 内 M9 原有文档的重新批准。此前的待审状态、执行者
+自检及质量检查保留为历史记录，不改写为此前已经通过。
+
+### 规范问题结算与冻结范围
+
+| 规范问题 | 本次登记状态 | 仍需满足的后续条件 |
+| --- | --- | --- |
+| R1 | 依据引用的静态复审关闭 | T-070～T-075 各自的实现完成证据仍未满足 |
+| R2 | 依据引用的静态复审关闭 | 机制、声明和保障验收仍须后续有效实验分别判断 |
+| R3 | 依据引用的静态复审关闭 | 实际命中证据机制及验收测试尚未实现或验证 |
+| C1 | 依据引用的静态复审关闭 | 带前置条件的标记、文件集合、哈希和运行状态断言仍待实验 |
+| S1 | 依据引用的静态复审关闭 | 两个报告维度的行为仍待实现和测试 |
+| S2 | 依据引用的静态复审关闭 | 后续 T-080 审计仍须遵守运行时只读边界 |
+| S3 | 依据引用的静态复审关闭 | 静态反驳候选及其他未来实验要求未变成已验证能力 |
+
+冻结的是规范，具体细化程度遵循 AC-M10-1：T-077/T-078 规范冻结；T-079/T-080
+冻结范围、入口与判据，字段级细化仍须在前置任务关闭后完成并通过各自冻结门。
+不宣布所有细节已经完成，也不宣布 M9 或 M10 里程碑实施完成、M10 保障验收通过。
+
+### 当前实现门与本次修改范围
+
+REQ-M10-12 继续约束全部 M10 实现。声明源可读，但 §3 列出的 T-070、T-071、
+T-072、T-073、T-074、T-075 均未提供所需的可读完成报告和实现提交，仍为
+**Not satisfied**；T-076 不属于该门。T-077 因此保持阻塞，T-078 仍须 T-077
+关闭，T-080 仍须 T-078 关闭，T-079 仍须 T-078 与 T-080 关闭，并分别满足规范
+冻结、质量门和新会话条件。本次不启动 T-070、T-077 或其他实现。
+
+本次只修改现有七份 M10/review 文档的状态、评审结算、冻结登记与许可说明：
+
+- `REVIEW-REQUEST.md`
+- `docs/tasks/M10-runtime-assurance-verification.md`
+- `docs/tasks/T-077-guarantee-boundary-ledger.md`
+- `docs/tasks/T-078-deterministic-failpoints.md`
+- `docs/tasks/T-079-run-local-and-project-assurance-reporting.md`
+- `docs/tasks/T-080-evidence-and-artifact-integrity-audit.md`
+- `docs/reports/M10-specification-freeze-report.md`
+
+唯一非状态修正位于 R-M10-6：不同中断案例可能留下相似产物，因此不得仅凭
+产物形态推断实际注入位置；必须使用测试端实际命中证据。该文字遵循
+REQ-078-12，不改变 failpoint 范围、异常处理或验收要求。
+
+### 本次实际质量检查
+
+以下检查在干净的现有 M10 worktree 上，以 START_HEAD 加本次文档修改运行，
+使用 Python 3.12.10、现有 `uv.lock` 和 `UV_FROZEN=true`。未更新依赖，
+未运行 live provider；§5 历史结果不作为本次证据。
+
+| 命令／检查 | 本次实际结果 | 退出码 |
+| --- | --- | --- |
+| `uv run pytest -v` | 771 passed, 3 skipped, 3 warnings in 11.54s | 0 |
+| `uv run ruff check .` | All checks passed! | 0 |
+| `uv run ruff format --check .` | 208 files already formatted | 0 |
+| `git diff --check` | 通过，无空白错误 | 0 |
+| `git diff --cached --check` | 提交前检查通过，无空白错误 | 0 |
+| 本轮范围与状态核对 | 仅七份现有许可文档；无新增、删除、重命名或未跟踪文件；任务正文、AC-M10-1/验收条款及依赖门保持不变；新增内容未发现机器绝对路径或凭据模式 | 0 |
+
+三项跳过分别位于 `tests/test_repository_tools.py:238`、`tests/test_runs.py:204`、
+`tests/test_scanner.py:148`，原因是 Windows 符号链接权限。三项警告为
+`TestStrategyAgent`、`TestStrategyOutput` 的 pytest 收集警告，以及 Starlette/httpx
+弃用警告。本轮 Ruff 输出没有警告；未复制上一轮的警告或耗时作为本次结果。
+完整命令日志保留在仓库之外，原始输出未进入提交。
+
+本轮 diff 无 M9 规范、运行时代码、测试、依赖、锁文件、CI、基准或其他范围外
+改动。质量检查是现有回归与静态检查，不是尚未实施的 M10 保障验收证据。
+冻结登记提交自身的 SHA 在提交后写入 PR 正文、登记评论和交付记录，不追加
+循环 provenance 提交。完成登记与发布后停止。
