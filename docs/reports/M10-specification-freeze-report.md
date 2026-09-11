@@ -125,7 +125,14 @@ or modified, and no dependency manifest is changed.
 
 ## 7. Revision history
 
-| Revision | Commit | Change |
-| --- | --- | --- |
-| 1 | `0ee6046` | Initial draft: milestone plus T-077 and T-078 full specs, boundary-only T-079 through T-081 |
-| 2 | pending | Addresses the PR #6 review: four-condition verification semantics, four ledger states with `refuted` preserved, three separate verdicts, pre-execution `undetermined`, evidence-backed dependency gates, Appendix A citation reproduction, excerpt allowlist, boundary-separated read-only rule, normalized determinism, corrected `_COMPLETE` semantics, entry-point coverage table, closed fault set, failpoint registration isolation, T-079 dimension separation, T-080 narrowing and reordering, T-081 removal |
+| Revision | Commit | This report's blob | Change |
+| --- | --- | --- | --- |
+| 1 | `0ee6046` | `14925fd8440d3b9bdff60ebf943f3feb448c2919` | Initial draft: milestone plus T-077 and T-078 full specs, boundary-only T-079 through T-081 |
+| 2 | `010b024a2cfdc35fd6fcaa15d8cfa50c3eea29d2` | see the following commit | Addresses the PR #6 review: four-condition verification semantics, four ledger states with `refuted` preserved, three separate verdicts, pre-execution `undetermined`, evidence-backed dependency gates, Appendix A citation reproduction, excerpt allowlist, boundary-separated read-only rule, normalized determinism, corrected `_COMPLETE` semantics, entry-point coverage table, closed fault set, failpoint registration isolation, T-079 dimension separation, T-080 narrowing and reordering, T-081 removal |
+
+**Provenance.** Revision 1's freeze report blob is
+`14925fd8440d3b9bdff60ebf943f3feb448c2919`; revision 2's content is committed by
+the commit that introduces this table. Both are verifiable locally with
+`git hash-object docs/reports/M10-specification-freeze-report.md`, so a reader can
+confirm which revision they are holding without relying on a forward reference
+inside the document itself.
