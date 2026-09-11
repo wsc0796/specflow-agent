@@ -2,6 +2,7 @@
 
 **Status:** DRAFT FOR FREEZE — REVISION 3, awaiting re-review.
 **Branch:** `docs/m10-runtime-assurance-spec`
+**Revision 3 head:** `ab14b9a` (the commit immediately preceding this report update)
 **Base:** `1b44127` (`origin/main`, `security: harden repository and prompt trust boundaries`)
 **Predecessor milestone:** M9 — Runtime Resilience & Efficiency, specification frozen in `02c1d3f` on branch `docs/m9-runtime-resilience-specs` (published to the remote at revision 3) and merged into this branch
 
@@ -143,6 +144,4 @@ documents under `docs/` and nothing else.
 | 2 | `010b024` | Addresses the PR #6 review: four-condition verification semantics, four ledger states with `refuted` preserved, three separate verdicts, pre-execution `undetermined`, evidence-backed dependency gates, Appendix A citation reproduction, excerpt allowlist, boundary-separated read-only rule, normalized determinism, corrected `_COMPLETE` semantics, entry-point coverage table, closed fault set, failpoint registration isolation, T-079 dimension separation, T-080 narrowing and reordering, T-081 removal |
 | 3 | `5df7462` plus this report's commit | Completes the B1 fix: `docs/m9-runtime-resilience-specs` published to the remote, the M9 specifications merged into this branch, REQ-M10-6 rewritten to require a reviewer-readable citation, Appendix A re-labelled as the within-document copy of record, and row-1 gate evidence made concrete |
 
-Revision provenance is by blob: revision 1's report blob is
-`14925fd8440d3b9bdff60ebf943f3feb448c2919`. A reader can confirm which revision
-they hold with `git hash-object docs/reports/M10-specification-freeze-report.md`.
+Revision provenance is by commit and blob. Revision 3 was pushed as `ab14b9a`; revision 1's report blob is `14925fd8440d3b9bdff60ebf943f3feb448c2919`. A reader can confirm which revision they hold with `git log -1 --format=%h` and `git hash-object docs/reports/M10-specification-freeze-report.md`.
