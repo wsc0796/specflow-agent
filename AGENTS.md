@@ -58,18 +58,22 @@ The current local candidate is v1.1.1; it remains untagged and unpublished.
 Future work requires a separately frozen task specification.
 Future task IDs are not permission to implement future features.
 
-## V5.3 learning contract
+## V5.3.2 learning contract
 
 This repository is also the sole implementation track for the 30-day AI Agent
-engineering study plan in `docs/study/ROADMAP_V5_3.md`. The objective is learner
-ownership, not maximum feature throughput.
+engineering study plan in `docs/study/ROADMAP_V5_3_2.md`. The objective is
+learner ownership, not maximum feature throughput. V5.3.2 preserves the V5.3.1
+Evaluation First, Gap Driven, and Minimal Observability sequence while adding
+Context isolation evidence, Evaluator Contracts, failure attribution, Context
+identity, and a Retest Queue. Full OTel, Grafana, Tempo, and Jaeger platform
+work remains deferred.
 
 ### Source of truth
 
 Before each study task, read:
 
 1. this file and `docs/00-SPEC-BASELINE.md`;
-2. `docs/study/ROADMAP_V5_3.md`;
+2. `docs/study/ROADMAP_V5_3_2.md`;
 3. `docs/study/CURRENT.md`;
 4. the relevant source, tests, task specification, and existing evidence.
 

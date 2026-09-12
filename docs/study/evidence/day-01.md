@@ -1,6 +1,6 @@
 # Day 01 Evidence Card
 
-- Status: COMPLETE — C1/C2 PRACTICING
+- 状态：已完成，C1/C2 练习中
 - Roadmap: [V5.3 Day 1](../ROADMAP_V5_3.md#5-第一周接管-specflow--三次短校准)
 - Study state: [CURRENT.md](../CURRENT.md)
 
@@ -130,6 +130,42 @@ turn a roadmap target into an implementation claim.
 - Learner interpretation: a passing Mock run proves repeatable workflow,
   Handoff, Schema, and Artifact contracts; it does not prove real-LLM semantic
   analysis quality.
+
+## Day 1 能力结果
+
+Day 1 帮助我建立了第一版 SpecFlow 项目心智模型。这不代表我已经普遍掌握 Agent 工程，也不代表我已经具备独立维护 SpecFlow 的能力。
+
+### 已验证或已有直接学习者证据
+
+| 能力 | 当前状态 | 学习者证据 |
+| --- | --- | --- |
+| 说明 SpecFlow 的基本用途 | 已验证（仅限本项目） | 能说明系统接收仓库路径和开发需求，搜索代码证据并输出可审查结果。 |
+| 区分 Mock 与真实模型证据 | 已验证（仅限本项目） | 能说明 Mock 证明流程、Schema、Handoff、Artifact 等工程合同，但不能证明真实 LLM 的语义质量。 |
+| 提出 Tool 权限执行位置 | 已验证的设计决策 | 学习者提出在 `ToolExecutor` 统一执行单个 Agent 的权限，并用 AOP 切面解释统一治理、减少重复和方便调整。 |
+
+### 正在练习
+
+| 能力 | 当前状态 | 已达到的程度 | 仍需补强 |
+| --- | --- | --- | --- |
+| 追踪主调用链 | C1 练习中 | 能重建 `cli.main -> run_multi_agent -> EvidenceBundle -> Coordinator.plan -> MultiAgentScheduler -> Handoff -> Review -> Artifact`。 | 仍需减少对提示的依赖，并能为关键调用边独立给出 `path:line`。 |
+| 区分结构正确与业务正确 | C2 练习中 | 能说明 `PlanValidator` 可以证明结构合法，但不能证明计划内容或业务结果正确。 | 需要在新案例中独立识别“Schema 合法但内容错误”。 |
+| 区分声明与真实执行 | C2 练习中 | 能使用“已声明、已执行、已测试、未知”判断 `tool_permissions`、`input_hash`、`_COMPLETE` 等控制。 | 需要在陌生模块中独立完成一次消费者追踪。 |
+| 解释失败终态 | C2 练习中 | 已接触技术失败 `failed + exit 3` 与业务拒绝 `completed + revision_exhausted=true` 的区别。 | 仍需在没有提示时准确使用状态名称，并说明为什么不能混为一谈。 |
+| 审查完整性边界 | C2 练习中 | 能理解“写入端生成哈希和完成标记”不等于“读取端已经执行验证”。 | 需要亲自完成一次 Artifact 篡改实验，并解释消费者的行为。 |
+
+### 尚未验证，不能写成已经掌握
+
+- C3 工程维护：D2 的测试、实现、回归和提交由 Codex 完成；学习者尚未独立复现、定位并实现一个补丁。
+- C4 架构设计：已有一条集中式权限决策，但尚未完整比较两个候选方案的约束、取舍和故障路径。
+- C5 创造：尚未根据需求独立完成一个可维护的 Agent 工程闭环。
+- 独立测试设计、Trace 定位、故障注入、数据库建模、checkpoint/resume 和 Live Provider 质量评估均未验证。
+
+### Day 1 结束后能够做什么
+
+- 面对陌生 Agent 仓库时，先寻找入口、Evidence、计划、执行、Handoff、Review 和 Artifact，不再从目录树开始逐个阅读文件。
+- 看到 `permission`、`retry`、`checkpoint`、`hash` 等字段时，继续追踪运行时消费者，不把“代码中存在”误认为“功能已经生效”。
+- 阅读测试或 benchmark 结果时，能够区分工程合同通过与业务、语义质量通过。
+- 对无法从源码或实验证明的结论标记为“未知”，并把下一步改写成可以复现的验证问题。
 
 ## What surprised me
 
