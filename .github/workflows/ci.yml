@@ -47,5 +47,4 @@ jobs:
       - uses: astral-sh/setup-uv@v5
         with:
           python-version: "3.12"
-      - run: uv build
       - run: python scripts/smoke_installed_wheel.py

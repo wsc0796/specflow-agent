@@ -97,11 +97,17 @@ LLMs, workers, and workflow logic; later tasks added those capabilities incremen
 
 ## Prompt Registry
 
-Prompt assets live under `prompts/` and are managed by Git so behavior changes
+Prompt assets live under `src/specflow/prompt_assets/` and are managed by Git so behavior changes
 can be reviewed as ordinary diffs. The current registry supports loading a
 prompt by name and version, validating YAML metadata, checking template variables
 against declared `required_variables`, rendering with Jinja2 `StrictUndefined`,
 and producing a stable `prompt_hash`.
+
+Default prompts load from installed package resources through `importlib.resources`,
+independent of the working directory. Source, editable, wheel and sdist installations
+use the same assets. `PromptRegistry(custom_root)` explicitly selects a validated
+custom directory; a missing/invalid custom root fails without fallback. A target
+repository or CWD `prompts/` directory cannot override the defaults.
 
 ## Context Builder
 

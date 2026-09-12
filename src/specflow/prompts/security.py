@@ -4,7 +4,7 @@ Repository content is untrusted data. Every prompt path that renders
 repository evidence (the legacy worker templates, the multi-agent adapter,
 and the legacy system message) must carry an explicit warning; the canonical
 wording lives here so the programmatic builders stay in sync. The static
-``prompts/*/template.md`` files carry the same wording literally because
+``src/specflow/prompt_assets/*/template.md`` files carry the same wording literally because
 Markdown templates cannot import a Python constant.
 """
 

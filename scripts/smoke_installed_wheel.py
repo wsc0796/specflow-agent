@@ -14,16 +14,19 @@ import secrets
 import socket
 import subprocess
 import sys
+import tarfile
 import tempfile
 import time
 import urllib.error
 import urllib.request
 from hashlib import sha256
 from pathlib import Path
+from zipfile import ZipFile
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 TIMEOUT_SECONDS = 90
 SMOKE_CREDENTIAL = secrets.token_urlsafe(32)
+PROMPT_NAMES = ("analyze_requirement", "generate_spec", "review_generation")
 LOOPBACK_OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 
 TERMINAL_STATES = frozenset(
@@ -40,7 +43,7 @@ TERMINAL_STATES = frozenset(
 
 
 def _run(cmd: list[str], cwd: Path | None = None, env: dict[str, str] | None = None) -> str:
-    result = subprocess.run(cmd, cwd=cwd, env=env, capture_output=True, text=True)
+    result = subprocess.run(cmd, cwd=cwd, env=env, capture_output=True, text=True, timeout=120)
     if result.returncode != 0:
         details = f"stdout: {result.stdout}\nstderr: {result.stderr}"
         raise RuntimeError(f"command failed ({result.returncode}): {' '.join(cmd)}\n{details}")
@@ -53,9 +56,17 @@ def _free_port() -> int:
         return sock.getsockname()[1]
 
 
+def _runtime_environment() -> dict[str, str]:
+    return {
+        key: value
+        for key, value in os.environ.items()
+        if key not in {"PYTHONPATH", "PYTHONHOME"} and not key.startswith("SPECFLOW_")
+    }
+
+
 def _server_environment(allowed_repository_root: Path) -> dict[str, str]:
     """Build a fail-closed API environment scoped to the smoke fixture."""
-    environment = os.environ.copy()
+    environment = _runtime_environment()
     environment["SPECFLOW_API_KEY"] = SMOKE_CREDENTIAL
     environment["SPECFLOW_ALLOWED_REPOSITORY_ROOTS"] = str(allowed_repository_root)
     return environment
@@ -78,18 +89,21 @@ def _http(method: str, url: str, payload: dict | None = None) -> tuple[int, dict
 
 
 class Smoke:
-    def __init__(self, wheel: Path) -> None:
+    def __init__(self, wheel: Path, constraints: Path | None = None) -> None:
         self.wheel = wheel
+        self.constraints = constraints
         self.failures: list[str] = []
 
-    def check(self, name: str, fn: object) -> None:
+    def check(self, name: str, fn: object) -> bool:
         print(f"[smoke] {name} ...", flush=True)
         try:
             fn()
             print(f"[smoke]   PASS: {name}", flush=True)
+            return True
         except Exception as error:  # noqa: BLE001
             self.failures.append(name)
             print(f"[smoke]   FAIL: {name}: {error}", flush=True)
+            return False
 
     def run(self) -> int:
         with tempfile.TemporaryDirectory(prefix="specflow-smoke-") as td:
@@ -103,11 +117,25 @@ class Smoke:
             (repo_dir / "app.py").write_text("def main():\n    pass\n", encoding="utf-8")
             _run([sys.executable, "-m", "venv", str(venv)])
 
-            self.check("clean venv + wheel install", lambda: self._install(pip, venv))
-            self.check("specflow --version", lambda: self._version(py))
+            if not self.check("clean venv + wheel install", lambda: self._install(pip, venv)):
+                print("[smoke] RESULT: FAIL (installation; runtime checks could not start)")
+                return 1
+            self.check("installed package identity", lambda: self._identity(py, work))
+            self.check("specflow --version", lambda: self._version(py, work))
             self.check(
                 "import specflow.artifacts",
-                lambda: _run([str(py), "-c", "import specflow, specflow.artifacts"]),
+                lambda: self._python(py, work, "import specflow, specflow.artifacts"),
+            )
+            self.check("default legacy CLI (no --mode)", lambda: self._cli(py, work, repo_dir))
+            self.check("explicit legacy CLI", lambda: self._cli(py, work, repo_dir, mode="legacy"))
+            self.check(
+                "explicit multi-agent CLI",
+                lambda: self._cli(py, work, repo_dir, mode="multi-agent"),
+            )
+            self.check("bundled + custom + hostile CWD prompts", lambda: self._resources(py, work))
+            self.check(
+                "default CLI with hostile CWD prompts",
+                lambda: self._cli(py, work, repo_dir, label="hostile"),
             )
             self.check(
                 "boot API + mock run + artifact read",
@@ -120,12 +148,195 @@ class Smoke:
         return 0
 
     def _install(self, pip: Path, venv: Path) -> None:
-        _run([str(pip), "install", "--quiet", str(self.wheel)])
+        if self.constraints is not None:
+            # uv's export includes pinned transitive requirements and hashes.
+            # Install those first; a local, newly built wheel has no lockfile hash.
+            _run(
+                [str(pip), "install", "--quiet", "--require-hashes", "-r", str(self.constraints)],
+                cwd=venv.parent,
+                env=_runtime_environment(),
+            )
+        command = [str(pip), "install", "--quiet"]
+        if self.constraints is not None:
+            command.append("--no-deps")
+        _run([*command, str(self.wheel)], cwd=venv.parent, env=_runtime_environment())
 
-    def _version(self, py: Path) -> None:
+    def _version(self, py: Path, work: Path) -> None:
         entry = py.parent / ("specflow.exe" if os.name == "nt" else "specflow")
-        output = _run([str(entry), "--version"])
-        assert "1.1.1" in output, f"unexpected version output: {output!r}"
+        output = _run([str(entry), "--version"], cwd=work, env=_runtime_environment())
+        version = self._python(
+            py, work, 'from importlib.metadata import version; print(version("specflow-agent"))'
+        ).strip()
+        assert output.strip() == f"specflow {version}", f"unexpected version output: {output!r}"
+
+    def _python(self, py: Path, work: Path, code: str, *args: str) -> str:
+        return _run([str(py), "-I", "-c", code, *args], cwd=work, env=_runtime_environment())
+
+    def _identity(self, py: Path, work: Path) -> None:
+        output = self._python(
+            py,
+            work,
+            """
+import json, sys, specflow
+from pathlib import Path
+from importlib.metadata import distribution
+dist = distribution('specflow-agent')
+assert Path(specflow.__file__).resolve().is_relative_to(Path(sys.prefix).resolve())
+assert Path(dist.locate_file('')).resolve().is_relative_to(Path(sys.prefix).resolve())
+direct = json.loads(dist.read_text('direct_url.json'))
+assert not direct.get('dir_info', {}).get('editable', False)
+assert direct['url'].endswith('.whl')
+print(json.dumps({'version':dist.version, 'source':'venv/site-packages', 'editable':False}))
+""",
+        )
+        print(f"[smoke]   identity: {output.strip()}")
+
+    def _cli(
+        self, py: Path, work: Path, repo: Path, *, mode: str | None = None, label: str = "default"
+    ) -> None:
+        entry = py.parent / ("specflow.exe" if os.name == "nt" else "specflow")
+        output = work / f"cli-{mode or label}"
+        command = [
+            str(entry),
+            "run",
+            "--repo",
+            str(repo),
+            "--requirement",
+            "Add a health endpoint.",
+            "--output",
+            str(output),
+            "--mock",
+        ]
+        if mode is not None:
+            command.extend(["--mode", mode])
+        _run(command, cwd=work, env=_runtime_environment())
+        directories = [p for p in output.glob("run-*") if p.is_dir()]
+        assert len(directories) == 1, "expected exactly one completed CLI run directory"
+        directory = directories[0]
+        if mode == "multi-agent":
+            self._verify_multi(py, work, directory)
+        else:
+            self._verify_legacy(py, work, directory)
+
+    def _verify_legacy(self, py: Path, work: Path, directory: Path) -> None:
+        self._python(
+            py,
+            work,
+            """
+import json, sys
+from pathlib import Path
+from specflow.workers.analyze import AnalysisOutput
+from specflow.workers.generate import GenerationOutput
+from specflow.workers.review import ReviewOutput
+root = Path(sys.argv[1])
+read = lambda name: (root / name).read_text(encoding='utf-8')
+manifest = json.loads(read('manifest.json'))
+assert manifest['run_id'] == root.name
+assert manifest['status'] == 'completed' and manifest['provider_type'] == 'mock'
+assert manifest['review_decision'] == 'PASS'
+assert not manifest['degraded'] and not manifest['requires_review']
+analysis = AnalysisOutput.from_json(read('analysis.json'))
+generation = GenerationOutput.from_json(
+    read('generation.json'), analysis_hash=analysis.analysis_hash)
+review = ReviewOutput.from_json(read('review.json'),
+    analysis_hash=analysis.analysis_hash, generation_hash=generation.generation_hash)
+assert analysis.requirement_summary.strip() and generation.proposed_solution.strip()
+assert generation.implementation_steps and generation.test_plan
+assert review.decision.value == 'PASS' and review.summary.strip()
+assert not any([analysis.degraded, generation.degraded, review.degraded,
+                review.requires_revision, review.requires_human_review])
+for name in ('analysis', 'generation', 'review'):
+    value = {'analysis':analysis, 'generation':generation, 'review':review}[name]
+    assert manifest[name + '_hash'] == getattr(value, name + '_hash')
+traces = json.loads(read('trace.json'))
+assert len(traces) == 3
+assert {t['metadata']['worker_role'] for t in traces} == {'analyze','generate','review'}
+assert all(t['fallback_level'] == 'none' for t in traces)
+for name in ('technical-spec.md','test-plan.md','run-summary.md'):
+    assert read(name).strip()
+""",
+            str(directory),
+        )
+
+    def _verify_multi(self, py: Path, work: Path, directory: Path) -> None:
+        self._python(
+            py,
+            work,
+            """
+import json, sys
+from pathlib import Path
+from specflow.runner_multi import _build_registry
+from specflow.schema import build_schema_registry
+root = Path(sys.argv[1])
+read = lambda name: json.loads((root/name).read_text(encoding='utf-8'))
+manifest, outputs, metrics = read('manifest.json'), read('agent-outputs.json'), read('metrics.json')
+assert manifest['run_id'] == root.name and manifest['workflow_state'] == 'completed'
+assert metrics['provider'] == 'mock' and metrics['review_decision'] == 'PASS'
+assert metrics['schema_validated_count'] == 6 and metrics['degraded_count'] == 0
+registry, schemas = _build_registry(), build_schema_registry()
+assert len(outputs) == 6
+for result in outputs.values():
+    assert result.get('success', True) and result['schema_validated']
+    identity = registry.get(result['agent_id']).identity
+    schemas.get(identity.output_schema_id).model_validate(result['output'])
+assert len(read('handoffs.json')) == 7
+assert (root/'_COMPLETE').is_file()
+""",
+            str(directory),
+        )
+
+    def _resources(self, py: Path, work: Path) -> None:
+        with ZipFile(self.wheel) as archive:
+            expected = {
+                f"{name}/{filename}": sha256(
+                    archive.read(f"specflow/prompt_assets/{name}/{filename}")
+                ).hexdigest()
+                for name in PROMPT_NAMES
+                for filename in ("template.md", "v1.0.0.yaml")
+            }
+        output = self._python(
+            py,
+            work,
+            """
+import json, sys
+from pathlib import Path
+from hashlib import sha256
+from importlib import resources
+from specflow.prompts import PromptRegistry, PromptNotFoundError
+names = ('analyze_requirement','generate_spec','review_generation')
+assets = resources.files('specflow').joinpath('prompt_assets')
+actual, definitions = {}, {}
+for name in names:
+    definitions[name] = PromptRegistry().get(name,'1.0.0')
+    assert definitions[name].render(dict.fromkeys(definitions[name].required_variables, 'fixture'))
+    for filename in ('template.md','v1.0.0.yaml'):
+        actual[name+'/'+filename] = sha256(assets.joinpath(name,filename).read_bytes()).hexdigest()
+custom = Path('explicit-custom')
+for name in names:
+    (custom/name).mkdir(parents=True)
+    for filename in ('template.md','v1.0.0.yaml'):
+        (custom/name/filename).write_bytes(assets.joinpath(name,filename).read_bytes())
+    assert PromptRegistry(custom).get(name,'1.0.0').prompt_hash == definitions[name].prompt_hash
+for root, name, version in [(Path('missing-root'), names[0], '1.0.0'),
+                            (custom, '../escape', '1.0.0'), (custom, names[0], '../1.0.0')]:
+    try:
+        PromptRegistry(root).get(name,version)
+    except PromptNotFoundError:
+        pass
+    else:
+        raise AssertionError('invalid custom lookup silently succeeded')
+for name in names:
+    forged = Path('prompts')/name
+    forged.mkdir(parents=True)
+    (forged/'v1.0.0.yaml').write_bytes(assets.joinpath(name,'v1.0.0.yaml').read_bytes())
+    template = assets.joinpath(name,'template.md').read_text(encoding='utf-8')
+    (forged/'template.md').write_text('FORGED CWD PROMPT\\n'+template, encoding='utf-8')
+    assert 'FORGED CWD PROMPT' in PromptRegistry('prompts').get(name,'1.0.0').template
+    assert PromptRegistry().get(name,'1.0.0').prompt_hash == definitions[name].prompt_hash
+print(json.dumps(actual))
+""",
+        )
+        assert json.loads(output) == expected, "installed prompt bytes differ from the exact wheel"
 
     def _api(self, work: Path, py: Path, api_dir: Path, repo_dir: Path) -> None:
         port = _free_port()
@@ -178,6 +389,10 @@ class Smoke:
             assert artifacts.get("files"), f"no artifacts generated: {artifacts}"
             assert "manifest.json" in artifacts["files"], f"manifest missing: {artifacts}"
             self._verify_manifest(api_dir, run_id)
+            directory = next((api_dir / "data" / "runs" / run_id).glob("run-multi-*"))
+            self._verify_multi(py, work, directory)
+            _, package = _http("GET", f"{base}/api/v1/runs/{run_id}/review-package")
+            assert package, "empty completed-Run review package"
         finally:
             server.terminate()
             try:
@@ -223,22 +438,71 @@ def main() -> int:
     parser.add_argument(
         "--wheel", help="path to a prebuilt wheel; defaults to building from the repo"
     )
+    parser.add_argument("--sdist", help="also rebuild this exact sdist and smoke its wheel")
+    parser.add_argument(
+        "--constraints", help="locked runtime requirements (default: uv.lock export)"
+    )
     args = parser.parse_args()
+    with tempfile.TemporaryDirectory(prefix="specflow-build-smoke-") as td:
+        work = Path(td)
+        constraints = Path(args.constraints).resolve() if args.constraints else work / "locked.txt"
+        if not args.constraints:
+            _run(
+                [
+                    "uv",
+                    "export",
+                    "--frozen",
+                    "--no-dev",
+                    "--no-emit-project",
+                    "--format",
+                    "requirements-txt",
+                    "--output-file",
+                    str(constraints),
+                ],
+                cwd=REPO_ROOT,
+            )
+        if args.wheel:
+            wheel = Path(args.wheel).resolve()
+            sdist = Path(args.sdist).resolve() if args.sdist else None
+        else:
+            dist = work / "dist"
+            _run(["uv", "build", "--out-dir", str(dist)], cwd=REPO_ROOT)
+            wheel = _only_built(dist, "*.whl")
+            sdist = _only_built(dist, "*.tar.gz")
+        _print_identity(wheel)
+        outcome = Smoke(wheel, constraints).run()
+        if sdist is not None:
+            _print_identity(sdist)
+            source_root = work / "sdist-only"
+            source_root.mkdir()
+            with tarfile.open(sdist) as archive:
+                archive.extractall(source_root, filter="data")
+            projects = list(source_root.glob("*/pyproject.toml"))
+            assert len(projects) == 1, "sdist must contain one standalone project"
+            rebuilt = work / "rebuilt"
+            _run(
+                ["uv", "build", "--wheel", "--out-dir", str(rebuilt)],
+                cwd=projects[0].parent,
+                env=_runtime_environment(),
+            )
+            rebuilt_wheel = _only_built(rebuilt, "*.whl")
+            _print_identity(rebuilt_wheel)
+            print("[smoke] standalone sdist-rebuilt wheel", flush=True)
+            outcome = max(outcome, Smoke(rebuilt_wheel, constraints).run())
+        return outcome
 
-    if args.wheel:
-        wheel = Path(args.wheel).resolve()
-        if not wheel.exists():
-            print(f"[smoke] wheel not found: {wheel}")
-            return 1
-    else:
-        _run(["uv", "build"], cwd=REPO_ROOT)
-        wheels = sorted((REPO_ROOT / "dist").glob("specflow_agent-*.whl"))
-        if not wheels:
-            print("[smoke] no wheel built")
-            return 1
-        wheel = wheels[-1]
 
-    return Smoke(wheel).run()
+def _only_built(directory: Path, pattern: str) -> Path:
+    candidates = list(directory.glob(pattern))
+    if len(candidates) != 1:
+        raise RuntimeError(f"expected one newly built {pattern}, found {len(candidates)}")
+    return candidates[0]
+
+
+def _print_identity(path: Path) -> None:
+    print(
+        f"[smoke] artifact: {path.name} sha256={sha256(path.read_bytes()).hexdigest()}", flush=True
+    )
 
 
 if __name__ == "__main__":

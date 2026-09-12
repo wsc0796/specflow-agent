@@ -65,6 +65,24 @@ def test_cli_mock_run_succeeds(tmp_path: Path) -> None:
     assert exit_code == 0
 
 
+def test_default_legacy_cli_works_outside_source_tree(tmp_path, monkeypatch):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "app.py").write_text("def health():\n    return {'status':'ok'}\n")
+    monkeypatch.chdir(tmp_path)
+    output = tmp_path / "out"
+    assert _run_cli_mock(repo, output, "Add a health endpoint.") == 0
+    run_dir = next(output.glob("run-*"))
+    assert json.loads((run_dir / "manifest.json").read_text())["status"] == "completed"
+    traces = json.loads((run_dir / "trace.json").read_text())
+    assert {trace["metadata"]["worker_role"] for trace in traces} == {
+        "analyze",
+        "generate",
+        "review",
+    }
+    assert all(trace["fallback_level"] == "none" for trace in traces)
+
+
 def test_cli_mock_run_creates_artifacts(tmp_path: Path) -> None:
     repo = tmp_path / "test-repo"
     repo.mkdir()
