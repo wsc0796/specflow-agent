@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import fnmatch
-import json
 import math
 import os
 import re
@@ -18,6 +17,7 @@ from typing import Any
 from specflow.llm import OpenAICompatibleConfig
 from specflow.plan.hash_utils import canonical_json_bytes
 from specflow.policy import DEFAULT_POLICY, ExecutionPolicy, SpecFlowError
+from specflow.policy.models import RunOutcome, RunStatus
 from specflow.tools.exceptions import BinaryFileError
 from specflow.tools.repository_policy import RepositoryAccessPolicy
 from specflow.tools.repository_tools import _read_text
@@ -181,7 +181,11 @@ def prepare_run(
 
 
 class RunResult(int):
-    """Int-compatible exit code with safe audit and an internal artifact locator."""
+    """Immutable runtime outcome with the existing integer exit-code interface.
+
+    Runners create this only after execution and required writes finish. The
+    manifest is an audit artifact, not the source for reconstructing this result.
+    """
 
     def __new__(
         cls,
@@ -193,11 +197,42 @@ class RunResult(int):
         single_flight: dict[str, str] | None = None,
     ) -> RunResult:
         result = super().__new__(cls, code)
-        result.error_code = safe_code(error_code) if error_code else None
-        result.artifact_directory = artifact_directory
-        result.result_status = result_status
-        result.single_flight = dict(single_flight or {})
+        default_status, default_error = {
+            0: (RunStatus.COMPLETED, ""),
+            4: (RunStatus.COMPLETED_DEGRADED, ""),
+            2: (RunStatus.FAILED_SECURITY, "REPOSITORY_UNAVAILABLE"),
+        }.get(code, (RunStatus.FAILED_RUNTIME, "RUNNER_FAILED"))
+        outcome = RunOutcome(
+            status=result_status or default_status,
+            error_code=safe_code(error_code) if error_code else default_error,
+            degraded=code == 4,
+        )
+        object.__setattr__(result, "_outcome", outcome)
+        object.__setattr__(result, "_artifact_directory", artifact_directory)
+        object.__setattr__(result, "_metadata", tuple((single_flight or {}).items()))
         return result
+
+    def __setattr__(self, name: str, value: object) -> None:
+        raise AttributeError("RunResult is immutable")
+
+    def __delattr__(self, name: str) -> None:
+        raise AttributeError("RunResult is immutable")
+
+    @property
+    def error_code(self) -> str | None:
+        return self._outcome.error_code or None
+
+    @property
+    def result_status(self) -> str:
+        return self._outcome.status
+
+    @property
+    def artifact_directory(self) -> Path | None:
+        return self._artifact_directory
+
+    @property
+    def single_flight(self) -> dict[str, str]:
+        return dict(self._metadata)
 
     def with_audit(self, metadata: dict[str, str]) -> RunResult:
         return RunResult(
@@ -303,41 +338,28 @@ class SingleFlightCoordinator:
 DEFAULT_COORDINATOR = SingleFlightCoordinator()
 
 
-def artifact_result(
-    code: int,
-    directory: Path,
-    *,
-    existed: bool = False,
-    require_complete: bool = False,
-) -> RunResult:
-    """Read only this owner's bounded manifest; never adopt an old result."""
-    result = RunResult(code)
-    if existed or directory.is_symlink() or not directory.is_dir():
-        return result
-    resolved = directory.resolve()
-    if not resolved.is_relative_to(directory.parent.resolve()):
-        return result
-    manifest = directory / "manifest.json"
-    if manifest.is_symlink() or not manifest.is_file():
-        return result
+def completed_artifact_directory(directory: Path, *, require_complete: bool = False) -> Path | None:
+    """Validate a locator after this owner's writer finishes, without parsing it.
+
+    This is not a lookup for previous runs: the caller must have just completed
+    the write. The API additionally enforces its own artifact-root boundary.
+    """
     try:
-        with manifest.open("rb") as stream:
-            data = stream.read(131073)
-        if len(data) > 131072:
-            return result
-        payload = json.loads(data)
-        if not isinstance(payload, dict):
-            return result
-    except (OSError, ValueError):
-        return result
-    complete = directory / "_COMPLETE"
-    can_share = not require_complete or (complete.is_file() and not complete.is_symlink())
-    return RunResult(
-        code,
-        error_code=payload.get("error") if code == 3 else None,
-        artifact_directory=resolved if can_share else None,
-        result_status="rejected" if code == 0 and payload.get("revision_exhausted") else None,
-    )
+        is_link = RepositoryAccessPolicy._is_link_or_reparse_point
+        if is_link(directory) or not directory.is_dir():
+            return None
+        resolved = directory.resolve()
+        if not resolved.is_relative_to(directory.parent.resolve()):
+            return None
+        manifest = directory / "manifest.json"
+        if is_link(manifest) or not manifest.is_file():
+            return None
+        complete = directory / "_COMPLETE"
+        if require_complete and (is_link(complete) or not complete.is_file()):
+            return None
+        return resolved
+    except (OSError, RuntimeError):
+        return None
 
 
 def execute_owned(

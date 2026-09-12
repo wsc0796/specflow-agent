@@ -1,6 +1,6 @@
 # T-070 — Run Single-Flight and Early Idempotency 完成报告
 
-日期：2026-09-11。状态：实现交付待评审。本地验证结果见下，不自行宣布独立验收通过。
+初始交付：2026-09-11；A01 修复更新：2026-09-12。状态：实现交付待评审。本地验证结果见下，不自行宣布独立验收通过。
 
 ## 实现基线、分支与远端状态
 
@@ -17,6 +17,7 @@
 - **同步需求单独记录：** 实现分支尚未吸收父分支的上述文档提交，仍保留已经验证的 IMPLEMENTATION_BASE；未自动 merge/rebase。合并评审时由维护者决定何时同步或在父 PR 合并后 retarget。当前 PR 的三点比较基线仍是 `826d3a7`，只计算 T-070 增量。
 - T-070、M9 任务和冻结报告与 SPEC_SOURCE 比较无差异。M10 实现门不用于阻塞或授权本任务。
 - 最终实现 SHA 与 PR 链接在提交后记录于 PR 和交付回复，本报告不要求包含自身提交 SHA。
+- 本轮 A01 修复起点：`7856e3a1bff737282f7cf9cece2e38f2fe7895f9`；在用户确认分离结果与文件解析方案后追加一个聚焦修复提交，不改写已发布历史。
 
 ## 修改范围与调用链决定
 
@@ -34,6 +35,8 @@
 
 无需修改 `policy/models.py`：现有完整 `ExecutionPolicy.policy_hash()` 提供策略指纹，`max_wall_time_seconds`（默认 300 秒）提供 follower 等待配置；Flight.wait 进一步拒绝非有限或负数界限。数据库列、冻结规范、六 agent 拓扑、stage 依赖、handoff schema、revision 上限和 benchmark baseline 均未改动。
 
+A01 修复复用该文件中现有的冻结 `RunOutcome`，由整数兼容的 `RunResult` 持有；未新增第三套结果模型。此次生产改动仅在 `single_flight.py`、`runner.py`、`runner_multi.py`、`runs.py`，另更新现有 single-flight 测试与本报告。
+
 1. 昂贵工作始于 `EvidenceCollector.collect`，随后是 `Coordinator.plan` 的 enrichment/provider、`MultiAgentScheduler.execute` 和产物目录创建。legacy 在 evidence 前配置 client，随后调用 workers 和 ArtifactStore。
 2. HTTP 中间件和 dependency 先认证；`RunService.create` 在读取仓库前重新验证现行 allowlist。相同 key 也必须通过上述路径。
 3. 原 permit 在路由进入服务前领取、路由 finally 释放。现在协调器在锁内区分 owner/follower，并在同一次原子操作中准入：owner 调用原 acquire，follower 只计每分钟请求。不同键的并发拒绝不消耗速率配额，保留已有测试的计数语义。
@@ -41,6 +44,7 @@
 5. **唯一 ownership 入口是协调器 claim。** API 领取后显式传 owner Flight 给 runner；runner 不再次注册。直接 multi-agent/legacy 调用自行进入同一协调器。
 6. 完成发布和移除 entry 在 owner 的 finally 路径执行，API permit 同时释放。API owner 的持久化终态提交在发布 follower 结果之前完成。
 7. 同步调用退栈才清理；scheduler 已有 `shutdown(wait=True)` 等待实际执行中的线程。取消调用方等待不等于底层工作已结束。
+8. 两条 owned runner 直接返回结构化终态、错误分类与已完成产物的安全定位；API 从这份结果保存请求终态。manifest 是持久化审计产物，不再用于重建本次执行结果。既有 bare-int adapter 兼容分支仍可读取其旧产物，但标准 runner 不走该分支。
 
 ## 等价键与早期 snapshot 边界
 
@@ -71,6 +75,8 @@ snapshot 使用既有 `RepositoryAccessPolicy` 的敏感文件、ignored-directo
 
 两个 state_payload 分别保存 `{"mock":true,"single_flight":...}`；两个 artifact_directory 可以指向同一个安全的 `owner-id/run-multi-example` 相对目录。API 不返回本地目录，产物索引仍通过各自 Run ID 请求。直接调用返回 int 子类 RunResult，其 role/owner_run_id 和内部 owner 产物定位可检查；CLI 退出码和确定性 run_id 保持兼容。
 
+RunResult 的普通字段赋值和删除被禁止，审计 metadata 每次返回副本，避免 owner/follower 调用者修改已发布的共享终态。分类集中在现有 RunOutcome/RunResult，RunService 不再重复从退出码映射另一份终态。
+
 - 成功与已分类失败共享 owner 终态，不启动第二套执行。
 - 业务 REJECT 保持业务拒绝，正常 revision 最多一次；不会变成基础设施失败。
 - 意外异常使用安全运行时失败；owner 真正取消退栈时 follower 得到 RUN_CANCELLED/cancelled。
@@ -79,6 +85,27 @@ snapshot 使用既有 `RepositoryAccessPolicy` 的敏感文件、ignored-directo
 - multi-agent 仅共享带既有 `_COMPLETE` 标志的目录；部分产物失败不会作为完成产物引用。legacy 保持原写入契约，不扩展原子性。
 - API 共享引用必须重新落在该服务的 artifact_root 内；越界时明确安全失败，不复制产物到 follower 目录。
 - 清理后的下一请求重新执行，完成结果不保留在协调器中。相同 output 已存在时保持原冲突行为，不读取旧结果充当缓存。
+
+## 2026-09-12 A01 修复证据
+
+独立验收在初始实现发现：legacy 需求正文进入 manifest，文件超过 131072 字节时，新增 artifact_result 提前返回保留完成码但没有 artifact_directory 的结果；真实重叠的两个调用都返回 4，却丢失共享引用。这是必需结果契约缺口，初始全量测试通过不能证明该边界正确。
+
+本次修复删除该结果反向解析函数及 128 KiB 阈值。owned runner 在真实执行、必需产物写入结束后直接产生 RunResult；`completed_artifact_directory` 仅检查安全定位、manifest 文件存在性以及 multi-agent 的原有完成标志，不解析 JSON 内容。原有 artifact-integrity 的文件哈希仍执行，未扩大或绕过它的契约。
+
+成功或降级完成结果只有在必需写入结束并取得安全定位后才产生。已分类执行失败直接保留原错误码，诊断产物写入失败不会把它改成无分类结果；正常产物 I/O 失败则显式返回 ARTIFACT_WRITE_FAILED。API 最终持久化提交仍先于向 follower 发布结果，ownership/permit 释放时机未提前。
+
+| 新增/增强验证 | 实际结果 |
+| --- | --- |
+| test_legacy_overlapping_calls_share_execution，短需求、120000 与 140000 字符参数 | 3 个参数均通过；覆盖 128 KiB 上下的 manifest，引用非空、相同且 10 个产物完整 |
+| 原独立 A01 复现脚本 | 1 passed in 1.00s；manifest_bytes=140985，两个退出码为 4，两个引用均存在，evidence_executions=1，active_count=0 |
+| RunResult 的整数兼容、只读字段、metadata 副本与终态分类 | 5 个通过场景 |
+| artifact I/O 三个失败点、缺失完成标志、诊断写入失败后原错误保留 | 5 个通过场景 |
+| 当前源码下独立 API/真实 worker 取消与跨入口补验 | 3 passed in 1.58s |
+| 独立注入 API owner 最终 Session.commit OSError | follower 保存 failed_runtime/RUNNER_FAILED、无成功引用；owner 回滚为 running 由原启动恢复处理；coordinator=0，permit 可重新取得 |
+
+开发红测试实际记录：长 manifest/新结果分类等出现 6 failed、2 passed；三个 artifact I/O 分类出现 3 failed。完成最小修复后全部通过，未削弱原断言。独立只读修复复核未发现阻塞问题。
+
+A01 对原 head 的审查报告保持为历史证据；本段只记录本轮修复与复验，不自行合并或关闭 T-070。
 
 ## REQ/AC → 实现 → 测试证据
 
@@ -89,6 +116,7 @@ snapshot 使用既有 `RepositoryAccessPolicy` 的敏感文件、ignored-directo
 | REQ-070-2；AC-070-1 | coordinator / runner wrapper | test_direct_overlapping_calls_share_execution_and_audit：owner evidence 被 Event 阻塞，follower 在释放前加入；实际一套 evidence、6 次正常 mock enrichment、4 次 scheduler、9 个各写一次的产物 |
 | REQ-070-3；AC-070-4 | RunRead / state_payload / _finish_run | test_api_single_flight_dto_is_durable_without_new_columns；test_overlapping_api_requests_keep_audit_security_and_capacity：两个 running 行、不同 UUID、相同 owner、安全共享目录；test_api_cannot_share_direct_owner_artifacts_outside_its_root |
 | REQ-070-4/8；AC-070-3 | Flight.wait / RunResult / 安全分类 | test_owner_terminal_paths_release_followers_and_allow_later_execution；API 重叠的 success/reject/classified/exception/artifact/evidence 六场景；test_partial_artifact_failure_is_not_shared_as_completed |
+| REQ-070-3/4/7；A01 | owned runner 直接结果 / completed_artifact_directory | 长 legacy 并发参数、test_run_result_keeps_int_compatibility_and_is_immutable、test_run_result_carries_terminal_classification、test_artifact_io_failure_is_an_explicit_runtime_result、test_missing_completion_marker_cannot_publish_success、test_primary_failure_survives_unavailable_diagnostic_artifacts |
 | REQ-070-5；AC-070-3/5 | owner finally 移除、发布与释放 | test_follower_exit_keeps_the_owner_and_later_follower；test_api_follower_timeout_is_durable_and_does_not_release_owner；test_caller_cancellation_keeps_running_api_work_and_permit；test_completed_results_are_not_cached |
 | REQ-070-6；AC-070-4/6 | admit_single_flight / count_request | test_single_flight_followers_count_without_a_second_permit；API 重叠时 401、旧项目越权 403、不同键 429、同键第三请求计数 429；既有 quota 测试 |
 | REQ-070-7；AC-070-6 | legacy wrapper / multi-agent CLI | test_legacy_overlapping_calls_share_execution；test_cli.py、test_cli_multi_agent.py、test_runner_dlp.py、安装 wheel/API mock 冒烟、12 案例 benchmark |
@@ -98,7 +126,7 @@ snapshot 使用既有 `RepositoryAccessPolicy` 的敏感文件、ignored-directo
 
 ## 执行验证
 
-测试基线为上述 IMPLEMENTATION_BASE 加本报告列出的工作区变更。使用 `uv sync --locked --all-groups`；uv.lock/pyproject 未变化。live provider 没有调用。
+初始实现基线为上述 IMPLEMENTATION_BASE；下表最新回归使用 7856e3a 加本轮四个生产文件及现有测试的 A01 修复。依赖使用既有锁定环境；uv.lock/pyproject 未变化。live provider 没有调用。
 
 | 阶段与命令 | 退出码 | 实际结果 |
 | --- | --- | --- |
@@ -106,8 +134,9 @@ snapshot 使用既有 `RepositoryAccessPolicy` 的敏感文件、ignored-directo
 | 基线 `uv run ruff check .` | 0 | All checks passed；既有 test_coordinator.py:113 invalid noqa warning |
 | 基线 `uv run ruff format --check .` | 0 | 208 files already formatted |
 | 基线 `git diff --check` | 0 | 无输出 |
-| 定向检查（完整命令见下） | 0 | 196 passed, 2 skipped, 1 warning in 14.46s |
-| `uv run pytest -v` | 0 | 828 passed, 3 skipped, 3 warnings in 16.06s；较基线新增 57 个通过场景 |
+| 初始交付完整 pytest | 0 | 828 passed, 3 skipped, 3 warnings in 16.06s；后续独立验收仍发现 A01 |
+| 定向检查（完整命令见下） | 0 | 208 passed, 2 skipped, 1 warning in 12.42s |
+| `uv run pytest -v` | 0 | 840 passed, 3 skipped, 3 warnings in 18.05s；较修复起点新增 12 个通过场景 |
 | `uv run ruff check .` | 0 | All checks passed |
 | `uv run ruff format --check .` | 0 | 210 files already formatted |
 | `git diff --check` | 0 | 无输出 |
@@ -124,10 +153,11 @@ snapshot 使用既有 `RepositoryAccessPolicy` 的敏感文件、ignored-directo
 
 ```text
 uv run pytest tests/test_run_single_flight.py tests/test_runs.py tests/test_api_security.py tests/test_cli_multi_agent.py tests/test_cli.py tests/test_runner_dlp.py tests/test_execution_policy.py tests/test_repository_tools.py -v
-uv run specflow benchmark --suite benchmarks/cases --repo benchmarks/fixtures/portfolio-python --output artifacts/t070-benchmark --baseline artifacts/t070-benchmark/baseline.json
-git diff --no-index --exit-code benchmarks/results/mock-baseline.json artifacts/t070-benchmark/baseline.json
+uv run specflow benchmark --suite benchmarks/cases --repo benchmarks/fixtures/portfolio-python --output artifacts/t070-a01-fix --baseline artifacts/t070-a01-fix/baseline.json
+git diff --no-index --exit-code benchmarks/results/mock-baseline.json artifacts/t070-a01-fix/baseline.json
 uv export --locked --no-dev --no-emit-project --no-hashes --format requirements-txt --output-file <temporary-constraints.txt>
 PIP_CONSTRAINT=<temporary-constraints.txt> uv run python scripts/smoke_installed_wheel.py
+uv run pytest C:\Users\50469\temp\t070-acceptance-20260912\test_independent_artifact_reference.py -v -s --tb=short
 ```
 
 PIP_CONSTRAINT 在 Windows 本轮命令进程内赋值；最后一行是其简写。工作区验证日志保存在本机 TEMP 的 specflow-t070-* 日志文件，不作为可移植持久化契约。
@@ -140,7 +170,7 @@ PIP_CONSTRAINT 在 Windows 本轮命令进程内赋值；最后一行是其简�
 
 ## 本地验证与远端 CI 的分界
 
-本地门禁结果如上；不是远端 CI 证据。当前 `.github/workflows/ci.yml` 的 pull_request 触发分支仅为 main，而本次 base 为 docs/m10-runtime-assurance-spec，因此堆叠 PR 可能没有自动 CI runs。PR 创建后按实际查询结果报告“未触发”或 pending，不推断成功，不为本任务修改 CI 配置。
+本地门禁结果如上；不是远端 CI 证据。PR #8 已存在，修复推送前远端仍为 7856e3a。当前 `.github/workflows/ci.yml` 的 pull_request 触发分支仅为 main，而本次 base 为 docs/m10-runtime-assurance-spec；此前实际查询为未触发。修复推送后再次按实际查询结果报告，不推断成功，不为本任务修改 CI 配置。
 
 ## 已验证范围、剩余边界与停止点
 

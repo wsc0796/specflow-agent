@@ -9,7 +9,8 @@ import pytest
 from specflow import runner_multi
 
 
-def test_legacy_overlapping_calls_share_execution(tmp_path, monkeypatch):
+@pytest.mark.parametrize("requirement_size", [0, 120000, 140000])
+def test_legacy_overlapping_calls_share_execution(tmp_path, monkeypatch, requirement_size):
     from specflow import runner
     from specflow.single_flight import SingleFlightCoordinator
 
@@ -28,7 +29,8 @@ def test_legacy_overlapping_calls_share_execution(tmp_path, monkeypatch):
         return original(self, **kwargs)
 
     monkeypatch.setattr(runner.EvidenceCollector, "collect", collect)
-    kwargs = dict(repo=repo, requirement="feature", mock=True, _coordinator=coordinator)
+    requirement = "feature" if not requirement_size else "feature " + "x" * requirement_size
+    kwargs = dict(repo=repo, requirement=requirement, mock=True, _coordinator=coordinator)
     with ThreadPoolExecutor(2) as pool:
         owner = pool.submit(runner.run, output=tmp_path / "owner", **kwargs)
         try:
@@ -44,12 +46,51 @@ def test_legacy_overlapping_calls_share_execution(tmp_path, monkeypatch):
         finally:
             release.set()
         first, second = owner.result(5), follower.result(5)
-    assert first == second == 0
+    assert first == second == (4 if requirement_size else 0)
     assert calls == ["evidence"]
     assert second.single_flight["role"] == "follower"
     assert first.artifact_directory == second.artifact_directory
+    assert second.artifact_directory is not None
+    manifest = second.artifact_directory / "manifest.json"
+    if requirement_size == 140000:
+        assert manifest.stat().st_size > 131072
+    else:
+        assert manifest.stat().st_size <= 131072
+    assert len(list(second.artifact_directory.iterdir())) == 10
     assert not (tmp_path / "follower").exists()
     assert coordinator.active_count == 0
+
+
+def test_run_result_keeps_int_compatibility_and_is_immutable():
+    from specflow.single_flight import RunResult
+
+    result = RunResult(4, single_flight={"role": "owner", "owner_run_id": "run-example"})
+    assert isinstance(result, int) and result in {0, 4}
+    assert result.result_status == "completed_degraded"
+    with pytest.raises(AttributeError):
+        result.error_code = "CHANGED"
+    with pytest.raises(AttributeError):
+        del result.artifact_directory
+    metadata = result.single_flight
+    metadata["role"] = "follower"
+    assert result.single_flight["role"] == "owner"
+
+
+@pytest.mark.parametrize(
+    "code, state, error",
+    [
+        (0, "completed", None),
+        (4, "completed_degraded", None),
+        (2, "failed_security", "REPOSITORY_UNAVAILABLE"),
+        (3, "failed_runtime", "RUNNER_FAILED"),
+    ],
+)
+def test_run_result_carries_terminal_classification(code, state, error):
+    from specflow.single_flight import RunResult
+
+    result = RunResult(code)
+    assert result.result_status == state
+    assert result.error_code == error
 
 
 def test_key_includes_summary_directory_existence(tmp_path):
@@ -422,6 +463,76 @@ def test_partial_artifact_failure_is_not_shared_as_completed(tmp_path, monkeypat
         mock=True,
     )
     assert result == 3
+    assert result.error_code == "ARTIFACT_WRITE_FAILED"
+    assert result.artifact_directory is None
+
+
+@pytest.mark.parametrize("failure_point", ["directory", "manifest.json", "_COMPLETE"])
+def test_artifact_io_failure_is_an_explicit_runtime_result(tmp_path, monkeypatch, failure_point):
+    from specflow.single_flight import SingleFlightCoordinator
+
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    original_write = runner_multi._safe_write
+    original_mkdir = Path.mkdir
+
+    def fail_write(directory, filename, *args, **kwargs):
+        if filename == failure_point:
+            raise OSError("test-artifact-io-failure")
+        return original_write(directory, filename, *args, **kwargs)
+
+    def fail_mkdir(path, *args, **kwargs):
+        if failure_point == "directory" and path.name.startswith("run-multi-"):
+            raise OSError("test-artifact-directory-failure")
+        return original_mkdir(path, *args, **kwargs)
+
+    monkeypatch.setattr(runner_multi, "_safe_write", fail_write)
+    monkeypatch.setattr(Path, "mkdir", fail_mkdir)
+    coordinator = SingleFlightCoordinator()
+    result = runner_multi.run_multi_agent(
+        repo=repo,
+        requirement="x",
+        output=tmp_path / "out",
+        mock=True,
+        _coordinator=coordinator,
+    )
+    assert result == 3 and result.result_status == "failed_runtime"
+    assert result.error_code == "ARTIFACT_WRITE_FAILED"
+    assert result.artifact_directory is None
+    assert coordinator.active_count == 0
+
+
+def test_missing_completion_marker_cannot_publish_success(tmp_path, monkeypatch):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    monkeypatch.setattr(runner_multi, "_finalize_run_directory", lambda *args: None)
+    result = runner_multi.run_multi_agent(
+        repo=repo, requirement="x", output=tmp_path / "out", mock=True
+    )
+    assert result == 3
+    assert result.error_code == "ARTIFACT_WRITE_FAILED"
+    assert result.artifact_directory is None
+
+
+def test_primary_failure_survives_unavailable_diagnostic_artifacts(tmp_path, monkeypatch):
+    from specflow.policy import SpecFlowError
+
+    repo = tmp_path / "repo"
+    repo.mkdir()
+
+    def fail_stage(*args, **kwargs):
+        raise SpecFlowError("CALL_BUDGET_EXCEEDED", "safe")
+
+    def fail_write(*args, **kwargs):
+        raise OSError("test-diagnostic-io-failure")
+
+    monkeypatch.setattr(runner_multi, "_run_and_accumulate", fail_stage)
+    monkeypatch.setattr(runner_multi, "_safe_write", fail_write)
+    result = runner_multi.run_multi_agent(
+        repo=repo, requirement="x", output=tmp_path / "out", mock=True
+    )
+    assert result == 3
+    assert result.error_code == "CALL_BUDGET_EXCEEDED"
     assert result.artifact_directory is None
 
 

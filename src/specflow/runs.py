@@ -237,11 +237,8 @@ class RunService:
         return run
 
     def _finish_run(self, session: Session, run: WorkflowRun, result: RunResult) -> WorkflowRun:
-        run.current_state, run.result_status, run.error_code = _outcome_from_exit_code(result)
-        if result.result_status:
-            run.current_state = run.result_status = result.result_status
-        if result.error_code:
-            run.error_code = result.error_code
+        run.current_state = run.result_status = result.result_status
+        run.error_code = result.error_code
         run.artifact_directory = None
         if result.artifact_directory:
             candidate = result.artifact_directory.resolve()
@@ -368,16 +365,6 @@ def recover_interrupted_runs(database: Database) -> int:
             )
         )
     return result.rowcount or 0
-
-
-def _outcome_from_exit_code(exit_code: int) -> tuple[str, str, str | None]:
-    if exit_code == 0:
-        return RunStatus.COMPLETED, RunStatus.COMPLETED, None
-    if exit_code == 4:
-        return RunStatus.COMPLETED_DEGRADED, RunStatus.COMPLETED_DEGRADED, None
-    if exit_code == 2:
-        return RunStatus.FAILED_SECURITY, RunStatus.FAILED_SECURITY, "REPOSITORY_UNAVAILABLE"
-    return RunStatus.FAILED_RUNTIME, RunStatus.FAILED_RUNTIME, "RUNNER_FAILED"
 
 
 def get_session(request: Request) -> Generator[Session, None, None]:

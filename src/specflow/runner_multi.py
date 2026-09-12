@@ -48,7 +48,7 @@ from specflow.single_flight import (
     Flight,
     RunResult,
     SingleFlightCoordinator,
-    artifact_result,
+    completed_artifact_directory,
     execute_owned,
     prepare_run,
 )
@@ -84,10 +84,7 @@ def run_multi_agent(
     def work(flight: Flight) -> RunResult:
         if not flight.owner:
             raise SpecFlowError("SINGLE_FLIGHT_OWNERSHIP_ERROR", "Invalid ownership.")
-        run_id = f"run-multi-{sha256(f'{repo.resolve()}|{requirement}'.encode()).hexdigest()[:12]}"
-        directory = output / run_id
-        existed = directory.exists()
-        code = _run_multi_agent_owned(
+        result = _run_multi_agent_owned(
             repo=repo,
             requirement=requirement,
             output=output,
@@ -99,9 +96,7 @@ def run_multi_agent(
             _provider_config=flight.prepared.provider_config,
             _single_flight=flight.metadata,
         )
-        return artifact_result(code, directory, existed=existed, require_complete=True).with_audit(
-            flight.metadata
-        )
+        return result.with_audit(flight.metadata)
 
     # The API owns both persistence and capacity through the same lease. It
     # passes this lease explicitly, so the runner never waits on its own work.
@@ -143,7 +138,7 @@ def _run_multi_agent_owned(
     _executor_overrides: Mapping[str, AgentExecutor] | None = None,
     _provider_config: OpenAICompatibleConfig | None = None,
     _single_flight: dict[str, str] | None = None,
-) -> int:
+) -> RunResult:
     """Execute the fixed plan and persist auditable multi-agent artifacts.
 
     ``_executor_overrides`` is intentionally test-only injection: it lets the
@@ -157,11 +152,11 @@ def _run_multi_agent_owned(
     guard = RuntimeGuard(policy)
 
     if not repo.is_dir() or not requirement.strip():
-        return 2
+        return RunResult(2)
 
     run_id = f"run-multi-{sha256(f'{repo.resolve()}|{requirement}'.encode()).hexdigest()[:12]}"
     if (output / run_id).exists():
-        return 3
+        return RunResult(3)
 
     # Collect repository evidence (same pipeline as legacy runner)
     evidence_text = ""
@@ -199,7 +194,7 @@ def _run_multi_agent_owned(
         # Evidence is a required, untrusted input boundary.  Continuing would
         # let agents produce an ungrounded plan with no audit evidence.
         logger.error("run %s failed while collecting repository evidence", run_id)
-        return 3
+        return RunResult(3)
 
     registry = _build_registry()
 
@@ -216,7 +211,7 @@ def _run_multi_agent_owned(
             import sys
 
             print("Provider configuration error", file=sys.stderr)
-            return 2
+            return RunResult(2, error_code="PROVIDER_CONFIGURATION_FAILED")
 
     # Build schema registry before Coordinator so PlanValidator can check schema IDs.
     from specflow.schema import build_schema_registry
@@ -428,7 +423,7 @@ def _run_multi_agent_owned(
             error.code,
             coordinator.engine.state.value,
         )
-        _persist_failed_run(
+        directory = _persist_failed_run(
             output=output,
             run_id=run_id,
             coordinator=coordinator,
@@ -440,7 +435,7 @@ def _run_multi_agent_owned(
             guard=guard,
             error=error.code,
         )
-        return 3
+        return RunResult(3, error_code=error.code, artifact_directory=directory)
     except ScheduleExecutionError as error:
         if isinstance(error.__cause__, SpecFlowError):
             error_code = error.__cause__.code
@@ -454,7 +449,7 @@ def _run_multi_agent_owned(
             error_code,
             coordinator.engine.state.value,
         )
-        _persist_failed_run(
+        directory = _persist_failed_run(
             output=output,
             run_id=run_id,
             coordinator=coordinator,
@@ -466,14 +461,14 @@ def _run_multi_agent_owned(
             guard=guard,
             error=error_code,
         )
-        return 3
+        return RunResult(3, error_code=error_code, artifact_directory=directory)
     except Exception:
         logger.error(
             "run %s failed with an unexpected error in phase %s",
             run_id,
             coordinator.engine.state.value,
         )
-        _persist_failed_run(
+        directory = _persist_failed_run(
             output=output,
             run_id=run_id,
             coordinator=coordinator,
@@ -485,12 +480,15 @@ def _run_multi_agent_owned(
             guard=guard,
             error="MULTI_AGENT_RUN_FAILED",
         )
-        return 3
+        return RunResult(3, error_code="MULTI_AGENT_RUN_FAILED", artifact_directory=directory)
 
     run_dir = output / run_id
     if run_dir.exists():
-        return 3
-    run_dir.mkdir(parents=True, exist_ok=False)
+        return RunResult(3)
+    try:
+        run_dir.mkdir(parents=True, exist_ok=False)
+    except OSError:
+        return RunResult(3, error_code="ARTIFACT_WRITE_FAILED")
     agent_outputs = {
         _output_ref(stage.stage_index, agent_id): result
         for stage in stages
@@ -576,8 +574,10 @@ def _run_multi_agent_owned(
             },
             guard,
         )
-    except SpecFlowError:
-        return 3
+    except SpecFlowError as error:
+        return RunResult(3, error_code=error.code)
+    except OSError:
+        return RunResult(3, error_code="ARTIFACT_WRITE_FAILED")
     # Persist unified metrics for A/B comparison
     wall_ms = int((time.monotonic() - t0) * 1000)
     metrics = _build_multi_agent_metrics(
@@ -598,9 +598,18 @@ def _run_multi_agent_owned(
     try:
         _safe_write(run_dir, "metrics.json", metrics.as_dict(), guard)
         _finalize_run_directory(run_dir, guard)
-    except SpecFlowError:
-        return 3
-    return 0
+    except SpecFlowError as error:
+        return RunResult(3, error_code=error.code)
+    except OSError:
+        return RunResult(3, error_code="ARTIFACT_WRITE_FAILED")
+    directory = completed_artifact_directory(run_dir, require_complete=True)
+    if directory is None:
+        return RunResult(3, error_code="ARTIFACT_WRITE_FAILED")
+    return RunResult(
+        0,
+        artifact_directory=directory,
+        result_status="rejected" if revision_exhausted else None,
+    )
 
 
 def _build_registry() -> AgentRegistry:
@@ -985,7 +994,7 @@ def _persist_failed_run(
     discovered_files: int,
     guard: RuntimeGuard,
     error: str,
-) -> None:
+) -> Path | None:
     """Persist FAILED manifest, state history, and partial traces for audit."""
     try:
         if coordinator.engine.state not in {
@@ -1026,12 +1035,14 @@ def _persist_failed_run(
         }
         _safe_write(run_dir, "agent-outputs.json", agent_outputs, guard, sort_keys=True)
         _finalize_run_directory(run_dir, guard)
+        return completed_artifact_directory(run_dir, require_complete=True)
     except Exception:
         # Artifact persistence is best-effort — don't hide the original error.
         import logging
 
         logger = logging.getLogger(__name__)
         logger.debug("Failed to persist failed-run artifacts")
+        return None
 
 
 def _build_multi_agent_metrics(
