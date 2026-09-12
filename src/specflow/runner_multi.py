@@ -43,6 +43,15 @@ from specflow.policy import (
     RuntimeGuard,
     SpecFlowError,
 )
+from specflow.single_flight import (
+    DEFAULT_COORDINATOR,
+    Flight,
+    RunResult,
+    SingleFlightCoordinator,
+    completed_artifact_directory,
+    execute_owned,
+    prepare_run,
+)
 from specflow.tools import ToolExecutor, ToolRegistry
 from specflow.tools.repository_tools import RepositoryToolSet
 from specflow.tools.sanitization import final_dlp_scan
@@ -63,7 +72,73 @@ def run_multi_agent(
     model: str = "mock-model",
     policy: ExecutionPolicy = DEFAULT_POLICY,
     _executor_overrides: Mapping[str, AgentExecutor] | None = None,
+    _flight: Flight | None = None,
+    _coordinator: SingleFlightCoordinator = DEFAULT_COORDINATOR,
+    _on_join: Callable[[dict[str, str]], None] | None = None,
 ) -> int:
+    """Coalesce in-flight execution while preserving int-compatible CLI exits."""
+    PolicyValidator().validate(policy)
+    if not repo.is_dir() or not requirement.strip():
+        return RunResult(2, error_code="REPOSITORY_UNAVAILABLE")
+
+    def work(flight: Flight) -> RunResult:
+        if not flight.owner:
+            raise SpecFlowError("SINGLE_FLIGHT_OWNERSHIP_ERROR", "Invalid ownership.")
+        result = _run_multi_agent_owned(
+            repo=repo,
+            requirement=requirement,
+            output=output,
+            mock=mock,
+            provider=provider,
+            model=model,
+            policy=policy,
+            _executor_overrides=_executor_overrides,
+            _provider_config=flight.prepared.provider_config,
+            _single_flight=flight.metadata,
+        )
+        return result.with_audit(flight.metadata)
+
+    # The API owns both persistence and capacity through the same lease. It
+    # passes this lease explicitly, so the runner never waits on its own work.
+    if _flight is not None:
+        return work(_flight)
+    try:
+        prepared = prepare_run(
+            repo=repo,
+            requirement=requirement,
+            mode="multi-agent",
+            mock=mock,
+            provider=provider,
+            model=model,
+            policy=policy,
+            extra={"executors": {k: id(v) for k, v in (_executor_overrides or {}).items()}},
+        )
+    except SpecFlowError as error:
+        return RunResult(2, error_code=error.code)
+    run_id = f"run-multi-{sha256(f'{repo.resolve()}|{requirement}'.encode()).hexdigest()[:12]}"
+    return execute_owned(
+        prepared=prepared,
+        run_id=run_id,
+        work=work,
+        timeout=policy.max_wall_time_seconds,
+        coordinator=_coordinator,
+        on_join=_on_join,
+    )
+
+
+def _run_multi_agent_owned(
+    *,
+    repo: Path,
+    requirement: str,
+    output: Path,
+    mock: bool = False,
+    provider: str = "mock",
+    model: str = "mock-model",
+    policy: ExecutionPolicy = DEFAULT_POLICY,
+    _executor_overrides: Mapping[str, AgentExecutor] | None = None,
+    _provider_config: OpenAICompatibleConfig | None = None,
+    _single_flight: dict[str, str] | None = None,
+) -> RunResult:
     """Execute the fixed plan and persist auditable multi-agent artifacts.
 
     ``_executor_overrides`` is intentionally test-only injection: it lets the
@@ -77,11 +152,11 @@ def run_multi_agent(
     guard = RuntimeGuard(policy)
 
     if not repo.is_dir() or not requirement.strip():
-        return 2
+        return RunResult(2)
 
     run_id = f"run-multi-{sha256(f'{repo.resolve()}|{requirement}'.encode()).hexdigest()[:12]}"
     if (output / run_id).exists():
-        return 3
+        return RunResult(3)
 
     # Collect repository evidence (same pipeline as legacy runner)
     evidence_text = ""
@@ -118,8 +193,8 @@ def run_multi_agent(
     except Exception:
         # Evidence is a required, untrusted input boundary.  Continuing would
         # let agents produce an ungrounded plan with no audit evidence.
-        logger.exception("run %s failed while collecting repository evidence", run_id)
-        return 3
+        logger.error("run %s failed while collecting repository evidence", run_id)
+        return RunResult(3)
 
     registry = _build_registry()
 
@@ -129,12 +204,14 @@ def run_multi_agent(
         llm_client = _make_mock_llm_client()
     else:
         try:
-            llm_client = _create_real_llm_client(provider, model, policy=policy)
+            llm_client = _create_real_llm_client(
+                provider, model, policy=policy, config=_provider_config
+            )
         except Exception:
             import sys
 
             print("Provider configuration error", file=sys.stderr)
-            return 2
+            return RunResult(2, error_code="PROVIDER_CONFIGURATION_FAILED")
 
     # Build schema registry before Coordinator so PlanValidator can check schema IDs.
     from specflow.schema import build_schema_registry
@@ -346,7 +423,7 @@ def run_multi_agent(
             error.code,
             coordinator.engine.state.value,
         )
-        _persist_failed_run(
+        directory = _persist_failed_run(
             output=output,
             run_id=run_id,
             coordinator=coordinator,
@@ -358,7 +435,7 @@ def run_multi_agent(
             guard=guard,
             error=error.code,
         )
-        return 3
+        return RunResult(3, error_code=error.code, artifact_directory=directory)
     except ScheduleExecutionError as error:
         if isinstance(error.__cause__, SpecFlowError):
             error_code = error.__cause__.code
@@ -372,7 +449,7 @@ def run_multi_agent(
             error_code,
             coordinator.engine.state.value,
         )
-        _persist_failed_run(
+        directory = _persist_failed_run(
             output=output,
             run_id=run_id,
             coordinator=coordinator,
@@ -384,14 +461,14 @@ def run_multi_agent(
             guard=guard,
             error=error_code,
         )
-        return 3
+        return RunResult(3, error_code=error_code, artifact_directory=directory)
     except Exception:
-        logger.exception(
+        logger.error(
             "run %s failed with an unexpected error in phase %s",
             run_id,
             coordinator.engine.state.value,
         )
-        _persist_failed_run(
+        directory = _persist_failed_run(
             output=output,
             run_id=run_id,
             coordinator=coordinator,
@@ -403,12 +480,15 @@ def run_multi_agent(
             guard=guard,
             error="MULTI_AGENT_RUN_FAILED",
         )
-        return 3
+        return RunResult(3, error_code="MULTI_AGENT_RUN_FAILED", artifact_directory=directory)
 
     run_dir = output / run_id
     if run_dir.exists():
-        return 3
-    run_dir.mkdir(parents=True, exist_ok=False)
+        return RunResult(3)
+    try:
+        run_dir.mkdir(parents=True, exist_ok=False)
+    except OSError:
+        return RunResult(3, error_code="ARTIFACT_WRITE_FAILED")
     agent_outputs = {
         _output_ref(stage.stage_index, agent_id): result
         for stage in stages
@@ -427,6 +507,7 @@ def run_multi_agent(
 
     manifest = {
         "run_id": run_id,
+        "single_flight": _single_flight,
         "idempotency_key": idempotency_key,
         "plan_id": plan.plan_id,
         "structure_hash": plan.structure_hash,
@@ -493,8 +574,10 @@ def run_multi_agent(
             },
             guard,
         )
-    except SpecFlowError:
-        return 3
+    except SpecFlowError as error:
+        return RunResult(3, error_code=error.code)
+    except OSError:
+        return RunResult(3, error_code="ARTIFACT_WRITE_FAILED")
     # Persist unified metrics for A/B comparison
     wall_ms = int((time.monotonic() - t0) * 1000)
     metrics = _build_multi_agent_metrics(
@@ -515,9 +598,18 @@ def run_multi_agent(
     try:
         _safe_write(run_dir, "metrics.json", metrics.as_dict(), guard)
         _finalize_run_directory(run_dir, guard)
-    except SpecFlowError:
-        return 3
-    return 0
+    except SpecFlowError as error:
+        return RunResult(3, error_code=error.code)
+    except OSError:
+        return RunResult(3, error_code="ARTIFACT_WRITE_FAILED")
+    directory = completed_artifact_directory(run_dir, require_complete=True)
+    if directory is None:
+        return RunResult(3, error_code="ARTIFACT_WRITE_FAILED")
+    return RunResult(
+        0,
+        artifact_directory=directory,
+        result_status="rejected" if revision_exhausted else None,
+    )
 
 
 def _build_registry() -> AgentRegistry:
@@ -902,7 +994,7 @@ def _persist_failed_run(
     discovered_files: int,
     guard: RuntimeGuard,
     error: str,
-) -> None:
+) -> Path | None:
     """Persist FAILED manifest, state history, and partial traces for audit."""
     try:
         if coordinator.engine.state not in {
@@ -918,7 +1010,7 @@ def _persist_failed_run(
         import logging
 
         logger = logging.getLogger(__name__)
-        logger.debug("Failed to record workflow failure state", exc_info=True)
+        logger.debug("Failed to record workflow failure state")
 
     try:
         run_dir = output / run_id
@@ -943,12 +1035,14 @@ def _persist_failed_run(
         }
         _safe_write(run_dir, "agent-outputs.json", agent_outputs, guard, sort_keys=True)
         _finalize_run_directory(run_dir, guard)
+        return completed_artifact_directory(run_dir, require_complete=True)
     except Exception:
         # Artifact persistence is best-effort — don't hide the original error.
         import logging
 
         logger = logging.getLogger(__name__)
-        logger.debug("Failed to persist failed-run artifacts", exc_info=True)
+        logger.debug("Failed to persist failed-run artifacts")
+        return None
 
 
 def _build_multi_agent_metrics(
@@ -1097,12 +1191,18 @@ def _repo_summary(repo: Path) -> str:
     return f"Project at {repo.name}"
 
 
-def _create_real_llm_client(provider: str, model: str, *, policy: ExecutionPolicy) -> LLMClient:
+def _create_real_llm_client(
+    provider: str,
+    model: str,
+    *,
+    policy: ExecutionPolicy,
+    config: OpenAICompatibleConfig | None = None,
+) -> LLMClient:
     """Create a real OpenAI-compatible LLM client from env vars.
 
     The provider timeout is capped at the run's wall-clock budget so a hung
     provider request can never outlive the run deadline.
     """
-    config = OpenAICompatibleConfig.from_env()
+    config = config or OpenAICompatibleConfig.from_env()
     capped_timeout = min(config.timeout_seconds, policy.max_wall_time_seconds)
     return OpenAICompatibleLLMClient(replace(config, timeout_seconds=capped_timeout))

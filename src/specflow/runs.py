@@ -10,6 +10,7 @@ from datetime import UTC, datetime
 from hashlib import sha256
 from pathlib import Path
 from typing import Annotated, Literal
+from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field
@@ -17,8 +18,14 @@ from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
 from specflow.db import Database, Project, ReviewDecision, WorkflowRun
-from specflow.policy import DEFAULT_POLICY, RunStatus
+from specflow.policy import DEFAULT_POLICY, RunStatus, SpecFlowError
 from specflow.runner_multi import run_multi_agent
+from specflow.single_flight import (
+    DEFAULT_COORDINATOR,
+    RunResult,
+    SingleFlightCoordinator,
+    prepare_run,
+)
 
 router = APIRouter(prefix="/api/v1/runs", tags=["runs"])
 logger = logging.getLogger(__name__)
@@ -47,6 +54,12 @@ class RunRead(BaseModel):
     started_at: datetime
     finished_at: datetime | None
     artifact_available: bool
+    single_flight: SingleFlightRead | None = None
+
+
+class SingleFlightRead(BaseModel):
+    role: Literal["owner", "follower"]
+    owner_run_id: str = Field(min_length=1, max_length=64, pattern=r"^[a-zA-Z0-9-]+$")
 
 
 class RunArtifactsRead(BaseModel):
@@ -115,10 +128,15 @@ class RunService:
         repository: RunRepository,
         artifact_root: Path,
         validate_repository_path: Callable[[str], Path],
+        *,
+        admit: Callable[[bool], Callable[[], None] | None] | None = None,
+        coordinator: SingleFlightCoordinator | None = None,
     ) -> None:
         self.repository = repository
         self.artifact_root = artifact_root.resolve()
         self._validate_repository_path = validate_repository_path
+        self._admit = admit
+        self._coordinator = coordinator or DEFAULT_COORDINATOR
 
     def create(self, session: Session, payload: RunCreate) -> WorkflowRun:
         project = session.get(Project, payload.project_id)
@@ -128,14 +146,84 @@ class RunService:
         # retargeted through a symlink after registration. Revalidate at the
         # execution boundary before any runner reads the repository.
         repository_path = self._validate_repository_path(project.repository_path)
+        try:
+            prepared = prepare_run(
+                repo=repository_path,
+                requirement=payload.requirement,
+                mode="multi-agent",
+                mock=True,
+                provider="mock",
+                model="mock-model",
+                extra={"executors": {}},
+            )
+        except SpecFlowError as error:
+            # An accepted invalid repository still gets its existing durable
+            # failure identity. It never joins an in-flight execution.
+            release = self._admit(True) if self._admit else None
+            try:
+                run = self._start_run(session, project, payload, str(uuid4()), None)
+                code = "REPOSITORY_UNAVAILABLE" if not repository_path.is_dir() else error.code
+                return self._finish_run(session, run, RunResult(2, error_code=code))
+            finally:
+                if release:
+                    release()
 
+        with self._coordinator.claim(prepared, str(uuid4()), self._admit) as flight:
+            run_id = flight.metadata["owner_run_id"] if flight.owner else str(uuid4())
+            run = self._start_run(session, project, payload, run_id, flight.metadata)
+            try:
+                if flight.owner:
+                    output = self.artifact_root / run.id
+                    try:
+                        result = run_multi_agent(
+                            repo=repository_path,
+                            requirement=payload.requirement,
+                            output=output,
+                            mock=True,
+                            _flight=flight,
+                        )
+                    except Exception:
+                        logger.error("run %s failed with an unexpected exception", run.id)
+                        result = RunResult(3, error_code="RUNNER_FAILED")
+                    # Keep compatibility with integer-returning runner adapters.
+                    if not isinstance(result, RunResult):
+                        relative = self._artifact_directory(output)
+                        result = RunResult(
+                            result,
+                            error_code=self._failed_error_code(output) if result == 3 else None,
+                            artifact_directory=self.artifact_root / relative if relative else None,
+                        )
+                else:
+                    result = flight.wait(DEFAULT_POLICY.max_wall_time_seconds)
+                self._finish_run(session, run, result)
+                if flight.owner:
+                    flight.complete(result)
+                return run
+            except BaseException as error:
+                if not isinstance(error, Exception):
+                    self._finish_run(
+                        session,
+                        run,
+                        RunResult(3, error_code="RUN_CANCELLED", result_status=RunStatus.CANCELLED),
+                    )
+                raise
+
+    def _start_run(
+        self,
+        session: Session,
+        project: Project,
+        payload: RunCreate,
+        run_id: str,
+        metadata: dict[str, str] | None,
+    ) -> WorkflowRun:
         run = self.repository.add(
             session,
             WorkflowRun(
+                id=run_id,
                 project_id=project.id,
                 workflow_type="multi-agent",
                 current_state=RunStatus.CREATED,
-                state_payload={"mock": True},
+                state_payload={"mock": True, **({"single_flight": metadata} if metadata else {})},
                 requirement_hash=sha256(payload.requirement.encode("utf-8")).hexdigest(),
                 repository_alias=project.name,
                 policy_hash=DEFAULT_POLICY.policy_hash(),
@@ -146,31 +234,25 @@ class RunService:
         run.current_state = RunStatus.RUNNING
         run.version += 1
         session.commit()
+        return run
 
-        output = self.artifact_root / run.id
-        try:
-            exit_code = run_multi_agent(
-                repo=repository_path,
-                requirement=payload.requirement,
-                output=output,
-                mock=True,
-            )
-        except Exception:
-            logger.exception("run %s failed with an unexpected exception", run.id)
-            exit_code = -1
-
-        run.current_state, run.result_status, run.error_code = _outcome_from_exit_code(exit_code)
-        if exit_code == 3:
-            manifest_error = self._failed_error_code(output)
-            if manifest_error:
-                run.error_code = manifest_error
-        run.artifact_directory = self._artifact_directory(output)
+    def _finish_run(self, session: Session, run: WorkflowRun, result: RunResult) -> WorkflowRun:
+        run.current_state = run.result_status = result.result_status
+        run.error_code = result.error_code
+        run.artifact_directory = None
+        if result.artifact_directory:
+            candidate = result.artifact_directory.resolve()
+            if candidate.is_relative_to(self.artifact_root) and candidate.is_dir():
+                run.artifact_directory = candidate.relative_to(self.artifact_root).as_posix()
+            else:
+                run.current_state = run.result_status = RunStatus.FAILED_SECURITY
+                run.error_code = "SINGLE_FLIGHT_ARTIFACT_UNAVAILABLE"
         run.finished_at = datetime.now(UTC)
         run.version += 1
         try:
             session.commit()
         except Exception:
-            logger.exception(
+            logger.error(
                 "run %s final state commit failed; rolling back (recovery will "
                 "resolve the stale state on next startup)",
                 run.id,
@@ -285,16 +367,6 @@ def recover_interrupted_runs(database: Database) -> int:
     return result.rowcount or 0
 
 
-def _outcome_from_exit_code(exit_code: int) -> tuple[str, str, str | None]:
-    if exit_code == 0:
-        return RunStatus.COMPLETED, RunStatus.COMPLETED, None
-    if exit_code == 4:
-        return RunStatus.COMPLETED_DEGRADED, RunStatus.COMPLETED_DEGRADED, None
-    if exit_code == 2:
-        return RunStatus.FAILED_SECURITY, RunStatus.FAILED_SECURITY, "REPOSITORY_UNAVAILABLE"
-    return RunStatus.FAILED_RUNTIME, RunStatus.FAILED_RUNTIME, "RUNNER_FAILED"
-
-
 def get_session(request: Request) -> Generator[Session, None, None]:
     yield from request.app.state.database.sessions()
 
@@ -307,19 +379,17 @@ def _service(request: Request) -> RunService:
         RunRepository(),
         request.app.state.artifact_root,
         request.app.state.security.validate_repository_path,
+        admit=request.app.state.security.admit_single_flight,
     )
 
 
 @router.post("", response_model=RunRead, status_code=status.HTTP_201_CREATED)
 def create_run(payload: RunCreate, request: Request, session: SessionDependency) -> RunRead:
-    permit = request.app.state.security.rate_limit_create_run()
     try:
         result = _service(request).create(session, payload)
         return _to_read(result)
     except LookupError as error:
         raise HTTPException(404, "Project not found.") from error
-    finally:
-        permit.release()
 
 
 @router.get("/{run_id}/review-package", response_model=ReviewPackageRead)
@@ -396,6 +466,7 @@ def _to_read(run: WorkflowRun) -> RunRead:
         started_at=run.started_at,
         finished_at=run.finished_at,
         artifact_available=run.artifact_directory is not None,
+        single_flight=(run.state_payload or {}).get("single_flight"),
     )
 
 
