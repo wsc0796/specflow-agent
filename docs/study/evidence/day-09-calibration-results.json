@@ -1,0 +1,271 @@
+{
+  "status": "passed",
+  "fixtures_checked": 34,
+  "existing_core_executions": 8,
+  "semantic_scorers_executed": 0,
+  "provider_calls": 0,
+  "case_executions": 0,
+  "observations": [
+    {
+      "fixture_id": "CAL-CR-P01",
+      "execution_status": "executed_existing_core",
+      "matches_expected": true,
+      "raw": {
+        "case_id": "CAL-CR-P01",
+        "category": "repository_understanding",
+        "status": "passed",
+        "artifact_directory": "CAL-CR-P01",
+        "schema_validated": true,
+        "degraded": false,
+        "fallback": false,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "wall_time_ms": 0,
+        "error_codes": []
+      }
+    },
+    {
+      "fixture_id": "CAL-CR-P02",
+      "execution_status": "executed_existing_core",
+      "matches_expected": true,
+      "raw": {
+        "case_id": "CAL-CR-P02",
+        "category": "repository_understanding",
+        "status": "passed",
+        "artifact_directory": "CAL-CR-P02",
+        "schema_validated": true,
+        "degraded": false,
+        "fallback": false,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "wall_time_ms": 0,
+        "error_codes": []
+      }
+    },
+    {
+      "fixture_id": "CAL-CR-F01",
+      "execution_status": "executed_existing_core",
+      "matches_expected": true,
+      "raw": {
+        "case_id": "CAL-CR-F01",
+        "category": "repository_understanding",
+        "status": "failed",
+        "error_codes": [
+          "benchmark_artifact_invalid"
+        ]
+      }
+    },
+    {
+      "fixture_id": "CAL-CR-F02",
+      "execution_status": "executed_existing_core",
+      "matches_expected": true,
+      "raw": {
+        "case_id": "CAL-CR-F02",
+        "category": "repository_understanding",
+        "status": "failed",
+        "artifact_directory": "CAL-CR-F02",
+        "schema_validated": false,
+        "degraded": false,
+        "fallback": false,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "wall_time_ms": 0,
+        "error_codes": [
+          "benchmark_contract_failed"
+        ]
+      }
+    },
+    {
+      "fixture_id": "CAL-CR-U01",
+      "execution_status": "not_run",
+      "reason": "scorer/profile wrapper unavailable; expectation only",
+      "raw": null
+    },
+    {
+      "fixture_id": "CAL-CR-N01",
+      "execution_status": "not_run",
+      "reason": "scorer/profile wrapper unavailable; expectation only",
+      "raw": null
+    },
+    {
+      "fixture_id": "CAL-SR-P01",
+      "execution_status": "executed_existing_core",
+      "matches_expected": true,
+      "raw": {
+        "finding_codes": []
+      }
+    },
+    {
+      "fixture_id": "CAL-SR-P02",
+      "execution_status": "executed_existing_core",
+      "matches_expected": true,
+      "raw": {
+        "finding_codes": []
+      }
+    },
+    {
+      "fixture_id": "CAL-SR-F01",
+      "execution_status": "executed_existing_core",
+      "matches_expected": true,
+      "raw": {
+        "finding_codes": [
+          "source_path_external"
+        ]
+      }
+    },
+    {
+      "fixture_id": "CAL-SR-F02",
+      "execution_status": "executed_existing_core",
+      "matches_expected": true,
+      "raw": {
+        "finding_codes": [
+          "source_path_missing"
+        ]
+      }
+    },
+    {
+      "fixture_id": "CAL-SR-U01",
+      "execution_status": "not_run",
+      "reason": "scorer/profile wrapper unavailable; expectation only",
+      "raw": null
+    },
+    {
+      "fixture_id": "CAL-SR-N01",
+      "execution_status": "not_run",
+      "reason": "scorer/profile wrapper unavailable; expectation only",
+      "raw": null
+    },
+    {
+      "fixture_id": "CAL-FR-P01",
+      "execution_status": "not_run",
+      "reason": "scorer/profile wrapper unavailable; expectation only",
+      "raw": null
+    },
+    {
+      "fixture_id": "CAL-FR-F01",
+      "execution_status": "not_run",
+      "reason": "scorer/profile wrapper unavailable; expectation only",
+      "raw": null
+    },
+    {
+      "fixture_id": "CAL-FR-U01",
+      "execution_status": "not_run",
+      "reason": "scorer/profile wrapper unavailable; expectation only",
+      "raw": null
+    },
+    {
+      "fixture_id": "CAL-FR-N01",
+      "execution_status": "not_run",
+      "reason": "scorer/profile wrapper unavailable; expectation only",
+      "raw": null
+    },
+    {
+      "fixture_id": "CAL-CS-P01",
+      "execution_status": "not_run",
+      "reason": "scorer/profile wrapper unavailable; expectation only",
+      "raw": null
+    },
+    {
+      "fixture_id": "CAL-CS-F01",
+      "execution_status": "not_run",
+      "reason": "scorer/profile wrapper unavailable; expectation only",
+      "raw": null
+    },
+    {
+      "fixture_id": "CAL-CS-U01",
+      "execution_status": "not_run",
+      "reason": "scorer/profile wrapper unavailable; expectation only",
+      "raw": null
+    },
+    {
+      "fixture_id": "CAL-CS-N01",
+      "execution_status": "not_run",
+      "reason": "scorer/profile wrapper unavailable; expectation only",
+      "raw": null
+    },
+    {
+      "fixture_id": "CAL-TS-P01",
+      "execution_status": "not_run",
+      "reason": "scorer/profile wrapper unavailable; expectation only",
+      "raw": null
+    },
+    {
+      "fixture_id": "CAL-TS-F01",
+      "execution_status": "not_run",
+      "reason": "scorer/profile wrapper unavailable; expectation only",
+      "raw": null
+    },
+    {
+      "fixture_id": "CAL-TS-U01",
+      "execution_status": "not_run",
+      "reason": "scorer/profile wrapper unavailable; expectation only",
+      "raw": null
+    },
+    {
+      "fixture_id": "CAL-TC-P01",
+      "execution_status": "not_run",
+      "reason": "scorer/profile wrapper unavailable; expectation only",
+      "raw": null
+    },
+    {
+      "fixture_id": "CAL-TC-P02",
+      "execution_status": "not_run",
+      "reason": "scorer/profile wrapper unavailable; expectation only",
+      "raw": null
+    },
+    {
+      "fixture_id": "CAL-TC-F01",
+      "execution_status": "not_run",
+      "reason": "scorer/profile wrapper unavailable; expectation only",
+      "raw": null
+    },
+    {
+      "fixture_id": "CAL-TC-F02",
+      "execution_status": "not_run",
+      "reason": "scorer/profile wrapper unavailable; expectation only",
+      "raw": null
+    },
+    {
+      "fixture_id": "CAL-TC-U01",
+      "execution_status": "not_run",
+      "reason": "scorer/profile wrapper unavailable; expectation only",
+      "raw": null
+    },
+    {
+      "fixture_id": "CAL-TC-N01",
+      "execution_status": "not_run",
+      "reason": "scorer/profile wrapper unavailable; expectation only",
+      "raw": null
+    },
+    {
+      "fixture_id": "CAL-SA-P01",
+      "execution_status": "not_run",
+      "reason": "scorer/profile wrapper unavailable; expectation only",
+      "raw": null
+    },
+    {
+      "fixture_id": "CAL-SA-F01",
+      "execution_status": "not_run",
+      "reason": "scorer/profile wrapper unavailable; expectation only",
+      "raw": null
+    },
+    {
+      "fixture_id": "CAL-SA-F02",
+      "execution_status": "not_run",
+      "reason": "scorer/profile wrapper unavailable; expectation only",
+      "raw": null
+    },
+    {
+      "fixture_id": "CAL-SA-U01",
+      "execution_status": "not_run",
+      "reason": "scorer/profile wrapper unavailable; expectation only",
+      "raw": null
+    },
+    {
+      "fixture_id": "CAL-SA-N01",
+      "execution_status": "not_run",
+      "reason": "scorer/profile wrapper unavailable; expectation only",
+      "raw": null
+    }
+  ]
+}

@@ -1,0 +1,3 @@
+{"event_id":"D9-AUTH-001","date":"2026-09-13","actor":"user","purpose":"授权 AI 先批量完成本日机械工作","dataset_version":"v1-draft.1","content_access":false,"used_for_tuning":false}
+{"event_id":"D9-CREATE-001","date":"2026-09-13","actor":"Codex (AI; not independent creator)","purpose":"Day 9 起草 20 Dev + 10 内部 Holdout 与源码 Gold","dataset_version":"v1-draft.1","content_access":true,"splits":["dev","holdout"],"used_for_tuning":false,"product_changes":false}
+{"event_id":"D9-VALIDATE-001","date":"2026-09-13","actor":"Codex (AI; not independent access control)","purpose":"Day 9 机械校验数量、字段、revision、原文和组隔离；不运行用例","dataset_version":"v1-draft.1","content_access":true,"splits":["dev","holdout"],"used_for_tuning":false,"execution_count":0}

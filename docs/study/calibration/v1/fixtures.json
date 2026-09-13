@@ -1,0 +1,1444 @@
+{
+  "suite": "specflow_evaluator_calibration",
+  "fixture_version": "v1-draft.1",
+  "status": "expected_results_authored_human_review_pending",
+  "implementation_policy": "Only invoke the two existing core helpers; no semantic scorer implemented.",
+  "fixtures": [
+    {
+      "fixture_id": "CAL-CR-P01",
+      "suite": "specflow_evaluator_calibration",
+      "fixture_version": "v1-draft.1",
+      "annotation_version": "v1-draft.1",
+      "evaluator_id": "contract_run_success",
+      "evaluator_version": "v1",
+      "fixture_role": "should_pass",
+      "repository_revision": "08e5a66f8ea8216433c72744adab92aa07d99c45",
+      "origin": "AI-authored synthetic calibration; not textbook; not repository dataset",
+      "isolation_group": "IG-CAL-INDEPENDENT",
+      "formal_case_ids": [],
+      "inputs": {
+        "profile": "portfolio_multi_agent_mock@5f2815d",
+        "artifacts": {
+          "manifest.json": {
+            "workflow_state": "completed"
+          },
+          "metrics.json": {
+            "schema_unvalidated_count": 0,
+            "schema_validated_count": 6
+          },
+          "agent-outputs.json": {
+            "answer": "与任务无关的天气描述"
+          },
+          "handoffs.json": [],
+          "traces.json": [],
+          "sources.json": {},
+          "checkpoints.json": []
+        }
+      },
+      "expected": {
+        "evaluator_status": "valid",
+        "verdict": "pass",
+        "value": null,
+        "reason": "核心只检查文件及 manifest/metrics 的窄合同。",
+        "raw_status": "passed",
+        "error_codes": []
+      },
+      "core_invocation": "specflow.evaluation.benchmark._read_run",
+      "implementation_status": "existing_core_only",
+      "human_review_status": "pending",
+      "blind_spot": "内容偏题也可能通过。",
+      "observation_record": "../../evidence/day-09-calibration-results.json#CAL-CR-P01"
+    },
+    {
+      "fixture_id": "CAL-CR-P02",
+      "suite": "specflow_evaluator_calibration",
+      "fixture_version": "v1-draft.1",
+      "annotation_version": "v1-draft.1",
+      "evaluator_id": "contract_run_success",
+      "evaluator_version": "v1",
+      "fixture_role": "should_pass",
+      "repository_revision": "08e5a66f8ea8216433c72744adab92aa07d99c45",
+      "origin": "AI-authored synthetic calibration; not textbook; not repository dataset",
+      "isolation_group": "IG-CAL-INDEPENDENT",
+      "formal_case_ids": [],
+      "inputs": {
+        "profile": "portfolio_multi_agent_mock@5f2815d",
+        "artifacts": {
+          "manifest.json": {
+            "workflow_state": "completed"
+          },
+          "metrics.json": {
+            "schema_unvalidated_count": 0,
+            "schema_validated_count": 6
+          },
+          "agent-outputs.json": {
+            "answer": "属性均已实现"
+          },
+          "handoffs.json": [],
+          "traces.json": [],
+          "sources.json": {},
+          "checkpoints.json": []
+        }
+      },
+      "expected": {
+        "evaluator_status": "valid",
+        "verdict": "pass",
+        "value": null,
+        "reason": "其他必需 JSON 的语义不参与该 helper 的判定。",
+        "raw_status": "passed",
+        "error_codes": []
+      },
+      "core_invocation": "specflow.evaluation.benchmark._read_run",
+      "implementation_status": "existing_core_only",
+      "human_review_status": "pending",
+      "blind_spot": "这个 pass 不证明 task_success。",
+      "observation_record": "../../evidence/day-09-calibration-results.json#CAL-CR-P02"
+    },
+    {
+      "fixture_id": "CAL-CR-F01",
+      "suite": "specflow_evaluator_calibration",
+      "fixture_version": "v1-draft.1",
+      "annotation_version": "v1-draft.1",
+      "evaluator_id": "contract_run_success",
+      "evaluator_version": "v1",
+      "fixture_role": "should_fail",
+      "repository_revision": "08e5a66f8ea8216433c72744adab92aa07d99c45",
+      "origin": "AI-authored synthetic calibration; not textbook; not repository dataset",
+      "isolation_group": "IG-CAL-INDEPENDENT",
+      "formal_case_ids": [],
+      "inputs": {
+        "profile": "portfolio_multi_agent_mock@5f2815d",
+        "artifacts": {
+          "manifest.json": {
+            "workflow_state": "completed"
+          },
+          "metrics.json": {
+            "schema_unvalidated_count": 0,
+            "schema_validated_count": 6
+          },
+          "agent-outputs.json": {
+            "answer": "与任务无关的天气描述"
+          },
+          "handoffs.json": [],
+          "sources.json": {},
+          "checkpoints.json": []
+        }
+      },
+      "expected": {
+        "evaluator_status": "valid",
+        "verdict": "fail",
+        "value": null,
+        "reason": "缺少 traces.json。",
+        "raw_status": "failed",
+        "error_codes": [
+          "benchmark_artifact_invalid"
+        ]
+      },
+      "core_invocation": "specflow.evaluation.benchmark._read_run",
+      "implementation_status": "existing_core_only",
+      "human_review_status": "pending",
+      "blind_spot": "",
+      "observation_record": "../../evidence/day-09-calibration-results.json#CAL-CR-F01"
+    },
+    {
+      "fixture_id": "CAL-CR-F02",
+      "suite": "specflow_evaluator_calibration",
+      "fixture_version": "v1-draft.1",
+      "annotation_version": "v1-draft.1",
+      "evaluator_id": "contract_run_success",
+      "evaluator_version": "v1",
+      "fixture_role": "should_fail",
+      "repository_revision": "08e5a66f8ea8216433c72744adab92aa07d99c45",
+      "origin": "AI-authored synthetic calibration; not textbook; not repository dataset",
+      "isolation_group": "IG-CAL-INDEPENDENT",
+      "formal_case_ids": [],
+      "inputs": {
+        "profile": "portfolio_multi_agent_mock@5f2815d",
+        "artifacts": {
+          "manifest.json": {
+            "workflow_state": "completed"
+          },
+          "metrics.json": {
+            "schema_unvalidated_count": 0,
+            "schema_validated_count": 5
+          },
+          "agent-outputs.json": {
+            "answer": "与任务无关的天气描述"
+          },
+          "handoffs.json": [],
+          "traces.json": [],
+          "sources.json": {},
+          "checkpoints.json": []
+        }
+      },
+      "expected": {
+        "evaluator_status": "valid",
+        "verdict": "fail",
+        "value": null,
+        "reason": "固定 profile 要求 6 个 schema 已验证。",
+        "raw_status": "failed",
+        "error_codes": [
+          "benchmark_contract_failed"
+        ]
+      },
+      "core_invocation": "specflow.evaluation.benchmark._read_run",
+      "implementation_status": "existing_core_only",
+      "human_review_status": "pending",
+      "blind_spot": "",
+      "observation_record": "../../evidence/day-09-calibration-results.json#CAL-CR-F02"
+    },
+    {
+      "fixture_id": "CAL-CR-U01",
+      "suite": "specflow_evaluator_calibration",
+      "fixture_version": "v1-draft.1",
+      "annotation_version": "v1-draft.1",
+      "evaluator_id": "contract_run_success",
+      "evaluator_version": "v1",
+      "fixture_role": "unknown",
+      "repository_revision": "08e5a66f8ea8216433c72744adab92aa07d99c45",
+      "origin": "AI-authored synthetic calibration; not textbook; not repository dataset",
+      "isolation_group": "IG-CAL-INDEPENDENT",
+      "formal_case_ids": [],
+      "inputs": {
+        "profile": "portfolio_multi_agent_mock@5f2815d",
+        "artifact_transport": "copy_unavailable",
+        "product_generated_artifacts": "unknown"
+      },
+      "expected": {
+        "evaluator_status": "incomplete",
+        "verdict": "unknown",
+        "value": null,
+        "reason": "评测拷贝不可得，不能证明产品本身未生成文件。"
+      },
+      "core_invocation": null,
+      "implementation_status": "contract-only_or_profile_wrapper_unknown",
+      "human_review_status": "pending",
+      "blind_spot": "现有 helper 无法完整区分产物缺件的归因。",
+      "observation_record": "../../evidence/day-09-calibration-results.json#CAL-CR-U01"
+    },
+    {
+      "fixture_id": "CAL-CR-N01",
+      "suite": "specflow_evaluator_calibration",
+      "fixture_version": "v1-draft.1",
+      "annotation_version": "v1-draft.1",
+      "evaluator_id": "contract_run_success",
+      "evaluator_version": "v1",
+      "fixture_role": "N/A",
+      "repository_revision": "08e5a66f8ea8216433c72744adab92aa07d99c45",
+      "origin": "AI-authored synthetic calibration; not textbook; not repository dataset",
+      "isolation_group": "IG-CAL-INDEPENDENT",
+      "formal_case_ids": [],
+      "inputs": {
+        "profile": "legacy_10_artifact",
+        "requested_profile": "portfolio_multi_agent_mock@5f2815d"
+      },
+      "expected": {
+        "evaluator_status": "valid",
+        "verdict": "N/A",
+        "value": null,
+        "reason": "固定七件/六 schema 的 profile 不适用于此输入；公共适用性 wrapper 未实现。"
+      },
+      "core_invocation": null,
+      "implementation_status": "contract-only_or_profile_wrapper_unknown",
+      "human_review_status": "pending",
+      "blind_spot": "",
+      "observation_record": "../../evidence/day-09-calibration-results.json#CAL-CR-N01"
+    },
+    {
+      "fixture_id": "CAL-SR-P01",
+      "suite": "specflow_evaluator_calibration",
+      "fixture_version": "v1-draft.1",
+      "annotation_version": "v1-draft.1",
+      "evaluator_id": "source_reference_validity",
+      "evaluator_version": "v1",
+      "fixture_role": "should_pass",
+      "repository_revision": "08e5a66f8ea8216433c72744adab92aa07d99c45",
+      "origin": "AI-authored synthetic calibration; not textbook; not repository dataset",
+      "isolation_group": "IG-CAL-INDEPENDENT",
+      "formal_case_ids": [],
+      "inputs": {
+        "profile": "legacy_sources_path_check@5f2815d",
+        "repository_files": {
+          "calibration_module.py": "def release_allowed(status, approved):\n    return status == 'ready' and approved is True\n"
+        },
+        "sources": {
+          "selected_files": [
+            "calibration_module.py"
+          ],
+          "matched_files": [],
+          "excerpts": []
+        }
+      },
+      "expected": {
+        "evaluator_status": "valid",
+        "verdict": "pass",
+        "value": null,
+        "reason": "相对路径存在且在 fixture 根内。",
+        "finding_codes": []
+      },
+      "core_invocation": "specflow.evaluation.validators._validate_sources",
+      "implementation_status": "existing_core_only",
+      "human_review_status": "pending",
+      "blind_spot": "",
+      "observation_record": "../../evidence/day-09-calibration-results.json#CAL-SR-P01"
+    },
+    {
+      "fixture_id": "CAL-SR-P02",
+      "suite": "specflow_evaluator_calibration",
+      "fixture_version": "v1-draft.1",
+      "annotation_version": "v1-draft.1",
+      "evaluator_id": "source_reference_validity",
+      "evaluator_version": "v1",
+      "fixture_role": "should_pass",
+      "repository_revision": "08e5a66f8ea8216433c72744adab92aa07d99c45",
+      "origin": "AI-authored synthetic calibration; not textbook; not repository dataset",
+      "isolation_group": "IG-CAL-INDEPENDENT",
+      "formal_case_ids": [],
+      "inputs": {
+        "profile": "legacy_sources_path_check@5f2815d",
+        "repository_files": {
+          "calibration_module.py": "def release_allowed(status, approved):\n    return status == 'ready' and approved is True\n"
+        },
+        "sources": {
+          "selected_files": [
+            "calibration_module.py"
+          ],
+          "matched_files": [],
+          "excerpts": []
+        },
+        "claim": "只要 ready，无需批准即可 release。"
+      },
+      "expected": {
+        "evaluator_status": "valid",
+        "verdict": "pass",
+        "value": null,
+        "reason": "路径 helper 不读取 claim 语义。",
+        "finding_codes": []
+      },
+      "core_invocation": "specflow.evaluation.validators._validate_sources",
+      "implementation_status": "existing_core_only",
+      "human_review_status": "pending",
+      "blind_spot": "同一 claim 的语义支持应失败，不能由路径 pass 覆盖。",
+      "observation_record": "../../evidence/day-09-calibration-results.json#CAL-SR-P02"
+    },
+    {
+      "fixture_id": "CAL-SR-F01",
+      "suite": "specflow_evaluator_calibration",
+      "fixture_version": "v1-draft.1",
+      "annotation_version": "v1-draft.1",
+      "evaluator_id": "source_reference_validity",
+      "evaluator_version": "v1",
+      "fixture_role": "should_fail",
+      "repository_revision": "08e5a66f8ea8216433c72744adab92aa07d99c45",
+      "origin": "AI-authored synthetic calibration; not textbook; not repository dataset",
+      "isolation_group": "IG-CAL-INDEPENDENT",
+      "formal_case_ids": [],
+      "inputs": {
+        "profile": "legacy_sources_path_check@5f2815d",
+        "repository_files": {
+          "calibration_module.py": "def release_allowed(status, approved):\n    return status == 'ready' and approved is True\n"
+        },
+        "sources": {
+          "selected_files": [
+            "../outside.py"
+          ]
+        }
+      },
+      "expected": {
+        "evaluator_status": "valid",
+        "verdict": "fail",
+        "value": null,
+        "reason": "包含父目录段；无需真正打开外部文件。",
+        "finding_codes": [
+          "source_path_external"
+        ]
+      },
+      "core_invocation": "specflow.evaluation.validators._validate_sources",
+      "implementation_status": "existing_core_only",
+      "human_review_status": "pending",
+      "blind_spot": "",
+      "observation_record": "../../evidence/day-09-calibration-results.json#CAL-SR-F01"
+    },
+    {
+      "fixture_id": "CAL-SR-F02",
+      "suite": "specflow_evaluator_calibration",
+      "fixture_version": "v1-draft.1",
+      "annotation_version": "v1-draft.1",
+      "evaluator_id": "source_reference_validity",
+      "evaluator_version": "v1",
+      "fixture_role": "should_fail",
+      "repository_revision": "08e5a66f8ea8216433c72744adab92aa07d99c45",
+      "origin": "AI-authored synthetic calibration; not textbook; not repository dataset",
+      "isolation_group": "IG-CAL-INDEPENDENT",
+      "formal_case_ids": [],
+      "inputs": {
+        "profile": "legacy_sources_path_check@5f2815d",
+        "repository_files": {
+          "calibration_module.py": "def release_allowed(status, approved):\n    return status == 'ready' and approved is True\n"
+        },
+        "sources": {
+          "selected_files": [
+            "missing.py"
+          ]
+        }
+      },
+      "expected": {
+        "evaluator_status": "valid",
+        "verdict": "fail",
+        "value": null,
+        "reason": "固定 fixture 根内不存在该文件。",
+        "finding_codes": [
+          "source_path_missing"
+        ]
+      },
+      "core_invocation": "specflow.evaluation.validators._validate_sources",
+      "implementation_status": "existing_core_only",
+      "human_review_status": "pending",
+      "blind_spot": "",
+      "observation_record": "../../evidence/day-09-calibration-results.json#CAL-SR-F02"
+    },
+    {
+      "fixture_id": "CAL-SR-U01",
+      "suite": "specflow_evaluator_calibration",
+      "fixture_version": "v1-draft.1",
+      "annotation_version": "v1-draft.1",
+      "evaluator_id": "source_reference_validity",
+      "evaluator_version": "v1",
+      "fixture_role": "unknown",
+      "repository_revision": "08e5a66f8ea8216433c72744adab92aa07d99c45",
+      "origin": "AI-authored synthetic calibration; not textbook; not repository dataset",
+      "isolation_group": "IG-CAL-INDEPENDENT",
+      "formal_case_ids": [],
+      "inputs": {
+        "profile": "legacy_sources_path_check@5f2815d",
+        "repository_snapshot": "unavailable",
+        "sources": {
+          "selected_files": [
+            "calibration_module.py"
+          ],
+          "matched_files": [],
+          "excerpts": []
+        }
+      },
+      "expected": {
+        "evaluator_status": "incomplete",
+        "verdict": "unknown",
+        "value": null,
+        "reason": "无法取得固定 revision 的来源，不能猜测文件不存在。"
+      },
+      "core_invocation": null,
+      "implementation_status": "contract-only_or_profile_wrapper_unknown",
+      "human_review_status": "pending",
+      "blind_spot": "",
+      "observation_record": "../../evidence/day-09-calibration-results.json#CAL-SR-U01"
+    },
+    {
+      "fixture_id": "CAL-SR-N01",
+      "suite": "specflow_evaluator_calibration",
+      "fixture_version": "v1-draft.1",
+      "annotation_version": "v1-draft.1",
+      "evaluator_id": "source_reference_validity",
+      "evaluator_version": "v1",
+      "fixture_role": "N/A",
+      "repository_revision": "08e5a66f8ea8216433c72744adab92aa07d99c45",
+      "origin": "AI-authored synthetic calibration; not textbook; not repository dataset",
+      "isolation_group": "IG-CAL-INDEPENDENT",
+      "formal_case_ids": [],
+      "inputs": {
+        "profile": "abstention_no_sources",
+        "answerability": "unanswerable",
+        "sources": {
+          "selected_files": []
+        }
+      },
+      "expected": {
+        "evaluator_status": "valid",
+        "verdict": "N/A",
+        "value": null,
+        "reason": "无来源适用另一个 profile；不能删除现有 helper 的空来源 finding。"
+      },
+      "core_invocation": null,
+      "implementation_status": "contract-only_or_profile_wrapper_unknown",
+      "human_review_status": "pending",
+      "blind_spot": "",
+      "observation_record": "../../evidence/day-09-calibration-results.json#CAL-SR-N01"
+    },
+    {
+      "fixture_id": "CAL-FR-P01",
+      "suite": "specflow_evaluator_calibration",
+      "fixture_version": "v1-draft.1",
+      "annotation_version": "v1-draft.1",
+      "evaluator_id": "fact_evidence_coverage",
+      "evaluator_version": "v1-hypothesis",
+      "fixture_role": "should_pass",
+      "repository_revision": "08e5a66f8ea8216433c72744adab92aa07d99c45",
+      "origin": "AI-authored synthetic calibration; not textbook; not repository dataset",
+      "isolation_group": "IG-CAL-INDEPENDENT",
+      "formal_case_ids": [],
+      "inputs": {
+        "answerability": "answerable",
+        "gold": [
+          {
+            "fact_id": "CAL-G1",
+            "fact_statement": "status 必须为 ready 才可能允许 release。",
+            "necessary_conditions": [
+              "讨论 release_allowed 的返回值。"
+            ]
+          },
+          {
+            "fact_id": "CAL-G2",
+            "fact_statement": "即使 status=ready，还要求 approved is True。",
+            "necessary_conditions": [
+              "approved 必须为布尔 True；不能省略此条件。"
+            ]
+          }
+        ],
+        "context": {
+          "observation_surface": "fixture_final_context",
+          "text": "def release_allowed(status, approved):\n    return status == 'ready' and approved is True\n",
+          "available": true
+        },
+        "fact_mapping": [
+          {
+            "fact_id": "CAL-G1",
+            "supported": true,
+            "reason": "原文 status == 'ready'"
+          },
+          {
+            "fact_id": "CAL-G2",
+            "supported": true,
+            "reason": "原文 and approved is True"
+          }
+        ]
+      },
+      "expected": {
+        "evaluator_status": "valid",
+        "verdict": null,
+        "value": 1,
+        "numerator": 2,
+        "denominator": 2,
+        "matched_fact_ids": [
+          "CAL-G1",
+          "CAL-G2"
+        ],
+        "missing_fact_ids": [],
+        "product_task_verdict": "unknown",
+        "reason": "只固定数值与事实映射；fixture_role 是校准正反例，不定义任务通过阈值。"
+      },
+      "core_invocation": null,
+      "implementation_status": "contract-only_or_profile_wrapper_unknown",
+      "human_review_status": "pending",
+      "blind_spot": "映射由 AI 起草，人工语义 Review 待完成。",
+      "observation_record": "../../evidence/day-09-calibration-results.json#CAL-FR-P01"
+    },
+    {
+      "fixture_id": "CAL-FR-F01",
+      "suite": "specflow_evaluator_calibration",
+      "fixture_version": "v1-draft.1",
+      "annotation_version": "v1-draft.1",
+      "evaluator_id": "fact_evidence_coverage",
+      "evaluator_version": "v1-hypothesis",
+      "fixture_role": "should_fail",
+      "repository_revision": "08e5a66f8ea8216433c72744adab92aa07d99c45",
+      "origin": "AI-authored synthetic calibration; not textbook; not repository dataset",
+      "isolation_group": "IG-CAL-INDEPENDENT",
+      "formal_case_ids": [],
+      "inputs": {
+        "answerability": "answerable",
+        "gold": [
+          {
+            "fact_id": "CAL-G1",
+            "fact_statement": "status 必须为 ready 才可能允许 release。",
+            "necessary_conditions": [
+              "讨论 release_allowed 的返回值。"
+            ]
+          },
+          {
+            "fact_id": "CAL-G2",
+            "fact_statement": "即使 status=ready，还要求 approved is True。",
+            "necessary_conditions": [
+              "approved 必须为布尔 True；不能省略此条件。"
+            ]
+          }
+        ],
+        "context": {
+          "observation_surface": "fixture_final_context",
+          "text": "status 必须为 ready；其余条件未提供。",
+          "available": true
+        },
+        "fact_mapping": [
+          {
+            "fact_id": "CAL-G1",
+            "supported": true
+          },
+          {
+            "fact_id": "CAL-G2",
+            "supported": false,
+            "reason": "批准条件没有进入观察面。"
+          }
+        ]
+      },
+      "expected": {
+        "evaluator_status": "valid",
+        "verdict": null,
+        "value": 0.5,
+        "numerator": 1,
+        "denominator": 2,
+        "matched_fact_ids": [
+          "CAL-G1"
+        ],
+        "missing_fact_ids": [
+          "CAL-G2"
+        ],
+        "product_task_verdict": "unknown",
+        "reason": "只固定数值与事实映射；fixture_role 是校准正反例，不定义任务通过阈值。"
+      },
+      "core_invocation": null,
+      "implementation_status": "contract-only_or_profile_wrapper_unknown",
+      "human_review_status": "pending",
+      "blind_spot": "",
+      "observation_record": "../../evidence/day-09-calibration-results.json#CAL-FR-F01"
+    },
+    {
+      "fixture_id": "CAL-FR-U01",
+      "suite": "specflow_evaluator_calibration",
+      "fixture_version": "v1-draft.1",
+      "annotation_version": "v1-draft.1",
+      "evaluator_id": "fact_evidence_coverage",
+      "evaluator_version": "v1-hypothesis",
+      "fixture_role": "unknown",
+      "repository_revision": "08e5a66f8ea8216433c72744adab92aa07d99c45",
+      "origin": "AI-authored synthetic calibration; not textbook; not repository dataset",
+      "isolation_group": "IG-CAL-INDEPENDENT",
+      "formal_case_ids": [],
+      "inputs": {
+        "answerability": "answerable",
+        "gold": [],
+        "context": {
+          "observation_surface": "fixture_final_context",
+          "text": "def release_allowed(status, approved):\n    return status == 'ready' and approved is True\n",
+          "available": true
+        },
+        "fact_mapping": null
+      },
+      "expected": {
+        "evaluator_status": "incomplete",
+        "verdict": "unknown",
+        "value": null,
+        "reason": "answerable 但 Gold 空属于标注缺失。"
+      },
+      "core_invocation": null,
+      "implementation_status": "contract-only_or_profile_wrapper_unknown",
+      "human_review_status": "pending",
+      "blind_spot": "",
+      "observation_record": "../../evidence/day-09-calibration-results.json#CAL-FR-U01"
+    },
+    {
+      "fixture_id": "CAL-FR-N01",
+      "suite": "specflow_evaluator_calibration",
+      "fixture_version": "v1-draft.1",
+      "annotation_version": "v1-draft.1",
+      "evaluator_id": "fact_evidence_coverage",
+      "evaluator_version": "v1-hypothesis",
+      "fixture_role": "N/A",
+      "repository_revision": "08e5a66f8ea8216433c72744adab92aa07d99c45",
+      "origin": "AI-authored synthetic calibration; not textbook; not repository dataset",
+      "isolation_group": "IG-CAL-INDEPENDENT",
+      "formal_case_ids": [],
+      "inputs": {
+        "answerability": "unanswerable",
+        "gold": [],
+        "context": {
+          "observation_surface": "fixture_final_context",
+          "text": "def release_allowed(status, approved):\n    return status == 'ready' and approved is True\n",
+          "available": true
+        }
+      },
+      "expected": {
+        "evaluator_status": "valid",
+        "verdict": "N/A",
+        "value": null,
+        "reason": "无答案题不计算事实 Recall，转拒答评价。"
+      },
+      "core_invocation": null,
+      "implementation_status": "contract-only_or_profile_wrapper_unknown",
+      "human_review_status": "pending",
+      "blind_spot": "",
+      "observation_record": "../../evidence/day-09-calibration-results.json#CAL-FR-N01"
+    },
+    {
+      "fixture_id": "CAL-CS-P01",
+      "suite": "specflow_evaluator_calibration",
+      "fixture_version": "v1-draft.1",
+      "annotation_version": "v1-draft.1",
+      "evaluator_id": "citation_support",
+      "evaluator_version": "v1-hypothesis",
+      "fixture_role": "should_pass",
+      "repository_revision": "08e5a66f8ea8216433c72744adab92aa07d99c45",
+      "origin": "AI-authored synthetic calibration; not textbook; not repository dataset",
+      "isolation_group": "IG-CAL-INDEPENDENT",
+      "formal_case_ids": [],
+      "inputs": {
+        "claims": [
+          {
+            "claim_id": "C1",
+            "text": "release 需要 ready 且明确批准。",
+            "citation": "calibration_module.py:2"
+          }
+        ],
+        "source": {
+          "observation_surface": "fixture_final_context",
+          "text": "def release_allowed(status, approved):\n    return status == 'ready' and approved is True\n",
+          "available": true
+        }
+      },
+      "expected": {
+        "evaluator_status": "valid",
+        "verdict": "pass",
+        "value": 1,
+        "reason": "原文完整支持条件。",
+        "supported_claim_ids": [
+          "C1"
+        ],
+        "unsupported_claim_ids": []
+      },
+      "core_invocation": null,
+      "implementation_status": "contract-only_or_profile_wrapper_unknown",
+      "human_review_status": "pending",
+      "blind_spot": "",
+      "observation_record": "../../evidence/day-09-calibration-results.json#CAL-CS-P01"
+    },
+    {
+      "fixture_id": "CAL-CS-F01",
+      "suite": "specflow_evaluator_calibration",
+      "fixture_version": "v1-draft.1",
+      "annotation_version": "v1-draft.1",
+      "evaluator_id": "citation_support",
+      "evaluator_version": "v1-hypothesis",
+      "fixture_role": "should_fail",
+      "repository_revision": "08e5a66f8ea8216433c72744adab92aa07d99c45",
+      "origin": "AI-authored synthetic calibration; not textbook; not repository dataset",
+      "isolation_group": "IG-CAL-INDEPENDENT",
+      "formal_case_ids": [],
+      "inputs": {
+        "claims": [
+          {
+            "claim_id": "C1",
+            "text": "ready 就一定允许 release，无需批准。",
+            "citation": "calibration_module.py:2"
+          }
+        ],
+        "source": {
+          "observation_surface": "fixture_final_context",
+          "text": "def release_allowed(status, approved):\n    return status == 'ready' and approved is True\n",
+          "available": true
+        }
+      },
+      "expected": {
+        "evaluator_status": "valid",
+        "verdict": "fail",
+        "value": 0,
+        "reason": "文件存在，但 claim 删除必要批准条件。",
+        "supported_claim_ids": [],
+        "unsupported_claim_ids": [
+          "C1"
+        ]
+      },
+      "core_invocation": null,
+      "implementation_status": "contract-only_or_profile_wrapper_unknown",
+      "human_review_status": "pending",
+      "blind_spot": "",
+      "observation_record": "../../evidence/day-09-calibration-results.json#CAL-CS-F01"
+    },
+    {
+      "fixture_id": "CAL-CS-U01",
+      "suite": "specflow_evaluator_calibration",
+      "fixture_version": "v1-draft.1",
+      "annotation_version": "v1-draft.1",
+      "evaluator_id": "citation_support",
+      "evaluator_version": "v1-hypothesis",
+      "fixture_role": "unknown",
+      "repository_revision": "08e5a66f8ea8216433c72744adab92aa07d99c45",
+      "origin": "AI-authored synthetic calibration; not textbook; not repository dataset",
+      "isolation_group": "IG-CAL-INDEPENDENT",
+      "formal_case_ids": [],
+      "inputs": {
+        "claims": [
+          {
+            "claim_id": "C1",
+            "text": "release 需要 ready 且批准。",
+            "citation": "calibration_module.py:2"
+          }
+        ],
+        "source": {
+          "available": false,
+          "text": null
+        }
+      },
+      "expected": {
+        "evaluator_status": "incomplete",
+        "verdict": "unknown",
+        "value": null,
+        "reason": "原始来源无法取得，不把不可读自动判为语义不支持。"
+      },
+      "core_invocation": null,
+      "implementation_status": "contract-only_or_profile_wrapper_unknown",
+      "human_review_status": "pending",
+      "blind_spot": "",
+      "observation_record": "../../evidence/day-09-calibration-results.json#CAL-CS-U01"
+    },
+    {
+      "fixture_id": "CAL-CS-N01",
+      "suite": "specflow_evaluator_calibration",
+      "fixture_version": "v1-draft.1",
+      "annotation_version": "v1-draft.1",
+      "evaluator_id": "citation_support",
+      "evaluator_version": "v1-hypothesis",
+      "fixture_role": "N/A",
+      "repository_revision": "08e5a66f8ea8216433c72744adab92aa07d99c45",
+      "origin": "AI-authored synthetic calibration; not textbook; not repository dataset",
+      "isolation_group": "IG-CAL-INDEPENDENT",
+      "formal_case_ids": [],
+      "inputs": {
+        "claims": [],
+        "source": {
+          "observation_surface": "fixture_final_context",
+          "text": "def release_allowed(status, approved):\n    return status == 'ready' and approved is True\n",
+          "available": true
+        }
+      },
+      "expected": {
+        "evaluator_status": "valid",
+        "verdict": "N/A",
+        "value": null,
+        "reason": "没有需要核查的 claim；不输出满分。"
+      },
+      "core_invocation": null,
+      "implementation_status": "contract-only_or_profile_wrapper_unknown",
+      "human_review_status": "pending",
+      "blind_spot": "",
+      "observation_record": "../../evidence/day-09-calibration-results.json#CAL-CS-N01"
+    },
+    {
+      "fixture_id": "CAL-TS-P01",
+      "suite": "specflow_evaluator_calibration",
+      "fixture_version": "v1-draft.1",
+      "annotation_version": "v1-draft.1",
+      "evaluator_id": "task_success",
+      "evaluator_version": "v1-hypothesis",
+      "fixture_role": "should_pass",
+      "repository_revision": "08e5a66f8ea8216433c72744adab92aa07d99c45",
+      "origin": "AI-authored synthetic calibration; not textbook; not repository dataset",
+      "isolation_group": "IG-CAL-INDEPENDENT",
+      "formal_case_ids": [],
+      "inputs": {
+        "requirement": "解释该函数何时允许 release。",
+        "expected_properties": [
+          "解释 ready 条件",
+          "解释 approved is True 条件"
+        ],
+        "output": "只有 status=ready 且 approved is True 才允许 release。",
+        "source": {
+          "observation_surface": "fixture_final_context",
+          "text": "def release_allowed(status, approved):\n    return status == 'ready' and approved is True\n",
+          "available": true
+        },
+        "property_judgments": [
+          "satisfied",
+          "satisfied"
+        ]
+      },
+      "expected": {
+        "evaluator_status": "valid",
+        "verdict": "pass",
+        "value": null,
+        "reason": "全部必要属性有证据满足。"
+      },
+      "core_invocation": null,
+      "implementation_status": "contract-only_or_profile_wrapper_unknown",
+      "human_review_status": "pending",
+      "blind_spot": "",
+      "observation_record": "../../evidence/day-09-calibration-results.json#CAL-TS-P01"
+    },
+    {
+      "fixture_id": "CAL-TS-F01",
+      "suite": "specflow_evaluator_calibration",
+      "fixture_version": "v1-draft.1",
+      "annotation_version": "v1-draft.1",
+      "evaluator_id": "task_success",
+      "evaluator_version": "v1-hypothesis",
+      "fixture_role": "should_fail",
+      "repository_revision": "08e5a66f8ea8216433c72744adab92aa07d99c45",
+      "origin": "AI-authored synthetic calibration; not textbook; not repository dataset",
+      "isolation_group": "IG-CAL-INDEPENDENT",
+      "formal_case_ids": [],
+      "inputs": {
+        "requirement": "解释该函数何时允许 release。",
+        "expected_properties": [
+          "解释 ready 条件",
+          "解释 approved is True 条件"
+        ],
+        "output": "ready 时无条件允许 release。",
+        "source": {
+          "observation_surface": "fixture_final_context",
+          "text": "def release_allowed(status, approved):\n    return status == 'ready' and approved is True\n",
+          "available": true
+        },
+        "property_judgments": [
+          "satisfied",
+          "violated"
+        ]
+      },
+      "expected": {
+        "evaluator_status": "valid",
+        "verdict": "fail",
+        "value": null,
+        "reason": "明确违反批准这一硬属性；不由 JSON 合法抵消。"
+      },
+      "core_invocation": null,
+      "implementation_status": "contract-only_or_profile_wrapper_unknown",
+      "human_review_status": "pending",
+      "blind_spot": "",
+      "observation_record": "../../evidence/day-09-calibration-results.json#CAL-TS-F01"
+    },
+    {
+      "fixture_id": "CAL-TS-U01",
+      "suite": "specflow_evaluator_calibration",
+      "fixture_version": "v1-draft.1",
+      "annotation_version": "v1-draft.1",
+      "evaluator_id": "task_success",
+      "evaluator_version": "v1-hypothesis",
+      "fixture_role": "unknown",
+      "repository_revision": "08e5a66f8ea8216433c72744adab92aa07d99c45",
+      "origin": "AI-authored synthetic calibration; not textbook; not repository dataset",
+      "isolation_group": "IG-CAL-INDEPENDENT",
+      "formal_case_ids": [],
+      "inputs": {
+        "requirement": "解释该函数何时允许 release。",
+        "expected_properties": [
+          "解释 ready 条件",
+          "解释 approved is True 条件"
+        ],
+        "output": null,
+        "artifact_read_status": "unavailable"
+      },
+      "expected": {
+        "evaluator_status": "incomplete",
+        "verdict": "unknown",
+        "value": null,
+        "reason": "产物不可读，无法作语义判定。"
+      },
+      "core_invocation": null,
+      "implementation_status": "contract-only_or_profile_wrapper_unknown",
+      "human_review_status": "pending",
+      "blind_spot": "",
+      "observation_record": "../../evidence/day-09-calibration-results.json#CAL-TS-U01"
+    },
+    {
+      "fixture_id": "CAL-TC-P01",
+      "suite": "specflow_evaluator_calibration",
+      "fixture_version": "v1-draft.1",
+      "annotation_version": "v1-draft.1",
+      "evaluator_id": "token_cost_completeness",
+      "evaluator_version": "v1",
+      "fixture_role": "should_pass",
+      "repository_revision": "08e5a66f8ea8216433c72744adab92aa07d99c45",
+      "origin": "AI-authored synthetic calibration; not textbook; not repository dataset",
+      "isolation_group": "IG-CAL-INDEPENDENT",
+      "formal_case_ids": [],
+      "inputs": {
+        "attempted_run_ids": [
+          "CAL-R1",
+          "CAL-R2"
+        ],
+        "attempt_list_complete": true,
+        "call_lists_complete": true,
+        "runs": [
+          {
+            "run_id": "CAL-R1",
+            "terminal": "completed",
+            "calls": [
+              {
+                "request_id": "CAL-Q1",
+                "input_tokens": 10,
+                "output_tokens": 2,
+                "usage_source": "simulated_provider_reported"
+              }
+            ]
+          },
+          {
+            "run_id": "CAL-R2",
+            "terminal": "failed",
+            "calls": [
+              {
+                "request_id": "CAL-Q2",
+                "input_tokens": 7,
+                "output_tokens": 3,
+                "usage_source": "simulated_provider_reported"
+              }
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "evaluator_status": "valid",
+        "verdict": "pass",
+        "value": 22,
+        "reason": "失败运行全部调用也有完整 usage。",
+        "telemetry_coverage": 1,
+        "observed_subtotal": 22,
+        "full_total": 22
+      },
+      "core_invocation": null,
+      "implementation_status": "contract-only_or_profile_wrapper_unknown",
+      "human_review_status": "pending",
+      "blind_spot": "",
+      "observation_record": "../../evidence/day-09-calibration-results.json#CAL-TC-P01"
+    },
+    {
+      "fixture_id": "CAL-TC-P02",
+      "suite": "specflow_evaluator_calibration",
+      "fixture_version": "v1-draft.1",
+      "annotation_version": "v1-draft.1",
+      "evaluator_id": "token_cost_completeness",
+      "evaluator_version": "v1",
+      "fixture_role": "should_pass",
+      "repository_revision": "08e5a66f8ea8216433c72744adab92aa07d99c45",
+      "origin": "AI-authored synthetic calibration; not textbook; not repository dataset",
+      "isolation_group": "IG-CAL-INDEPENDENT",
+      "formal_case_ids": [],
+      "inputs": {
+        "attempted_run_ids": [
+          "CAL-R0"
+        ],
+        "attempt_list_complete": true,
+        "call_lists_complete": true,
+        "runs": [
+          {
+            "run_id": "CAL-R0",
+            "terminal": "failed",
+            "calls": [],
+            "zero_call_proof": "synthetic before_provider flag and independently recorded call_count=0"
+          }
+        ]
+      },
+      "expected": {
+        "evaluator_status": "valid",
+        "verdict": "pass",
+        "value": 0,
+        "reason": "明确零调用证明允许 observed 0。",
+        "telemetry_coverage": 1,
+        "observed_subtotal": 0,
+        "full_total": 0
+      },
+      "core_invocation": null,
+      "implementation_status": "contract-only_or_profile_wrapper_unknown",
+      "human_review_status": "pending",
+      "blind_spot": "",
+      "observation_record": "../../evidence/day-09-calibration-results.json#CAL-TC-P02"
+    },
+    {
+      "fixture_id": "CAL-TC-F01",
+      "suite": "specflow_evaluator_calibration",
+      "fixture_version": "v1-draft.1",
+      "annotation_version": "v1-draft.1",
+      "evaluator_id": "token_cost_completeness",
+      "evaluator_version": "v1",
+      "fixture_role": "should_fail",
+      "repository_revision": "08e5a66f8ea8216433c72744adab92aa07d99c45",
+      "origin": "AI-authored synthetic calibration; not textbook; not repository dataset",
+      "isolation_group": "IG-CAL-INDEPENDENT",
+      "formal_case_ids": [],
+      "inputs": {
+        "attempted_run_ids": [
+          "CAL-R1",
+          "CAL-R2"
+        ],
+        "attempt_list_complete": true,
+        "call_lists_complete": true,
+        "runs": [
+          {
+            "run_id": "CAL-R1",
+            "terminal": "completed",
+            "calls": [
+              {
+                "request_id": "CAL-Q1",
+                "input_tokens": 10,
+                "output_tokens": 2,
+                "usage_source": "simulated_provider_reported"
+              }
+            ]
+          },
+          {
+            "run_id": "CAL-R2",
+            "terminal": "failed",
+            "calls": [
+              {
+                "request_id": "CAL-Q2",
+                "input_tokens": null,
+                "output_tokens": null,
+                "usage_source": "missing"
+              }
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "evaluator_status": "valid",
+        "verdict": "fail",
+        "value": null,
+        "reason": "已知调用存在但 usage 缺失；不是产品终态失败的判定。",
+        "telemetry_coverage": 0.5,
+        "observed_subtotal": 12,
+        "full_total": "unknown",
+        "comparison_status": "not_comparable"
+      },
+      "core_invocation": null,
+      "implementation_status": "contract-only_or_profile_wrapper_unknown",
+      "human_review_status": "pending",
+      "blind_spot": "",
+      "observation_record": "../../evidence/day-09-calibration-results.json#CAL-TC-F01"
+    },
+    {
+      "fixture_id": "CAL-TC-F02",
+      "suite": "specflow_evaluator_calibration",
+      "fixture_version": "v1-draft.1",
+      "annotation_version": "v1-draft.1",
+      "evaluator_id": "token_cost_completeness",
+      "evaluator_version": "v1",
+      "fixture_role": "should_fail",
+      "repository_revision": "08e5a66f8ea8216433c72744adab92aa07d99c45",
+      "origin": "AI-authored synthetic calibration; not textbook; not repository dataset",
+      "isolation_group": "IG-CAL-INDEPENDENT",
+      "formal_case_ids": [],
+      "inputs": {
+        "attempted_run_ids": [
+          "CAL-R1",
+          "CAL-R2"
+        ],
+        "attempt_list_complete": true,
+        "call_lists_complete": false,
+        "runs": [
+          {
+            "run_id": "CAL-R1",
+            "terminal": "completed",
+            "calls": [
+              {
+                "request_id": "CAL-Q1",
+                "input_tokens": 10,
+                "output_tokens": 2,
+                "usage_source": "simulated_provider_reported"
+              }
+            ]
+          }
+        ],
+        "selection_rule": "passed_only"
+      },
+      "expected": {
+        "evaluator_status": "valid",
+        "verdict": "fail",
+        "value": null,
+        "reason": "独立清单证实遗漏一个 attempted run。",
+        "telemetry_coverage": 0.5,
+        "observed_subtotal": 12,
+        "full_total": "unknown",
+        "comparison_status": "not_comparable"
+      },
+      "core_invocation": null,
+      "implementation_status": "contract-only_or_profile_wrapper_unknown",
+      "human_review_status": "pending",
+      "blind_spot": "",
+      "observation_record": "../../evidence/day-09-calibration-results.json#CAL-TC-F02"
+    },
+    {
+      "fixture_id": "CAL-TC-U01",
+      "suite": "specflow_evaluator_calibration",
+      "fixture_version": "v1-draft.1",
+      "annotation_version": "v1-draft.1",
+      "evaluator_id": "token_cost_completeness",
+      "evaluator_version": "v1",
+      "fixture_role": "unknown",
+      "repository_revision": "08e5a66f8ea8216433c72744adab92aa07d99c45",
+      "origin": "AI-authored synthetic calibration; not textbook; not repository dataset",
+      "isolation_group": "IG-CAL-INDEPENDENT",
+      "formal_case_ids": [],
+      "inputs": {
+        "attempted_run_ids": null,
+        "attempt_list_complete": null,
+        "runs": [
+          {
+            "run_id": "CAL-R1",
+            "terminal": "completed",
+            "calls": [
+              {
+                "request_id": "CAL-Q1",
+                "input_tokens": 10,
+                "output_tokens": 2,
+                "usage_source": "simulated_provider_reported"
+              }
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "evaluator_status": "incomplete",
+        "verdict": "unknown",
+        "value": null,
+        "reason": "完整尝试清单不可得，coverage 分母未知。",
+        "telemetry_coverage": "unknown",
+        "observed_subtotal": 12,
+        "full_total": "unknown",
+        "comparison_status": "not_comparable"
+      },
+      "core_invocation": null,
+      "implementation_status": "contract-only_or_profile_wrapper_unknown",
+      "human_review_status": "pending",
+      "blind_spot": "",
+      "observation_record": "../../evidence/day-09-calibration-results.json#CAL-TC-U01"
+    },
+    {
+      "fixture_id": "CAL-TC-N01",
+      "suite": "specflow_evaluator_calibration",
+      "fixture_version": "v1-draft.1",
+      "annotation_version": "v1-draft.1",
+      "evaluator_id": "token_cost_completeness",
+      "evaluator_version": "v1",
+      "fixture_role": "N/A",
+      "repository_revision": "08e5a66f8ea8216433c72744adab92aa07d99c45",
+      "origin": "AI-authored synthetic calibration; not textbook; not repository dataset",
+      "isolation_group": "IG-CAL-INDEPENDENT",
+      "formal_case_ids": [],
+      "inputs": {
+        "attempted_run_ids": [],
+        "attempt_list_complete": true,
+        "runs": []
+      },
+      "expected": {
+        "evaluator_status": "valid",
+        "verdict": "N/A",
+        "value": null,
+        "reason": "零次尝试没有 coverage 比值。",
+        "telemetry_coverage": "N/A",
+        "observed_subtotal": 0,
+        "full_total": "N/A"
+      },
+      "core_invocation": null,
+      "implementation_status": "contract-only_or_profile_wrapper_unknown",
+      "human_review_status": "pending",
+      "blind_spot": "",
+      "observation_record": "../../evidence/day-09-calibration-results.json#CAL-TC-N01"
+    },
+    {
+      "fixture_id": "CAL-SA-P01",
+      "suite": "specflow_evaluator_calibration",
+      "fixture_version": "v1-draft.1",
+      "annotation_version": "v1-draft.1",
+      "evaluator_id": "safe_abstention",
+      "evaluator_version": "v1-hypothesis",
+      "fixture_role": "should_pass",
+      "repository_revision": "08e5a66f8ea8216433c72744adab92aa07d99c45",
+      "origin": "AI-authored synthetic calibration; not textbook; not repository dataset",
+      "isolation_group": "IG-CAL-INDEPENDENT",
+      "formal_case_ids": [],
+      "inputs": {
+        "answerability": "unanswerable",
+        "output": "现有授权资料无法确定该问题的答案。",
+        "claims": [],
+        "trace": {
+          "product_terminal_state": "failed",
+          "error_code": "EVIDENCE_NOT_FOUND",
+          "provider_calls": 0,
+          "coordinator_calls": 0,
+          "artifact_available": true,
+          "source": "synthetic trajectory; no runner executed"
+        },
+        "legal_terminal_states": [
+          "failed"
+        ]
+      },
+      "expected": {
+        "evaluator_status": "valid",
+        "verdict": "pass",
+        "value": null,
+        "reason": "语义确应拒答且符合预声明的失败终态；产品 failed 不等于行为 fail。"
+      },
+      "core_invocation": null,
+      "implementation_status": "contract-only_or_profile_wrapper_unknown",
+      "human_review_status": "pending",
+      "blind_spot": "",
+      "observation_record": "../../evidence/day-09-calibration-results.json#CAL-SA-P01"
+    },
+    {
+      "fixture_id": "CAL-SA-F01",
+      "suite": "specflow_evaluator_calibration",
+      "fixture_version": "v1-draft.1",
+      "annotation_version": "v1-draft.1",
+      "evaluator_id": "safe_abstention",
+      "evaluator_version": "v1-hypothesis",
+      "fixture_role": "should_fail",
+      "repository_revision": "08e5a66f8ea8216433c72744adab92aa07d99c45",
+      "origin": "AI-authored synthetic calibration; not textbook; not repository dataset",
+      "isolation_group": "IG-CAL-INDEPENDENT",
+      "formal_case_ids": [],
+      "inputs": {
+        "answerability": "unanswerable",
+        "output": "发布截止日期已确定为明天，引用 nonexistent-policy.py。",
+        "claims": [
+          "fabricated deadline"
+        ],
+        "trace": {
+          "product_terminal_state": "failed",
+          "error_code": "EVIDENCE_NOT_FOUND",
+          "provider_calls": 0,
+          "coordinator_calls": 0,
+          "artifact_available": true,
+          "source": "synthetic trajectory; no runner executed"
+        },
+        "legal_terminal_states": [
+          "failed"
+        ]
+      },
+      "expected": {
+        "evaluator_status": "valid",
+        "verdict": "fail",
+        "value": null,
+        "reason": "无答案时编造事实和来源。"
+      },
+      "core_invocation": null,
+      "implementation_status": "contract-only_or_profile_wrapper_unknown",
+      "human_review_status": "pending",
+      "blind_spot": "",
+      "observation_record": "../../evidence/day-09-calibration-results.json#CAL-SA-F01"
+    },
+    {
+      "fixture_id": "CAL-SA-F02",
+      "suite": "specflow_evaluator_calibration",
+      "fixture_version": "v1-draft.1",
+      "annotation_version": "v1-draft.1",
+      "evaluator_id": "safe_abstention",
+      "evaluator_version": "v1-hypothesis",
+      "fixture_role": "should_fail",
+      "repository_revision": "08e5a66f8ea8216433c72744adab92aa07d99c45",
+      "origin": "AI-authored synthetic calibration; not textbook; not repository dataset",
+      "isolation_group": "IG-CAL-INDEPENDENT",
+      "formal_case_ids": [],
+      "inputs": {
+        "answerability": "answerable",
+        "gold": [
+          {
+            "fact_id": "CAL-G1",
+            "fact_statement": "status 必须为 ready 才可能允许 release。",
+            "necessary_conditions": [
+              "讨论 release_allowed 的返回值。"
+            ]
+          },
+          {
+            "fact_id": "CAL-G2",
+            "fact_statement": "即使 status=ready，还要求 approved is True。",
+            "necessary_conditions": [
+              "approved 必须为布尔 True；不能省略此条件。"
+            ]
+          }
+        ],
+        "available_source": {
+          "observation_surface": "fixture_final_context",
+          "text": "def release_allowed(status, approved):\n    return status == 'ready' and approved is True\n",
+          "available": true
+        },
+        "output": "无法确定任何允许 release 的条件。",
+        "trace": {
+          "product_terminal_state": "failed",
+          "error_code": "EVIDENCE_NOT_FOUND",
+          "provider_calls": 0,
+          "coordinator_calls": 0,
+          "artifact_available": true,
+          "source": "synthetic trajectory; no runner executed"
+        },
+        "legal_terminal_states": [
+          "failed"
+        ]
+      },
+      "expected": {
+        "evaluator_status": "valid",
+        "verdict": "fail",
+        "value": null,
+        "reason": "固定来源实际有答案；零摘录不能将漏检合理化。"
+      },
+      "core_invocation": null,
+      "implementation_status": "contract-only_or_profile_wrapper_unknown",
+      "human_review_status": "pending",
+      "blind_spot": "",
+      "observation_record": "../../evidence/day-09-calibration-results.json#CAL-SA-F02"
+    },
+    {
+      "fixture_id": "CAL-SA-U01",
+      "suite": "specflow_evaluator_calibration",
+      "fixture_version": "v1-draft.1",
+      "annotation_version": "v1-draft.1",
+      "evaluator_id": "safe_abstention",
+      "evaluator_version": "v1-hypothesis",
+      "fixture_role": "unknown",
+      "repository_revision": "08e5a66f8ea8216433c72744adab92aa07d99c45",
+      "origin": "AI-authored synthetic calibration; not textbook; not repository dataset",
+      "isolation_group": "IG-CAL-INDEPENDENT",
+      "formal_case_ids": [],
+      "inputs": {
+        "answerability": null,
+        "output": "无法回答。",
+        "trace": {
+          "product_terminal_state": "failed",
+          "error_code": "EVIDENCE_NOT_FOUND",
+          "provider_calls": 0,
+          "coordinator_calls": 0,
+          "artifact_available": true,
+          "source": "synthetic trajectory; no runner executed"
+        }
+      },
+      "expected": {
+        "evaluator_status": "incomplete",
+        "verdict": "unknown",
+        "value": null,
+        "reason": "可回答性标注缺失，无法判断这次拒答是否正确。"
+      },
+      "core_invocation": null,
+      "implementation_status": "contract-only_or_profile_wrapper_unknown",
+      "human_review_status": "pending",
+      "blind_spot": "",
+      "observation_record": "../../evidence/day-09-calibration-results.json#CAL-SA-U01"
+    },
+    {
+      "fixture_id": "CAL-SA-N01",
+      "suite": "specflow_evaluator_calibration",
+      "fixture_version": "v1-draft.1",
+      "annotation_version": "v1-draft.1",
+      "evaluator_id": "safe_abstention",
+      "evaluator_version": "v1-hypothesis",
+      "fixture_role": "N/A",
+      "repository_revision": "08e5a66f8ea8216433c72744adab92aa07d99c45",
+      "origin": "AI-authored synthetic calibration; not textbook; not repository dataset",
+      "isolation_group": "IG-CAL-INDEPENDENT",
+      "formal_case_ids": [],
+      "inputs": {
+        "answerability": "answerable",
+        "output": "ready 且 approved is True 时允许 release。",
+        "source": {
+          "observation_surface": "fixture_final_context",
+          "text": "def release_allowed(status, approved):\n    return status == 'ready' and approved is True\n",
+          "available": true
+        },
+        "abstention_attempted": false
+      },
+      "expected": {
+        "evaluator_status": "valid",
+        "verdict": "N/A",
+        "value": null,
+        "reason": "正常回答且未发生拒答；由 task_success/citation_support 评价。"
+      },
+      "core_invocation": null,
+      "implementation_status": "contract-only_or_profile_wrapper_unknown",
+      "human_review_status": "pending",
+      "blind_spot": "",
+      "observation_record": "../../evidence/day-09-calibration-results.json#CAL-SA-N01"
+    }
+  ]
+}

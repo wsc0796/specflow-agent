@@ -3,12 +3,44 @@
 - Roadmap: [ROADMAP_V5_3_2.md](ROADMAP_V5_3_2.md)
 - Roadmap version: V5.3.2 Learning Effectiveness Patch
 - Campaign phase: Measure (Day 8-14)
-- Study status: DAY 8 COMPLETE — EVAL/EVALUATOR CONTRACTS FROZEN (OWNERSHIP IMPROVING)
-- Day: 8
-- Current mode: REVIEW
+- Study status: DAY 9 AI PREPARATION COMPLETE — DATASET / FIXTURES AWAITING LEARNER REVIEW
+- Day: 9
+- Current mode: TUTOR
 - Updated on: 2026-09-13
 
-## Day 8 completion record
+## Day 9 active contract
+
+用户于 2026-09-13 在独立任务中明确启动 Day 9，授权创建 Dataset v1、Evaluator
+calibration fixtures、Holdout evidence-level manifest、执行卡与恢复记录，并直接开始教学。
+唯一项目为 `D:\Documents\ChatGPT\一个月冲刺\specflow-agent`。
+启动 HEAD `08e5a66f8ea8216433c72744adab92aa07d99c45`，启动工作区干净；不重做 Day 8。
+
+执行入口：[Day 9 执行卡](day-09-execution-card.md)；本人记录：[Day 9 证据卡](evidence/day-09.md)。
+启动源码阅读与离线概念实验已完成，见 [Day 9 Evidence Pack](evidence/day-09-source-pack.md)。
+用户随后明确要求“AI 可以搞完的内容先一步搞定”。AI 已批量完成 30 条任务、34 个 Fixtures、
+manifest、访问记录及机械核验，统一入口为 [Day 9 审查包](day-09-review-pack.md)。
+当前下一步：学习者回来后再继续一个主要判断；可先做未公布答案的手算，再审三锚点与关键 Fixtures。
+早先公布数值的离线实验只算 AI 演示，不算学习者预测或过关。
+AI 完成候选数据/格式/机械核验；学习者只 Review 关键 Gold、Evaluator 盲区、隔离与取舍。
+每次回答后明确给【正确答案】与标准表述；AI-authored 不计本人 ownership。
+Day 8 整体仍为 `improving / partial`；Holdout 等级的有界决策保持 `verified`，不外推。
+
+本日已创建 20 Dev + 10 frozen_internal_holdout 的 `v1-draft.1` 草案：34 个不同事实、
+65 处源码定位检查通过；所有 Gold/annotation 绑定启动 revision，组/事实/Gold 来源文件不跨 split。
+七项 Evaluator 共 34 个 Fixtures，8 个现有核心 helper 的结果匹配预期，26 个仅保留合同预期。
+数据与 Fixture 的本人语义 Review 尚未完成，因此保持 draft_pending_review / frozen=false。
+详见 [AI 准备报告](../reports/day-09-ai-preparation-report.md)；这不是 Day 9 最终收束。
+保持 frozen_internal_holdout / never tune / freeze 后 run once / creator 与 access control 不独立。
+不使用复杂加密或 Primary/Reserve；污染后降级，替换必须新版本且不能恢复旧证据等级。
+不运行 Legacy/Multi-Agent baseline、Holdout 或 Live Provider，不改产品/Evaluator/Prompt/策略/阈值，
+不装依赖，不实现 RAG/Vector/Hybrid/Rerank，不进入 Day 10–15。
+
+本轮质量检查：777 passed、3 skipped、3 warnings；Ruff lint/format 通过，211 个文件格式合格。
+已有回归测试中的 mock fixture 运行不作为正式 Dev/Holdout baseline。默认数据检查不读取 Holdout 内容。
+
+## Day 8 archived completion record
+
+以下保留 Day 8 的历史完成状态与当时停止指令；用户已显式启动 Day 9，当前授权以上方为准。
 
 用户明确授权开始 Day 8：先创建执行卡、最小补充 ROADMAP，然后直接教学。
 执行与恢复入口：[Day 8 执行卡](day-08-execution-card.md)。Eval/Evaluator Contract v1

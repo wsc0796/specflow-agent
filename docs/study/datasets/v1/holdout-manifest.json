@@ -1,0 +1,75 @@
+{
+  "manifest_version": "v1",
+  "suite": "specflow_repository_tasks",
+  "dataset_version": "v1-draft.1",
+  "annotation_version": "v1-draft.1",
+  "repository_revision": "08e5a66f8ea8216433c72744adab92aa07d99c45",
+  "split": "holdout",
+  "file": "holdout.json",
+  "holdout_evidence_level": "frozen_internal_holdout",
+  "case_count": 10,
+  "used_for_tuning": false,
+  "execution_policy": "run_once_after_freeze",
+  "independent_creator": false,
+  "independent_access_control": false,
+  "case_ids": [
+    "SF-RT-H001",
+    "SF-RT-H002",
+    "SF-RT-H003",
+    "SF-RT-H004",
+    "SF-RT-H005",
+    "SF-RT-H006",
+    "SF-RT-H007",
+    "SF-RT-H008",
+    "SF-RT-H009",
+    "SF-RT-H010"
+  ],
+  "category_counts": {
+    "exact_keyword": 3,
+    "semantic_rewrite": 3,
+    "multi_file": 2,
+    "no_answer": 1,
+    "safety_or_stale_index": 1
+  },
+  "isolation_groups": [
+    "IG-H-RUN-REQUEST",
+    "IG-H-PROJECT",
+    "IG-H-RUN-OUTCOME",
+    "IG-H-RUN-RECOVERY",
+    "IG-H-REVIEW",
+    "IG-H-RUN-PERMIT",
+    "IG-H-LIVE-DB-CONTENTS",
+    "IG-H-API-AUTH"
+  ],
+  "creation_status": "authored",
+  "freeze_status": "draft_pending_manifest_review",
+  "frozen": false,
+  "freeze_commit": null,
+  "configuration_freeze_day": 20,
+  "execution_day": 21,
+  "execution_count": 0,
+  "results_available": false,
+  "access_log": "access-log.jsonl",
+  "identity": {
+    "dataset_version": "v1-draft.1",
+    "annotation_version": "v1-draft.1",
+    "repository_revision": "08e5a66f8ea8216433c72744adab92aa07d99c45",
+    "extra_content_digest": "not_generated"
+  },
+  "allowed_claim_after_execution": "在 10 条预注册、未参与调参的内部冻结用例上，按冻结配置完成一次性验证。",
+  "claim_currently_established": false,
+  "forbidden_claims": [
+    "严格盲测",
+    "独立数据泛化",
+    "统计显著性",
+    "生产流量效果",
+    "未知仓库普遍泛化"
+  ],
+  "contamination_policy": {
+    "trigger": "内容或逐题结果用于开发/调参",
+    "downgrade_to": "contaminated_internal_check",
+    "replacement_requires_new_dataset_version": true,
+    "old_evidence_level_restored_by_replacement": false
+  },
+  "review_policy": "学习者只审 manifest 与等级，不展示题面/Gold；作者创建与格式核验访问如实登记。"
+}

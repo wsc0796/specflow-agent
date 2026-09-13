@@ -1,0 +1,123 @@
+{
+  "manifest_version": "v1",
+  "suite": "specflow_repository_tasks",
+  "dataset_version": "v1-draft.1",
+  "annotation_version": "v1-draft.1",
+  "repository_revision": "08e5a66f8ea8216433c72744adab92aa07d99c45",
+  "status": "draft_pending_review",
+  "frozen": false,
+  "freeze_commit": null,
+  "case_count": 30,
+  "splits": {
+    "dev": {
+      "case_count": 20,
+      "category_counts": {
+        "exact_keyword": 5,
+        "semantic_rewrite": 5,
+        "multi_file": 4,
+        "no_answer": 3,
+        "safety_or_stale_index": 3
+      },
+      "file": "dev.json",
+      "case_ids": [
+        "SF-RT-D001",
+        "SF-RT-D002",
+        "SF-RT-D003",
+        "SF-RT-D004",
+        "SF-RT-D005",
+        "SF-RT-D006",
+        "SF-RT-D007",
+        "SF-RT-D008",
+        "SF-RT-D009",
+        "SF-RT-D010",
+        "SF-RT-D011",
+        "SF-RT-D012",
+        "SF-RT-D013",
+        "SF-RT-D014",
+        "SF-RT-D015",
+        "SF-RT-D016",
+        "SF-RT-D017",
+        "SF-RT-D018",
+        "SF-RT-D019",
+        "SF-RT-D020"
+      ]
+    },
+    "holdout": {
+      "case_count": 10,
+      "category_counts": {
+        "exact_keyword": 3,
+        "semantic_rewrite": 3,
+        "multi_file": 2,
+        "no_answer": 1,
+        "safety_or_stale_index": 1
+      },
+      "file": "holdout.json",
+      "manifest": "holdout-manifest.json",
+      "case_ids": [
+        "SF-RT-H001",
+        "SF-RT-H002",
+        "SF-RT-H003",
+        "SF-RT-H004",
+        "SF-RT-H005",
+        "SF-RT-H006",
+        "SF-RT-H007",
+        "SF-RT-H008",
+        "SF-RT-H009",
+        "SF-RT-H010"
+      ]
+    }
+  },
+  "input_isolation": {
+    "model_input_keys": [
+      "requirement"
+    ],
+    "evaluator_only_fields": [
+      "answerability",
+      "gold_evidence",
+      "expected_properties",
+      "forbidden_claims",
+      "annotation_provenance",
+      "legal_terminal_state",
+      "evaluator_ids"
+    ],
+    "actual_runner_projection": "unknown; new dataset is not wired to existing loaders",
+    "repository_snapshot_rule": "Use authorized source at repository_revision; exclude study data, Gold, calibration files and answer notes from tested Context. Do not scan the authoring checkout including new evaluation assets."
+  },
+  "suite_separation": {
+    "legacy_portfolio_cases_unchanged": true,
+    "textbook_cases_included": false,
+    "behavior_suite_included": false,
+    "calibration_cases_included": false
+  },
+  "evaluator_contracts": [
+    "SF-EVAL-v1",
+    "SF-EVALUATORS-v1"
+  ],
+  "reference_method": "relative_path + symbol + line range + exact source excerpt at repository_revision",
+  "content_identity": {
+    "dataset_version": "v1-draft.1",
+    "annotation_version": "v1-draft.1",
+    "freeze_commit": null,
+    "extra_content_digest": "not_generated"
+  },
+  "missing_implementation": {
+    "dataset_runner": "unknown",
+    "automatic_fact_scorer": "unknown",
+    "semantic_citation_scorer": "unknown",
+    "token_coverage_scorer": "unknown",
+    "task_terminal_profile_mapping": "unknown",
+    "index_version_rejection": "unknown"
+  },
+  "coverage_limits": [
+    "安全/旧索引类别当前使用已有安全边界场景；不声称已覆盖旧索引运行拒绝。",
+    "类别配额一致不保证两个 split 的模块分布或难度相同；本版本按事实来源职责分组。",
+    "只提供固定仓库内部 Golden Regression 数据；不是生产流量采样。"
+  ],
+  "freeze_requirements": [
+    "20 Dev 关键 Gold/answerability Review",
+    "隔离与证据等级 manifest Review",
+    "Evaluator fixture 语义预期 Review",
+    "记录争议并版本化解决，不覆盖已冻结版本"
+  ],
+  "execution_status": "not_run"
+}
