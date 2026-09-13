@@ -16,3 +16,6 @@ data/
 /artifacts-multi/
 /artifacts-ab/
 evaluation/results/mock/artifacts/
+
+# local AI-generated onboarding docs (published separately in specflow-learning)
+/.ai-learning/

@@ -8,10 +8,15 @@ strict payload-schema follow-up work:
 - M3: Agent Runtime Foundation
 - M4: Agent Workflow
 - M5: Tool Use & Repository Intelligence
-- M6: Multi-Agent Orchestration (Live Provider validated)
+- M6: Multi-Agent Orchestration (historical best-effort execution; see T-081 evidence correction)
 - M7: Evaluation, Demo & Resume (portfolio-ready)
 
-771 passing tests, 3 skipped, 3 known warnings after T-069.
+The T-069 baseline had 771 passing tests, 3 skipped, 3 known warnings.
+T-081 tightens minimum role content and explicit schema-failure handling;
+see its completion report for current offline verification.
+PR #9's original no-evidence task recorded 773 passing tests on its standalone
+baseline; it is now identified as T-083. Integrated results are recorded in
+`docs/reports/runtime-repairs-integration-2026-09-13.md`.
 M8 production hardening remains limited to the implemented policy, schema,
 fallback, evidence, and artifact boundaries; it does not claim a new
 live-provider validation or deployment work. T-056 adds a separately specified
@@ -27,6 +32,9 @@ every route except `/health`, including documentation and OpenAPI routes. It
 does not add user identity, authorization, or multi-tenant ownership.
 T-065 removes local repository paths from Project API responses and logs legacy
 error-artifact write failures without changing safe exit behavior.
+T-083 closes the multi-agent no-evidence path: zero usable evidence excerpts
+now stop before Coordinator/Agent execution with a classified
+`EVIDENCE_NOT_FOUND` failure and bounded failure artifacts.
 
 All tasks T-001 through T-032 are completed. Implemented:
 health endpoint, Project persistence API, safe scanning, deterministic technology
@@ -54,6 +62,108 @@ v1.0.0 is merged to `main` and v1.0.1 reconciles release metadata and CI.
 The current local candidate is v1.1.1; it remains untagged and unpublished.
 Future work requires a separately frozen task specification.
 Future task IDs are not permission to implement future features.
+
+## V5.3.2 learning contract
+
+Learning tasks use LEARN-001/LEARN-002; PR #9's product repairs use T-083/T-084.
+See `docs/tasks/TASK-IDENTITY-MAP-2026-09-13.md` for the original-number mapping.
+M9/M10 T-070 through T-080 retain their frozen meanings. Explicit engineering
+integration work does not advance the learner's active mode or evidence cards.
+
+This repository is also the sole implementation track for the 30-day AI Agent
+engineering study plan in `docs/study/ROADMAP_V5_3_2.md`. The objective is
+learner ownership, not maximum feature throughput. V5.3.2 preserves the V5.3.1
+Evaluation First, Gap Driven, and Minimal Observability sequence while adding
+Context isolation evidence, Evaluator Contracts, failure attribution, Context
+identity, and a Retest Queue. Full OTel, Grafana, Tempo, and Jaeger platform
+work remains deferred.
+
+### Source of truth
+
+Before each study task, read:
+
+1. this file and `docs/00-SPEC-BASELINE.md`;
+2. `docs/study/ROADMAP_V5_3_2.md`;
+3. `docs/study/CURRENT.md`;
+4. the relevant source, tests, task specification, and existing evidence.
+
+For current implementation facts, source and tests override roadmap assumptions.
+For allowed changes, the frozen baseline and mandatory workflow remain binding.
+State discrepancies explicitly and mark claims that cannot be proven from the
+repository as `unknown`.
+
+### Learning modes
+
+The active mode comes from `docs/study/CURRENT.md`. Do not infer a transition or
+run several modes in one response.
+
+- `SURVEY`: read-only source discovery. Report entry points, key symbols,
+  inputs/outputs, state changes, dependencies, and exact file/symbol evidence.
+  Do not supply a finished architecture conclusion; stop so the learner can
+  trace and draw it.
+- `TUTOR`: explain only concepts required for the current task and bind every
+  explanation to this repository. State the problem solved, where it appears,
+  common failure modes, and when not to use it.
+- `FAULT`: design 3–5 safe, reproducible faults. Give only the trigger, what the
+  learner should predict, legal terminal states, and Test/Trace/Log observation
+  points. Do not reveal root cause or repair before the learner records a
+  prediction.
+- `PATCH`: enter only after the learner explicitly approves a proposed solution.
+  Product-code changes additionally require a frozen task specification. List
+  files first, make the smallest patch, avoid unrelated refactors, summarize the
+  diff, give verification commands, and state remaining evidence gaps.
+- `REVIEW`: remain read-only and seek counterexamples across correctness, state,
+  failure semantics, retry/idempotency, permission, security, tests, evals, and
+  observability. Running code is not sufficient proof of correctness.
+
+`SURVEY`, `TUTOR`, `FAULT`, and `REVIEW` do not permit Codex to edit files.
+Updating `CURRENT.md`, evidence cards, or ADRs is an administrative study change:
+it requires an explicit user request and does not by itself enter `PATCH`.
+
+### Ownership and evidence
+
+Codex-generated diagrams, answers, bulk code, and unexplained patches do not
+count as learner ownership. Ownership evidence must come from the learner's own
+call-chain drawing, prediction, reproduced and located fault, design decision,
+review of the critical diff, interpretation of Test/Eval results, or closed-note
+explanation. Record that evidence under `docs/study/evidence/`.
+
+Preserve these hard boundaries:
+
+- agent-skeleton: at most 4 hours; diet-agent: at most 3 hours; cms-flow: at
+  most 2.5 hours. A durability micro-lab is at most 2 hours and is allowed only
+  when SpecFlow has no usable checkpoint hook. None becomes another
+  implementation track.
+- Repository RAG evaluation is fixed at 20 Dev + 10 Holdout cases. Do not
+  inspect or tune against Holdout before Day 21; after freezing the strategy,
+  run Holdout once and do not tune from its result.
+- Keep a separate 8–10 case Agent Behavior Suite for Tool choice, arguments,
+  bounded retry, termination, permission, and legal terminal states. Do not use
+  it as retrieval-tuning data or expand it into a second large benchmark.
+- Deterministic Fake Embedding proves only engineering contracts. Semantic
+  retrieval claims require a real embedding provider; final end-to-end claims
+  require the separately recorded live boundary.
+- Thresholds are hypotheses tied to provider/index versions: record T0 on Day 8,
+  calibrate only on Dev during Days 15–20, and freeze before Day 21 Holdout.
+- Runtime Safety uses deterministic L0–L3 policy: validate schema/path/version
+  for safe reads; bound low-risk reversible actions; require Human Approval plus
+  idempotency/preview for irreversible or external side effects; hard-deny
+  sensitive, unauthorized, or explicitly forbidden actions. A model Reviewer
+  cannot override hard deny or serve as the only high-risk boundary.
+- Complete only one bounded crash → checkpoint → resume experiment. Prefer an
+  existing SpecFlow hook; otherwise use a LangGraph micro-lab of at most 2 hours.
+  Do not build a persistence or durable-workflow engine merely to satisfy the
+  roadmap. Prove that completed steps and external side effects do not repeat.
+- Choose external references by capability: OpenAI Agents SDK for Agent Runtime,
+  LangGraph for stateful Agent Workflow, PydanticAI for typed/eval comparison,
+  Temporal for Durability, and Spring AI only when a Java Agent target requires
+  it. Revalidate version-sensitive claims against official sources before they
+  drive work. Migrate nothing unless a current SpecFlow failure or gap requires
+  it and a bounded experiment can produce evidence within 2 hours.
+
+At the end of each mode, stop and wait for the learner's answer or explicit
+transition. Codex may point to evidence and challenge the learner's work, but it
+must not replace the act of understanding.
 
 ## Mandatory workflow
 

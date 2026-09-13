@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+from collections.abc import Callable
 from dataclasses import asdict, is_dataclass
 from pathlib import Path
 
@@ -22,7 +23,22 @@ from specflow.llm import (
     OpenAICompatibleConfig,
     OpenAICompatibleLLMClient,
 )
-from specflow.policy import DEFAULT_POLICY, ExecutionBudget, ExecutionPolicy, PolicyValidator
+from specflow.policy import (
+    DEFAULT_POLICY,
+    ExecutionBudget,
+    ExecutionPolicy,
+    PolicyValidator,
+    SpecFlowError,
+)
+from specflow.single_flight import (
+    DEFAULT_COORDINATOR,
+    Flight,
+    RunResult,
+    SingleFlightCoordinator,
+    completed_artifact_directory,
+    execute_owned,
+    prepare_run,
+)
 from specflow.token_budget import BudgetPolicy, TokenBudgetManager
 from specflow.tools import ToolExecutor, ToolRegistry
 from specflow.tools.repository_tools import RepositoryToolSet
@@ -46,7 +62,64 @@ def run(
     mock: bool = False,
     max_files: int = 5,
     policy: ExecutionPolicy = DEFAULT_POLICY,
+    _coordinator: SingleFlightCoordinator = DEFAULT_COORDINATOR,
+    _on_join: Callable[[dict[str, str]], None] | None = None,
 ) -> int:
+    """Use the shared ownership contract without changing legacy CLI exits."""
+    PolicyValidator().validate(policy)
+    arguments = dict(
+        repo=repo,
+        requirement=requirement,
+        output=output,
+        provider=provider,
+        model=model,
+        mock=mock,
+        max_files=max_files,
+        policy=policy,
+    )
+    if not requirement.strip() or max_files <= 0 or not repo.is_dir():
+        return _run_owned(**arguments)
+    run_id = _generate_run_id(repo, requirement)
+    try:
+        prepared = prepare_run(
+            repo=repo,
+            requirement=requirement,
+            mode="legacy",
+            mock=mock,
+            provider=provider,
+            model=model,
+            policy=policy,
+            extra={"max_files": max_files},
+        )
+    except SpecFlowError as error:
+        _write_error_artifact(output, run_id, _now_iso(), error.code)
+        return RunResult(2, error_code=error.code)
+
+    def work(flight: Flight) -> RunResult:
+        return _run_owned(**arguments, _provider_config=flight.prepared.provider_config)
+
+    return execute_owned(
+        prepared=prepared,
+        run_id=run_id,
+        work=work,
+        timeout=policy.max_wall_time_seconds,
+        coordinator=_coordinator,
+        on_join=_on_join,
+    )
+
+
+def _run_owned(
+    *,
+    repo: Path,
+    requirement: str,
+    output: Path,
+    provider: str = "mock",
+    model: str = "",
+    mock: bool = False,
+    max_files: int = 5,
+    policy: ExecutionPolicy = DEFAULT_POLICY,
+    _provider_config: OpenAICompatibleConfig | None = None,
+) -> RunResult:
     """Run the complete specification generation pipeline. Returns exit code."""
     started_at = _now_iso()
     PolicyValidator().validate(policy)
@@ -56,7 +129,7 @@ def run(
         _write_error_artifact(
             output, run_id, started_at, "Requirement and max_files must be non-empty"
         )
-        return 2
+        return RunResult(2)
     use_mock = mock or provider == "mock"
 
     effective_provider = "mock" if use_mock else provider
@@ -69,10 +142,14 @@ def run(
         review_client = mock_clients["review"]
     else:
         try:
-            real_client = _create_llm_client(provider, model, use_mock)
+            real_client = (
+                OpenAICompatibleLLMClient(_provider_config)
+                if _provider_config is not None
+                else _create_llm_client(provider, model, use_mock)
+            )
         except LLMConfigurationError:
             _write_error_artifact(output, run_id, started_at, "PROVIDER_CONFIGURATION_FAILED")
-            return 2
+            return RunResult(2, error_code="PROVIDER_CONFIGURATION_FAILED")
         analyze_client = generate_client = review_client = real_client
 
     analyze_client = _PolicyBoundLLMClient(analyze_client, execution_budget)
@@ -81,14 +158,14 @@ def run(
 
     if not repo.exists() or not repo.is_dir():
         _write_error_artifact(output, run_id, started_at, "REPOSITORY_NOT_FOUND")
-        return 2
+        return RunResult(2, error_code="REPOSITORY_UNAVAILABLE")
 
     registry = ToolRegistry()
     try:
         RepositoryToolSet(repo).register_into(registry)
     except Exception:
         _write_error_artifact(output, run_id, started_at, "REPOSITORY_TOOL_SETUP_FAILED")
-        return 2
+        return RunResult(2, error_code="REPOSITORY_TOOL_SETUP_FAILED")
 
     evidence_config = EvidenceCollectionConfig(
         max_selected_files=min(max_files, policy.repository.max_selected_files),
@@ -106,7 +183,7 @@ def run(
         )
     except Exception:
         _write_error_artifact(output, run_id, started_at, "EVIDENCE_COLLECTION_FAILED")
-        return 3
+        return RunResult(3, error_code="EVIDENCE_COLLECTION_FAILED")
 
     project_context = ProjectContext(
         project_name=repo.resolve().name,
@@ -201,11 +278,11 @@ def run(
         results = executor.execute_until_complete()
     except Exception:
         _write_error_artifact(output, run_id, started_at, "WORKFLOW_EXECUTION_FAILED")
-        return 3
+        return RunResult(3, error_code="WORKFLOW_EXECUTION_FAILED")
 
     if not results or results[-1].current_state.value == "failed":
         _write_error_artifact(output, run_id, started_at, "Workflow execution failed")
-        return 3
+        return RunResult(3, error_code="WORKFLOW_EXECUTION_FAILED")
 
     final = results[-1]
     analysis_json = _extract_output(results, "analysis_json")
@@ -244,7 +321,7 @@ def run(
 
     store = ArtifactStore(output)
     try:
-        store.write_run(
+        written_directory = store.write_run(
             run_id=run_id,
             manifest=manifest,
             evidence=evidence,
@@ -263,11 +340,13 @@ def run(
         )
     except Exception:
         _write_error_artifact(output, run_id, started_at, "ARTIFACT_WRITE_FAILED")
-        return 3
+        return RunResult(3, error_code="ARTIFACT_WRITE_FAILED")
 
-    if degraded or requires_review or requires_human_review:
-        return 4
-    return 0
+    directory = completed_artifact_directory(written_directory)
+    if directory is None:
+        return RunResult(3, error_code="ARTIFACT_WRITE_FAILED")
+    code = 4 if degraded or requires_review or requires_human_review else 0
+    return RunResult(code, artifact_directory=directory)
 
 
 def _create_llm_client(provider: str, model: str, use_mock: bool) -> LLMClient:

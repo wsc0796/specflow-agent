@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class StrictAgentPayload(BaseModel):
@@ -21,6 +21,13 @@ class StrictAgentPayload(BaseModel):
     """
 
     model_config = ConfigDict(extra="forbid")
+
+    @field_validator("summary", check_fields=False)
+    @classmethod
+    def summary_has_content(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("summary must contain non-whitespace text")
+        return value
 
 
 class RepositoryAnalysisPayload(StrictAgentPayload):
@@ -34,7 +41,10 @@ class RepositoryAnalysisPayload(StrictAgentPayload):
 
 
 class DesignPayload(StrictAgentPayload):
-    """Output of the Design agent."""
+    """Design output: include at least one nonblank architecture change,
+    implementation step, API change or data-model change explanation.
+    An explicit no-op must explain what is already satisfied and how to check it.
+    """
 
     summary: str = Field(..., min_length=1, description="Design summary")
     architecture_changes: list[str] = Field(default_factory=list)
@@ -44,9 +54,26 @@ class DesignPayload(StrictAgentPayload):
     dependencies: list[str] = Field(default_factory=list)
     evidence_refs: list[str] = Field(default_factory=list)
 
+    @model_validator(mode="after")
+    def has_change_explanation(self) -> DesignPayload:
+        if not any(
+            item.strip()
+            for items in (
+                self.architecture_changes,
+                self.implementation_steps,
+                self.api_changes,
+                self.data_model_changes,
+            )
+            for item in items
+        ):
+            raise ValueError("design requires a nonblank change or no-op explanation")
+        return self
+
 
 class TestStrategyPayload(StrictAgentPayload):
-    """Output of the TestStrategy agent."""
+    """Test strategy: include at least one nonblank test scenario, edge case
+    or regression check, including a check for an explicitly justified no-op.
+    """
 
     summary: str = Field(..., min_length=1, description="Test strategy summary")
     test_scenarios: list[str] = Field(default_factory=list)
@@ -54,6 +81,16 @@ class TestStrategyPayload(StrictAgentPayload):
     regression_concerns: list[str] = Field(default_factory=list)
     coverage_gaps: list[str] = Field(default_factory=list)
     evidence_refs: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def has_test_intent(self) -> TestStrategyPayload:
+        if not any(
+            item.strip()
+            for items in (self.test_scenarios, self.edge_cases, self.regression_concerns)
+            for item in items
+        ):
+            raise ValueError("test strategy requires a nonblank scenario or check")
+        return self
 
 
 class RiskReviewPayload(StrictAgentPayload):
@@ -73,7 +110,12 @@ class SynthesisPayload(StrictAgentPayload):
     """Output of the Synthesis agent — merges Design, TestStrategy, and RiskReview."""
 
     summary: str = Field(..., min_length=1, description="Merged synthesis summary")
-    consolidated_design: str = Field(default="")
+    consolidated_design: str = Field(
+        ...,
+        min_length=1,
+        pattern=r"\S",
+        description="Change explanation, or explicit no-op/information-gap rationale",
+    )
     consolidated_risks: list[str] = Field(default_factory=list)
     consolidated_tests: list[str] = Field(default_factory=list)
     conflicts_resolved: list[str] = Field(default_factory=list)

@@ -1,3 +1,4 @@
+import shutil
 from pathlib import Path
 
 import pytest
@@ -53,6 +54,60 @@ def test_loads_repository_prompt_definition() -> None:
     assert definition.required_variables == ["project_context", "user_requirement"]
     assert definition.output_format == {"type": "json"}
     assert len(definition.prompt_hash) == 64
+
+
+@pytest.mark.parametrize("name", ["analyze_requirement", "generate_spec", "review_generation"])
+def test_default_resources_ignore_working_directory(tmp_path, monkeypatch, name):
+    expected = PromptRegistry().get(name, "1.0.0")
+    monkeypatch.chdir(tmp_path)
+    actual = PromptRegistry().get(name, "1.0.0")
+    assert actual.prompt_hash == expected.prompt_hash
+    assert actual.render(dict.fromkeys(actual.required_variables, "safe fixture"))
+
+
+def test_default_ignores_forged_cwd_prompts_and_custom_root_still_works(tmp_path, monkeypatch):
+    expected = PromptRegistry().get("analyze_requirement", "1.0.0")
+    forged = tmp_path / "prompts"
+    _write_prompt(forged, "analyze_requirement", "1.0.0", "FORGED {{ name }}", ["name"])
+    monkeypatch.chdir(tmp_path)
+    assert PromptRegistry().get("analyze_requirement", "1.0.0").prompt_hash == expected.prompt_hash
+    assert (
+        PromptRegistry(forged).get("analyze_requirement", "1.0.0").template == "FORGED {{ name }}"
+    )
+    with pytest.raises(PromptNotFoundError):
+        PromptRegistry(tmp_path / "missing").get("analyze_requirement", "1.0.0")
+    (tmp_path / "child").mkdir()
+    monkeypatch.chdir(tmp_path / "child")
+    assert PromptRegistry().get("analyze_requirement", "1.0.0").prompt_hash == expected.prompt_hash
+
+
+def test_materialized_default_path_is_not_cached(tmp_path, monkeypatch):
+    """A resource can be extracted afresh on each load (e.g. zip import)."""
+    from contextlib import contextmanager
+    from importlib import resources
+
+    source = resources.files("specflow").joinpath("prompt_assets")
+    materializations = []
+
+    @contextmanager
+    def temporary_resource(resource):
+        target = tmp_path / f"extraction-{len(materializations)}"
+        shutil.copytree(source, target)
+        materializations.append(target)
+        try:
+            yield target
+        finally:
+            assert target.resolve().is_relative_to(tmp_path.resolve())
+            shutil.rmtree(target)
+
+    monkeypatch.setattr(resources, "as_file", temporary_resource)
+    registry = PromptRegistry()
+    first = registry.get("analyze_requirement", "1.0.0")
+    second = registry.get("analyze_requirement", "1.0.0")
+    assert first.prompt_hash == second.prompt_hash
+    assert len(materializations) == 2
+    assert all(not path.exists() for path in materializations)
+    assert first.render(dict.fromkeys(first.required_variables, "safe fixture"))
 
 
 def test_renders_prompt_with_required_variables() -> None:

@@ -1,0 +1,291 @@
+{
+  "kind": "redacted field-level derivative, NOT a raw run",
+  "generated_on": "2026-09-11",
+  "method": "Retain keys, type/presence/array length and status only. Remove all business strings, requirements, evidence text, absolute paths, raw responses and unrelated metadata. Raw hashes identify files, not authenticity. Synthetic fixture is independent.",
+  "missing_runs": [
+    "run-multi-0d5c2fd450ab",
+    "suffix-82160eef3e3a"
+  ],
+  "samples": [
+    {
+      "sample": "A",
+      "directory_run_id": "run-multi-e5b97497dfd5",
+      "manifest_run_id": "run-multi-e5b97497dfd5",
+      "source_commit": "unknown",
+      "target_commit": "unknown",
+      "raw_exit_code": "unknown",
+      "raw_provider_and_mock_live": "not explicitly recorded",
+      "format": "unversioned JSON",
+      "plan": {
+        "enriched": true,
+        "degraded_agents": []
+      },
+      "workflow_state": "completed",
+      "raw_sha256": {
+        "agent-outputs.json": "4965aa2f6329bc69979b88911a857479ab6055d86e0da61890fe905bcb0941fd",
+        "handoffs.json": "fcbc519fc03a51d9021abf0e0a1f2bbd2c4235a99c11378044550ee3d0ce10c8",
+        "manifest.json": "6ce7bb62ff0d927e8b90a49992848d1cd61de10122d9b6cbe1ac3c882c8c4242",
+        "sources.json": "485493735990e684e20732363fe9a27a0747219172cade6bd94b74479a66bf97",
+        "traces.json": "d585ebe7882b1257b99a9948d13219fa162ca61cb532ee0fbc9ca9e3efd7cd82"
+      },
+      "agents": {
+        "stage-0/repository-analyst-agent-v1": {
+          "success": true,
+          "schema_validated": false,
+          "degraded": "absent",
+          "output_shape": {
+            "action": {
+              "type": "string",
+              "nonblank": true
+            },
+            "evidence": {
+              "type": "array",
+              "length": 0
+            },
+            "summary": {
+              "type": "string",
+              "nonblank": true
+            }
+          }
+        },
+        "stage-1/design-agent-v1": {
+          "success": true,
+          "schema_validated": false,
+          "degraded": "absent",
+          "output_shape": {
+            "architecture": {
+              "type": "object",
+              "nonempty": true
+            },
+            "data": {
+              "type": "object",
+              "nonempty": true
+            },
+            "implementation_plan": {
+              "type": "array",
+              "length": 6
+            },
+            "interface": {
+              "type": "object",
+              "nonempty": true
+            }
+          }
+        },
+        "stage-1/risk-review-agent-v1": {
+          "success": true,
+          "schema_validated": false,
+          "degraded": "absent",
+          "output_shape": {
+            "risks": {
+              "type": "array",
+              "length": 5
+            }
+          }
+        },
+        "stage-1/test-strategy-agent-v1": {
+          "success": true,
+          "schema_validated": false,
+          "degraded": "absent",
+          "output_shape": {
+            "test_strategy": {
+              "type": "object",
+              "nonempty": true
+            }
+          }
+        },
+        "stage-2/synthesis-agent-v1": {
+          "success": true,
+          "schema_validated": false,
+          "degraded": "absent",
+          "output_shape": {
+            "architecture": {
+              "type": "object",
+              "nonempty": true
+            },
+            "risks": {
+              "type": "array",
+              "length": 2
+            },
+            "summary": {
+              "type": "string",
+              "nonblank": true
+            },
+            "test_strategy": {
+              "type": "object",
+              "nonempty": true
+            }
+          }
+        },
+        "stage-3/review-agent-v1": {
+          "success": true,
+          "schema_validated": true,
+          "degraded": "absent",
+          "output_shape": {
+            "agent_id": {
+              "type": "string",
+              "nonblank": true
+            },
+            "decision": {
+              "type": "string",
+              "nonblank": true
+            },
+            "output": {
+              "type": "object",
+              "nonempty": true
+            },
+            "role": {
+              "type": "string",
+              "nonblank": true
+            }
+          }
+        }
+      }
+    },
+    {
+      "sample": "B",
+      "directory_run_id": "run-multi-e5b97497dfd5",
+      "manifest_run_id": "run-multi-e5b97497dfd5",
+      "source_commit": "unknown",
+      "target_commit": "unknown",
+      "raw_exit_code": "unknown",
+      "raw_provider_and_mock_live": "not explicitly recorded",
+      "format": "unversioned JSON",
+      "plan": {
+        "enriched": true,
+        "degraded_agents": []
+      },
+      "workflow_state": "completed",
+      "raw_sha256": {
+        "agent-outputs.json": "8b14b4821829b4341e0041adb7bd31c419da44ad8ab7a5ec7512ecc6780651ef",
+        "handoffs.json": "6463fbbf35b03eb887daaf42084442abe9884cd3f582aec70d4142537e0e3416",
+        "manifest.json": "5d05992f85c5e14b059e57e85d9fc3e4f6d0570258265403b96261392eaac9ca",
+        "sources.json": "485493735990e684e20732363fe9a27a0747219172cade6bd94b74479a66bf97",
+        "traces.json": "4f3df5d7330cd9e957afd1b443277293f9f355ece6db9681550c9bd3edc2112b"
+      },
+      "agents": {
+        "stage-0/repository-analyst-agent-v1": {
+          "success": true,
+          "schema_validated": false,
+          "degraded": "absent",
+          "output_shape": {
+            "analysis": {
+              "type": "string",
+              "nonblank": true
+            },
+            "repository_evidence": {
+              "type": "object",
+              "nonempty": true
+            },
+            "requirement": {
+              "type": "string",
+              "nonblank": true
+            }
+          }
+        },
+        "stage-1/design-agent-v1": {
+          "success": true,
+          "schema_validated": false,
+          "degraded": "absent",
+          "output_shape": {
+            "architecture": {
+              "type": "object",
+              "nonempty": true
+            },
+            "data": {
+              "type": "object",
+              "nonempty": true
+            },
+            "implementation_plan": {
+              "type": "object",
+              "nonempty": true
+            },
+            "interfaces": {
+              "type": "object",
+              "nonempty": true
+            }
+          }
+        },
+        "stage-1/risk-review-agent-v1": {
+          "success": true,
+          "schema_validated": false,
+          "degraded": "absent",
+          "output_shape": {
+            "risks": {
+              "type": "array",
+              "length": 5
+            }
+          }
+        },
+        "stage-1/test-strategy-agent-v1": {
+          "success": true,
+          "schema_validated": false,
+          "degraded": "absent",
+          "output_shape": {
+            "requirement": {
+              "type": "string",
+              "nonblank": true
+            },
+            "test_strategy": {
+              "type": "object",
+              "nonempty": true
+            }
+          }
+        },
+        "stage-2/synthesis-agent-v1": {
+          "success": true,
+          "schema_validated": false,
+          "degraded": "absent",
+          "output_shape": {
+            "analysis": {
+              "type": "string",
+              "nonblank": true
+            },
+            "design": {
+              "type": "object",
+              "nonempty": true
+            },
+            "repository_evidence": {
+              "type": "object",
+              "nonempty": true
+            },
+            "requirement": {
+              "type": "string",
+              "nonblank": true
+            },
+            "risks": {
+              "type": "array",
+              "length": 3
+            },
+            "test_strategy": {
+              "type": "object",
+              "nonempty": true
+            }
+          }
+        },
+        "stage-3/review-agent-v1": {
+          "success": true,
+          "schema_validated": true,
+          "degraded": "absent",
+          "output_shape": {
+            "agent_id": {
+              "type": "string",
+              "nonblank": true
+            },
+            "decision": {
+              "type": "string",
+              "nonblank": true
+            },
+            "output": {
+              "type": "object",
+              "nonempty": true
+            },
+            "role": {
+              "type": "string",
+              "nonblank": true
+            }
+          }
+        }
+      }
+    }
+  ]
+}

@@ -1,11 +1,13 @@
 """Tests for multi-agent runner and CLI --mode multi-agent."""
 
 import json
+from copy import deepcopy
 from hashlib import sha256
 from pathlib import Path
 
 import pytest
 
+from specflow.handoff.validator import HandoffValidator
 from specflow.plan.hash_utils import canonical_json_bytes
 from specflow.policy.models import ExecutionPolicy
 from specflow.runner_multi import (
@@ -15,6 +17,10 @@ from specflow.runner_multi import (
     run_multi_agent,
 )
 from specflow.schema import build_schema_registry
+
+
+def _write_matching_evidence(repo: Path, requirement: str) -> None:
+    (repo / "evidence.py").write_text(f"# {requirement}\n", encoding="utf-8")
 
 
 class TestMultiAgentRunner:
@@ -59,6 +65,7 @@ class TestMultiAgentRunner:
         repo = tmp_path / "test-repo"
         repo.mkdir()
         (repo / "README.md").write_text("# Test Repo")
+        _write_matching_evidence(repo, "Add feature X")
         output = tmp_path / "output"
         exit_code = run_multi_agent(
             repo=repo, requirement="Add feature X", output=output, mock=True
@@ -66,10 +73,70 @@ class TestMultiAgentRunner:
         assert exit_code == 0
         assert len(list(output.glob("run-multi-*"))) == 1
 
+    def test_zero_evidence_fails_before_agents_and_persists_reason(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        repo = tmp_path / "test-repo"
+        repo.mkdir()
+        (repo / "app.py").write_text("def existing_feature():\n    return True\n")
+        output = tmp_path / "output"
+        repository_analyst_called = False
+        coordinator_plan_called = False
+
+        def must_not_plan(*_: object) -> object:
+            nonlocal coordinator_plan_called
+            coordinator_plan_called = True
+            raise AssertionError("Coordinator.plan must not run without repository evidence")
+
+        monkeypatch.setattr("specflow.runner_multi.Coordinator.plan", must_not_plan)
+
+        def must_not_run(_: dict[str, object]) -> dict[str, object]:
+            nonlocal repository_analyst_called
+            repository_analyst_called = True
+            return {
+                "agent_id": "repository-analyst-agent-v1",
+                "role": "repository_analyst",
+                "output": {
+                    "summary": "This executor must not run without repository evidence.",
+                    "affected_components": [],
+                    "key_files": [],
+                    "technology_notes": "",
+                    "evidence_count": 0,
+                },
+            }
+
+        exit_code = run_multi_agent(
+            repo=repo,
+            requirement="totally_missing_symbol_xyz_74219",
+            output=output,
+            mock=True,
+            _executor_overrides={"repository-analyst-agent-v1": must_not_run},
+        )
+
+        assert exit_code == 3
+        assert repository_analyst_called is False
+        assert coordinator_plan_called is False
+        run_dir = next(output.glob("run-multi-*"))
+        manifest_path = run_dir / "manifest.json"
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        assert manifest["workflow_state"] == "failed"
+        assert manifest["error"] == "EVIDENCE_NOT_FOUND"
+        assert manifest["stages_completed"] == 0
+        assert manifest["selected_file_count"] == 0
+        assert manifest["referenced_file_count"] == 0
+        assert str(repo.resolve()) not in json.dumps(manifest)
+        integrity = json.loads((run_dir / "artifact-integrity.json").read_text(encoding="utf-8"))
+        assert (
+            integrity["artifact_hashes"]["manifest.json"]
+            == sha256(manifest_path.read_bytes()).hexdigest()
+        )
+        assert (run_dir / "_COMPLETE").is_file()
+
     def test_manifest_contains_three_hashes(self, tmp_path: Path) -> None:
         repo = tmp_path / "test-repo"
         repo.mkdir()
         (repo / "README.md").write_text("# Test")
+        _write_matching_evidence(repo, "Test")
         output = tmp_path / "output"
         run_multi_agent(repo=repo, requirement="Test", output=output, mock=True)
         manifest = json.loads(
@@ -85,6 +152,7 @@ class TestMultiAgentRunner:
         repo = tmp_path / "test-repo"
         repo.mkdir()
         (repo / "README.md").write_text("# Test")
+        _write_matching_evidence(repo, "Test")
         output = tmp_path / "output"
 
         assert run_multi_agent(repo=repo, requirement="Test", output=output, mock=True) == 0
@@ -110,6 +178,7 @@ class TestMultiAgentRunner:
         repo = tmp_path / "test-repo"
         repo.mkdir()
         (repo / "README.md").write_text("# Test")
+        _write_matching_evidence(repo, "Test")
         output = tmp_path / "output"
         policy = ExecutionPolicy(max_llm_calls=1)
 
@@ -126,6 +195,7 @@ class TestMultiAgentRunner:
         repo = tmp_path / "test-repo"
         repo.mkdir()
         (repo / "README.md").write_text("# Test")
+        _write_matching_evidence(repo, "Test")
         output = tmp_path / "output"
 
         assert run_multi_agent(repo=repo, requirement="Test", output=output, mock=True) == 0
@@ -183,11 +253,76 @@ class TestMultiAgentRunner:
         assert str(repo.resolve()) not in serialized_artifacts
         assert "api_key=secret" not in serialized_artifacts
 
+    def test_handoff_integrity_failure_stops_receiver_and_persists_context(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Post-hash tampering must fail closed with bounded handoff diagnostics."""
+        repo = tmp_path / "test-repo"
+        repo.mkdir()
+        _write_matching_evidence(repo, "Test handoff integrity")
+        output = tmp_path / "output"
+        receiver_called = False
+        tampered_value = "tampered-payload-sentinel"
+        original_validate_payload = HandoffValidator.validate_payload
+
+        def validate_tampered_payload(self, handoff, sender, payloads):
+            tampered_payloads = deepcopy(payloads)
+            payload_key = handoff.payload_ref.removeprefix("agent-outputs.json#")
+            tampered_payloads[payload_key]["output"]["summary"] = tampered_value
+            return original_validate_payload(self, handoff, sender, tampered_payloads)
+
+        def receiver_must_not_run(_: dict[str, object]) -> dict[str, object]:
+            nonlocal receiver_called
+            receiver_called = True
+            return {}
+
+        monkeypatch.setattr(HandoffValidator, "validate_payload", validate_tampered_payload)
+
+        exit_code = run_multi_agent(
+            repo=repo,
+            requirement="Test handoff integrity",
+            output=output,
+            mock=True,
+            _executor_overrides={"design-agent-v1": receiver_must_not_run},
+        )
+
+        assert exit_code == 3
+        assert receiver_called is False
+        run_dir = next(output.glob("run-multi-*"))
+        manifest = json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))
+        traces = json.loads((run_dir / "traces.json").read_text(encoding="utf-8"))
+        expected_context = {
+            "from_agent_id": "repository-analyst-agent-v1",
+            "to_agent_id": "design-agent-v1",
+            "payload_ref": "agent-outputs.json#stage-0/repository-analyst-agent-v1",
+        }
+
+        assert manifest["workflow_state"] == "failed"
+        assert manifest["error"] == "HANDOFF_INTEGRITY_FAILED"
+        assert manifest["failure_context"].pop("handoff_id").startswith("handoff-")
+        assert manifest["failure_context"] == expected_context
+        for trace in traces:
+            if trace.get("kind") in {"run", "coordinator"}:
+                assert trace["error_code"] == "HANDOFF_INTEGRITY_FAILED"
+                assert trace["failure_context"]["handoff_id"].startswith("handoff-")
+                assert {
+                    key: trace["failure_context"][key] for key in expected_context
+                } == expected_context
+
+        serialized_failure = "\n".join(
+            path.read_text(encoding="utf-8") for path in run_dir.iterdir() if path.is_file()
+        )
+        assert tampered_value not in serialized_failure
+        assert str(repo.resolve()) not in serialized_failure
+        assert "expected_hash" not in serialized_failure
+        assert "actual_hash" not in serialized_failure
+
     def test_reject_runs_one_revision_then_completes_when_limit_is_exhausted(
         self, tmp_path: Path
     ) -> None:
         repo = tmp_path / "test-repo"
         repo.mkdir()
+        _write_matching_evidence(repo, "Test revision")
         output = tmp_path / "output"
         reviews = 0
 
@@ -241,6 +376,7 @@ class TestMultiAgentRunner:
     def test_non_mock_provider_is_rejected_without_executing_agents(self, tmp_path: Path) -> None:
         repo = tmp_path / "test-repo"
         repo.mkdir()
+        _write_matching_evidence(repo, "Test")
         called = False
 
         def should_not_run(_: dict[str, object]) -> dict[str, object]:
@@ -263,6 +399,7 @@ class TestMultiAgentRunner:
     def test_duplicate_run_is_rejected_before_executors_run(self, tmp_path: Path) -> None:
         repo = tmp_path / "test-repo"
         repo.mkdir()
+        _write_matching_evidence(repo, "Test")
         output = tmp_path / "output"
         assert run_multi_agent(repo=repo, requirement="Test", output=output, mock=True) == 0
         called = False
@@ -287,6 +424,7 @@ class TestMultiAgentRunner:
     def test_required_agent_failure_stops_before_specialists(self, tmp_path: Path) -> None:
         repo = tmp_path / "test-repo"
         repo.mkdir()
+        _write_matching_evidence(repo, "Test required failure")
         specialists_called = False
 
         def required_failure(_: dict[str, object]) -> dict[str, object]:
@@ -320,6 +458,7 @@ class TestMultiAgentRunner:
     def test_llm_call_policy_stops_run_before_unbounded_execution(self, tmp_path: Path) -> None:
         repo = tmp_path / "test-repo"
         repo.mkdir()
+        _write_matching_evidence(repo, "Policy budget")
         policy = ExecutionPolicy(max_llm_calls=1)
 
         assert (
@@ -340,6 +479,7 @@ class TestMultiAgentRunner:
     def test_parallel_policy_stops_stage_before_agents_start(self, tmp_path: Path) -> None:
         repo = tmp_path / "test-repo"
         repo.mkdir()
+        _write_matching_evidence(repo, "Parallel policy")
         output = tmp_path / "output"
         policy = ExecutionPolicy(max_parallel_agents=2)
 

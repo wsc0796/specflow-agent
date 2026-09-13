@@ -32,7 +32,12 @@ def _make_identity(role: AgentRole = AgentRole.DESIGN) -> AgentIdentity:
 
 class FakeLLMClient:
     def __init__(self, content: str = "") -> None:
-        self.content = content or json.dumps({"summary": "A valid design response."})
+        self.content = content or json.dumps(
+            {
+                "summary": "A valid design response.",
+                "implementation_steps": ["Add a status route returning a JSON response."],
+            }
+        )
         self.last_request = None
 
     def complete(self, request):
@@ -75,7 +80,14 @@ class TestAgentRunner:
         class NoUsageClient:
             def complete(self, request):
                 return LLMResponse(
-                    content=json.dumps({"summary": "A valid design response."}),
+                    content=json.dumps(
+                        {
+                            "summary": "A valid design response.",
+                            "implementation_steps": [
+                                "Add a status route returning a JSON response."
+                            ],
+                        }
+                    ),
                     model="test",
                     usage=LLMUsage(input_tokens=0, output_tokens=0),
                     latency_ms=12,

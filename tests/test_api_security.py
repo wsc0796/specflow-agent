@@ -161,6 +161,7 @@ def test_reviewer_label_allowlist(tmp_path: Path) -> None:
     repository = tmp_path / "repository"
     repository.mkdir()
     (repository / "README.md").write_text("# repo\n", encoding="utf-8")
+    (repository / "search.py").write_text("# Add search\n", encoding="utf-8")
     security = ApiSecurity(
         api_key="test-api-key",
         allowed_repository_roots=(str(repository),),
@@ -208,6 +209,24 @@ def test_run_rate_limiter_rejects_bursts() -> None:
     permit.release()
     with pytest.raises(HTTPException):
         limiter.acquire()
+
+
+def test_single_flight_followers_count_without_a_second_permit():
+    security = ApiSecurity(max_runs_per_minute=3, max_concurrent_runs=1)
+    release = security.admit_single_flight(True)
+    try:
+        assert security.admit_single_flight(False) is None
+        with pytest.raises(HTTPException) as rejected:
+            security.admit_single_flight(True)
+        assert rejected.value.status_code == 429
+    finally:
+        release()
+    next_release = security.admit_single_flight(True)
+    next_release()
+    with pytest.raises(HTTPException) as exhausted:
+        security.admit_single_flight(False)
+    assert exhausted.value.status_code == 429
+    assert "rate limit" in exhausted.value.detail
 
 
 def test_concurrency_rejection_does_not_consume_run_rate_quota() -> None:
