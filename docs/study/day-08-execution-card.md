@@ -2,7 +2,7 @@
 
 - 日期：2026-09-13；唯一项目：`D:\Documents\ChatGPT\一个月冲刺\specflow-agent`。
 - 模式：`TUTOR`；用户明确授权本日规划更新后直接教学。
-- 状态：规划已准备，R1 待学习者回答；合同草稿待定稿，Day 8 未完成。
+- 状态：DAY 8 COMPLETE；合同、模板、数据纪律和 Teach-back 已收束。
 
 ## 1. 启动证据与边界
 
@@ -57,6 +57,15 @@ AI 产物不计为学习者已掌握，缺少实现证据写 `unknown`。
 ## 3. 教学顺序与第 19 章配套
 
 各项可以拆为多轮，但一轮只问一个主要判断；以下不是一次性问卷。
+
+2026-09-13 教学调整：R1–R3 的微型判断只用于暴露证据边界，学习者反馈其工程和
+架构获得感不足。后续不再连续做二选一；每轮由学习者提交一个可审查的小型合同或
+设计，AI 以源码和反例审查。完成顺序为 D1 Metric Contract → D2 Evaluator
+Contract → D3 Behavior Case → D4 数据纪律；仍保持每轮一个主要产物。
+
+再次校准：学习者指出 YAML、字段整理、模板和源码映射可由 AI 完成。后续由 AI
+直接起草这些材料，学习者只 Review 会改变结论可信度的边界、盲区与取舍；不要求
+手填机械字段。AI-authored 内容仍不冒充 learner ownership。
 
 | 顺序 | 判断主题 | 对应源码（相对 src/specflow） | 学习者产出 |
 | --- | --- | --- | --- |
@@ -142,6 +151,7 @@ case_id: <预留 ID>
 suite: specflow_repository_tasks
 dataset_version: <冻结时填写>
 split: <dev | holdout>
+holdout_evidence_level: <dev=N/A | holdout=frozen_internal_holdout>
 category: <五类之一>
 repository_revision: <固定提交>
 requirement: <Day 8 留空>
@@ -189,26 +199,26 @@ reachability: <proven | unknown | N/A，附源码理由>
 actual_trajectory: <本日未执行；以后记录 tool/args/observation/retry/approval/deny>
 ```
 
-每个槽位的具体断言由本日教学逐轮定义。不凭路线名称假设存在 Agent Tool Loop、
-Retry 或相应路径；终态和观察点不可证实时写 unknown。
+四字段模板与 10 个槽位在 Day 8 冻结；具体正式内容留到 Day 9 数据任务。本日源码
+导航只证明可达路径，不凭类别名称假设存在 Agent Tool Loop、Retry 或相应路径；
+终态和观察点不可证实时写 unknown。
 
-## 8. 数据纪律（用户已指定，待学习者解释）
+## 8. 数据纪律（FROZEN）
 
-1. 固定 20 Dev + 10 Holdout；先定 split 与同源规则，不看结果后换组或删坏例。
-2. Day 8 只有模板/ID。Day 9 通过独立保管流程准备、密封 Holdout，开发/调参
-   会话只看 manifest 的 ID、数量、数据版本与密封状态。具体保管者和方式当前
-   unknown，Day 9 建数据前落实；不能虚称已密封。
-3. Day 21 前开发者与本教学会话不打开 Holdout 题面、gold、人工备注、逐题输出。
-   目录命名不等于访问控制；本日不搜索 Holdout 正文。
-4. Day 20 冻结代码、模型、prompt、policy、strategy/阈值、数据与 Evaluator 版本；
-   Day 21 按冻结协议进行一次 Holdout 评测，不因结果差重跑或回调参数。
-5. 若泄露，记录污染范围并使相关 Holdout 证据失效，交数据保管流程处理；不继续
-   看题或利用泄露答案改进 Dev。
-6. 历史 evaluation、12 条 portfolio benchmark、10 条 Behavior、教材合成练习、
-   正式 30 条任务分别标 suite；不拼一个总通过率。
-7. 教材合成题、手写向量、离线排名及其变体不得进入 Dev/Holdout；同源 gold 或
-   问题改写不跨 split；人工复核记录也遵守隔离。
-8. Fake/Mock 只证明相应工程契约；语义与 Live 结论须有对应运行证据。
+1. 固定 20 Dev + 10 `frozen_internal_holdout`；数据来源不独立，不声称严格盲测。
+2. Day 9 固定 Case ID、内容、Gold、dataset/annotation version 和 isolation_group；
+   同源问题整体进入一个 split，教材合成数据不得并入。
+3. Days 10–20 不使用 10 条内部冻结题或逐题结果修改 Prompt、策略、阈值或 Evaluator。
+4. Day 20 冻结 code/model/Prompt/Policy/Evaluator/阈值/运行配置；Day 21 按冻结配置
+   运行一次、保存原始结果，结果差也不回调参数。
+5. 若内容或结果用于开发/调参，降级为 `contaminated_internal_check`；替换题目只能
+   创建新的 dataset version，不能恢复原版本证据等级。不使用 Primary/Reserve。
+6. 允许声称：在 10 条预注册、未参与调参的内部冻结用例上完成一次性验证。
+7. 禁止声称：严格盲测、独立数据泛化、统计显著性、生产流量效果、未知仓库普遍泛化。
+8. 未来只有同时具备独立来源、独立保管者和真实访问隔离，才定义
+   `blind_independent_holdout`。
+9. 历史 evaluation、12 条 portfolio benchmark、10 条 Behavior、教材合成练习、
+   正式 30 条任务分别标 suite，不拼成一个总通过率。Fake/Mock 只证明对应工程合同。
 
 ## 9. 收束与恢复
 
@@ -224,13 +234,17 @@ Retry 或相应路径；终态和观察点不可证实时写 unknown。
 - [x] 核对基线、读取材料、盘点现有能力。
 - [x] 执行卡、合同骨架、30/10 模板与 ID 规划。
 - [x] ROADMAP 教材对应关系、CURRENT 的 Day 8 TUTOR 状态。
-- [ ] 学习者定义指标，定稿 Eval Contract v1 与 T0。
-- [ ] 学习者解释正反例、盲区、复核，定稿 Evaluator Contract v1。
-- [ ] 学习者定义十条 Behavior 的断言/终态/证据，不可达项诚实记录。
-- [ ] 学习者解释并冻结 A/B、数据纪律、非目标。
-- [ ] 记录本人原答、【正确答案】、差异与 readiness，收束 Day 8。
+- [x] 冻结 Eval Contract v1；Recall T0 保持有理由的 hypothesis/unknown。
+- [x] 冻结 Evaluator Contract v1；AI 起草正反例/盲区，学习者 Review 关键边界。
+- [x] 冻结 10 条 Behavior 模板；Review No Evidence 双层状态，其余不可达项留 unknown。
+- [x] 冻结 A/B、数据纪律、非目标和 frozen_internal_holdout 证据等级。
+- [x] 完成第 19 章 Retrieval/Context Assembly 应用判断。
+- [x] 通过侧对话闭卷复述完成结构/事实/Context/Citation 等核心边界 Teach-back。
+- [x] 记录本人原答、【正确答案】、差异与 readiness，收束 Day 8。
 
-下一步 R1：展示 `benchmark.py:188–191`、`:235` 与
-`tests/test_benchmark.py:118–120`，判断 run_success_rate=1.0 是否能作为
-“真实需求完成率 100%”。目前没有学习者答案，不提前登记正确或掌握。
+Day 8 已完成。下一步只能在用户显式启动 Day 9 后创建 Dataset v1 与 Evaluator
+Fixtures；不得由本卡自动进入正式数据、baseline 或 RAG。
+各轮记录见 [Day 8 证据卡](evidence/day-08.md)。后台导航见
+[源码 Evidence Pack](evidence/day-08-source-pack.md)，其状态为
+`AI-prepared / learner-unverified`。
 规划落盘不等于 Day 8 完成；教学完成后停在 Day 8，不自动启动 Day 9。

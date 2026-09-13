@@ -184,7 +184,7 @@ observable_evidence
 | Day | 任务 | 当天硬交付 |
 | --- | --- | --- |
 | 8 | 定义 Eval Contract 与 Evaluator Contract；创建 30 条 Repository Task 模板 + 10 条 Behavior Suite；为行为用例定义 must/must-not/terminal；冻结非目标、Dev/Holdout 协议 | Eval Contract v1 + Evaluator Contract v1 + Case IDs + 数据纪律 |
-| 9 | 补 gold evidence / expected properties；为每个核心 Evaluator 补应通过与应失败样本；冻结 20 Dev + 10 Holdout；Holdout 密封 | Dataset v1 + Evaluator Fixtures + Holdout manifest |
+| 9 | 补 gold evidence / expected properties；为每个核心 Evaluator 补应通过与应失败样本；冻结 20 Dev + 10 frozen_internal_holdout；不参与调参 | Dataset v1 + Evaluator Fixtures + Holdout evidence-level manifest |
 | 10 | 跑 Legacy/Baseline 路径（同模型/同仓库/同任务/同限额） | Legacy Dev Report |
 | 11 | 跑 Multi-Agent 当前版本 baseline；禁止为了结果先改 Prompt/参数 | Multi-Agent Dev Report |
 | 12 | A/B 对比质量、Evidence、Risk、Token、Latency、LLM Calls；抽样人工复核 Evaluator 分歧；列差距而不是下结论 | A/B Trade-off Table + Evaluator Disagreement Log |
