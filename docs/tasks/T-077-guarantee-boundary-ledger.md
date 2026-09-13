@@ -1,5 +1,11 @@
 # T-077 — Guarantee Boundary Ledger and Declaration Registry
 
+> **修订说明（2026-09-13）：AMENDMENT PROPOSED / 待重审。** 来源为
+> PR #12 固定提交 `558004b2bfc46ddcf76317ba30123a12f486445f` 的外部规范重审
+> S12-04 / P2。本次补齐 determinism 的 evidence-input-set 边界，不代表实现
+> 完成或 dependency gate 已满足。下方 REVISION 4 为既有冻结记录；本修订尚待
+> 重审，不改变 REQ-M10-12 或放行 T-077。
+
 **Status:** SPECIFICATION FROZEN — REVISION 4. Implementation is blocked until the
 full REQ-M10-12 gate is satisfied: independently approved M10 specification
 freeze (decision and commit), readable declaration sources at their named source
@@ -68,6 +74,14 @@ and "contradicted" become distinguishable by machine.
   | Valid recorded evidence contradicts the declaration (fault cases satisfy REQ-M10-4; static audit candidates follow REQ-080-4) | `refuted` |
   | Declaration does not apply to the verified configuration | `not_applicable` |
 
+  参与判断的证据来自 REQ-077-8 的显式 evidence-input-set snapshot，不得隐式
+  扫描新生成的 ledger 来替代实际 execution evidence。同一 checkout 后续显式
+  提供有效证据，可以使 `declared` 依法变为 `verified`，但仍须逐项满足
+  REQ-M10-2 的四条件；skipped、version-mismatched 或 unexecuted evidence
+  均不能产生 `verified`。对同一声明及 tested-code/config，已登记的有效反证
+  必须在输入与结果中显式保留，不能因重跑、添加支持证据或悄悄移除反证而降级
+  `refuted`；缺失反证输入必须显式报告，不得伪装成无反证的成功判断。
+
 - **REQ-077-5 — Judgement and justification are separate fields.** The ledger
   records the state (`verified`, `declared`, `refuted`, `not_applicable`) and its
   basis separately. `verified` is not permitted while any of the four
@@ -96,12 +110,28 @@ and "contradicted" become distinguishable by machine.
   | Ledger output | Writable, but only inside the explicitly provided output directory |
 
 - **REQ-077-8 — Determinism is defined over normalized content, not the whole
-  package.** Repeated runs against the same checkout state must produce an
-  identical **normalized ledger content**: the same declarations, states,
-  evidence references, and ordering, with volatile fields removed. The existing
-  completion marker records `completed_at` from the wall clock and therefore must
-  not be expected to be byte-identical. Comparisons are defined on the normalized
-  ledger body; the surrounding package metadata is excluded by specification.
+  package.** 确定性以完整输入为条件：
+
+  ```text
+  Normalized Ledger = f(
+    declaration registry/source snapshot,
+    tested-code commit + effective configuration,
+    explicit evidence-input-set snapshot,
+    judgement-rule/schema version
+  )
+  ```
+
+  相同完整输入必须产生相同 normalized ledger content，包括 declarations、
+  states、evidence references 和 ordering，仅排除 volatile fields。仅有相同
+  checkout 不足以要求相同判断；evidence input set 改变时，judgement 可以按照
+  REQ-077-4/-5/-6 和 REQ-M10-2 改变。
+  evidence set 必须显式、有界、可版本绑定、可重现：记录规范排序的成员清单、
+  可解析的证据引用及内容/版本身份、实际执行结果与 tested-code/config 绑定；
+  空集合也须明确表示。重现须使用同一固定集合，不能把“目录当前有哪些文件”
+  当作未记录的隐式输入。当前输出 ledger 及其完成标记不自动成为下一次运行的
+  输入，避免 self-referential result drift；ledger 状态本身不替代底层有效证据。
+  已有完成标记的 `completed_at` 来自 wall clock，仍不要求整个包字节相同；
+  比较对象为 normalized ledger body，不包括外围易变 package metadata。
 
 - **REQ-077-9 — Conform to the existing artifact boundary.** The ledger artifact
   is written through the existing safe-artifact boundary (atomic write,
@@ -167,9 +197,18 @@ The following are explicit non-goals for T-077:
   repository, from `EvidenceBundle` content, or from prompt text cannot enter the
   ledger, while an excerpt from a curated `docs/` source can, subject to the
   configured length bound.
-- **AC-077-5:** Repeated runs produce identical normalized ledger content while
-  the package completion marker may differ; the comparison is defined on the
-  normalized body.
+- **AC-077-5:** 测试按 REQ-077-8 的完整输入验证以下情形；比较 normalized body，
+  package completion marker 可以不同：
+  - same declaration/source + same tested-code/config + same evidence set + same
+    judgement rules/schema → normalized result identical；
+  - same checkout，显式新增满足 REQ-M10-2 四条件的有效 evidence → `declared`
+    可以合法变成 `verified`；
+  - 仅提供 skipped、version-mismatched 或 unexecuted evidence → 仍为 `declared`，
+    不得 `verified`（已有有效反证时仍按下一项保留 `refuted`）；
+  - valid contradicting evidence → `refuted`，重跑和 rollup 均保留；悄悄移除已登记
+    反证不得产生降级后的成功判断；
+  - evidence set 的成员/内容/版本绑定可重现且有界；输出 ledger 的出现或
+    completion marker 的时间变化不自动改变下一次输入或 normalized result。
 - **AC-077-6:** Tests prove the command writes only inside the declared output
   directory and modifies no target repository file, no tracked source, and no
   existing run artifact.

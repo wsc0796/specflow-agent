@@ -1,5 +1,11 @@
 # T-075 — Unified Run Preflight Validator
 
+> **修订说明（2026-09-13）：AMENDMENT PROPOSED / 待重审。** 来源为
+> PR #12 固定提交 `558004b2bfc46ddcf76317ba30123a12f486445f` 的外部规范重审
+> S12-02 / P2。本次修订 preflight 与 follower admission 的边界，不代表实现
+> 完成或 dependency gate 已满足。下方 FROZEN 为既有冻结记录；本修订尚待重审，
+> 不构成实施放行。
+
 **Status:** FROZEN. Implementation requires T-074 to be closed and a new focused
 session.
 
@@ -17,11 +23,16 @@ existing component validators as the owners of their individual contracts.
   Agent-constraint, single-flight-key, cache, and execution-admission validators.
   Component-level checks remain callable and authoritative; preflight must not
   duplicate or bypass their rules.
-- **REQ-075-2 — Use a deterministic order.** Run security/input boundary checks
-  first; static policy/topology/schema/prompt/Agent checks second; mock/live
-  provider configuration third; cache/key compatibility and execution
-  admissibility last. Stop before evidence can enter a prompt or the Coordinator
-  can perform semantic enrichment.
+- **REQ-075-2 — Use a deterministic order.** 所有请求先经过适用的 authentication、
+  repository allowlist/security boundary、caller input validation 及 request/rate
+  accounting 检查；再做适用的静态 policy/topology/schema/prompt/Agent 检查、
+  mock/live provider configuration 检查和 cache/key compatibility 检查。
+  同 key 不能豁免这些检查或既有请求/速率计数规则。按 T-070 REQ-070-2/-3/-6
+  确定 owner/follower 身份后，才能判断是否需要新的 execution capacity；
+  不得在身份未确定时，以 lane capacity 为零一律拒绝请求。request/rate
+  accounting 保持既有原子接纳与计数语义，不重复扣计；确认 follower 前仍须
+  通过适用的速率门。全部检查须在 evidence 进入 prompt 或 Coordinator 进行
+  semantic enrichment 前完成，且不得为 follower 启动昂贵执行。
 - **REQ-075-3 — Cover both pipelines and entry points.** Legacy CLI,
   multi-agent CLI, mock-only Run API, and benchmark calls use the same applicable
   preflight contract. Mode-specific checks are explicit: mock mode never
@@ -43,11 +54,17 @@ existing component validators as the owners of their individual contracts.
   existing config types without opening a network connection and without
   persisting or logging credential values. Mock mode bypasses this check
   explicitly rather than supplying fake live credentials.
-- **REQ-075-7 — Keep admission authoritative.** Preflight may report current
-  lane capacity and reject a known-saturated request, but a later atomic T-072
-  admission remains the truth because capacity can change after preflight. A
-  race produces the existing explicit saturation error, never a silent retry or
-  TOCTOU success claim.
+- **REQ-075-7 — Keep admission authoritative.** Preflight 的 capacity observation
+  不是 reservation；真正容量事实由 T-072 atomic admission 决定。execution
+  lane saturation rejection 仅适用于真正需要启动新执行的 owner，不适用于
+  已通过上述检查并确认加入现有 owner 的 follower。依照 REQ-072-8，follower
+  不取得第二份 expensive execution permit，不提交第二份 provider/local lane
+  work，只按 T-070 做 bounded wait，并保留独立 Run API 审计身份。
+  对需要新执行的 owner，已知 saturation 通过 T-072 原子接纳明确拒绝；
+  preflight 不另建容量裁决或预留机制。observation 到 actual admission 之间
+  即使发生竞争，失败仍返回已有 T-072 saturation outcome，不 silent retry、
+  不生成第二 owner，也不声称观察到容量就已接纳。ownership 清理及 follower
+  失败/超时语义仍遵循 T-070。
 - **REQ-075-8 — Return a safe structured result.** Successful preflight yields a
   bounded immutable report with validated mode, policy/topology/schema/prompt
   versions, effective provider/model aliases, repository/equivalence hash
@@ -97,8 +114,16 @@ The following are explicit non-goals for T-075:
   and never exposes credential values.
 - **AC-075-3:** Focused tests independently fail repository boundary, policy,
   fixed topology, Agent registry, schema ID/freeze, prompt presence/variables,
-  provider config, equivalence/cache compatibility, and known saturation gates
-  with stable safe classifications.
+  provider config, equivalence/cache compatibility, and owner saturation gates
+  with stable safe classifications. 使用确定性同步覆盖 REQ-075-2/-7：
+  - lane saturated + same valid equivalence key → 合法 follower 可加入仍在执行的
+    owner；不增加 execution permit 或 provider/local lane submission，仅 bounded wait；
+  - lane saturated + different key → 需要新执行的 owner 由 atomic admission
+    明确拒绝，返回 T-072 saturation outcome；
+  - same key 但 unauthenticated、unauthorized repo 或 rate-limited → 仍拒绝，
+    不因可合并而绕过安全或 request/rate accounting；
+  - preflight 观察有容量但 admission race 失败 → 显式 T-072 saturation outcome，
+    无 silent retry、重复 owner 或重复昂贵执行。
 - **AC-075-4:** Tests prove each owning component validator is still invoked and
   remains independently covered; preflight does not reimplement its rules.
 - **AC-075-5:** API failures persist/return only the documented safe lifecycle

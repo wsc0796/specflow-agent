@@ -2,7 +2,11 @@
 
 日期：2026-09-13。审查基线：`2959a2f9ac8c7d0d3b5a2217102d0ce0ed223ed0`。
 
-## 本次交付与审查对象
+> 当前工作区包含针对 PR #12 固定提交 `558004b2bfc46ddcf76317ba30123a12f486445f`
+> 的四项规范修订，状态为 **AMENDMENT PROPOSED / 待重审**。下文初次交付与发布
+> 验证记录保留为历史；本轮修改及新执行的验证见“外部重审修订结算”，不代表实现放行。
+
+## 初次交付与审查对象（558004b 历史记录）
 
 本次应用户要求，将后续十项 T 任务集中到独立分支，供 GPT 审查规范。
 十项规范已经存在于上述 `main` 基线，本次只新增这个审查入口；规范正文、
@@ -67,7 +71,7 @@ T-079/T-080 目前冻结的是范围、入口和判断标准，字段级细节�
 修订建议。区分源码/规范发现、实际复现和未验证项；不能访问的材料请逐项列出。
 没有执行实验时不要声称已复现；无法证明实施门禁满足时不要宣告可以开始实施。
 
-## 发布验证记录
+## 初次发布验证记录（558004b 历史记录）
 
 本节记录本次文档交付的实际验证结果，不代表未来任务的行为验证。
 
@@ -79,3 +83,116 @@ T-079/T-080 目前冻结的是范围、入口和判断标准，字段级细节�
 - 本文 17 个相对文件链接均可解析。
 - 对比审查基线，`docs/tasks/`、`src/`、`tests/`、`uv.lock` 和
   `pyproject.toml` 无差异；本次交付仅新增本文。
+
+## 外部重审修订结算
+
+### 对象、范围和当前状态
+
+- 日期：2026-09-13；来源：用户转交的 PR #12 外部规范重审 S12-01～S12-04，均为 P2。
+- 仓库：`wsc0796/specflow-agent`；PR：[#12](https://github.com/wsc0796/specflow-agent/pull/12)。
+- 工作分支：`docs/t071-t080-spec-review`。
+- 固定审查提交及本轮修订起点 HEAD：`558004b2bfc46ddcf76317ba30123a12f486445f`。
+- PR base：`main @ 2959a2f9ac8c7d0d3b5a2217102d0ce0ed223ed0`；本地 merge-base 与其一致。
+- 修改前 `git status --short` 无输出；工作分支、HEAD 与固定对象一致，没有混入用户改动。
+- 修改对象仅为 T-071、T-075、T-076、T-077 四份规范和本报告，交付为该 HEAD 上的
+  未提交文档 Diff。状态为 **AMENDMENT PROPOSED / 待重审**，四项发现尚待外部重审结案。
+
+已读取 AGENTS、冻结基线、PR 正文、本入口及 T-071～T-080 的完整正文，同时交叉
+读取 T-070、M9/M10 总规范、两份历史 freeze report、TASK-IDENTITY-MAP 和
+`single_flight.py`。本轮是已确认规范问题的修订，不重开 handoff payload R1/P2，
+不实现任何 T-071～T-080 功能。既有规范中的未来 implementation surface 和验收
+测试描述，不是本轮生产代码或测试文件的修改授权。
+
+### 四项发现与修订映射
+
+| 发现 | 修改文件与条款 | 修订内容 | Disposition |
+| --- | --- | --- | --- |
+| S12-01 / P2 | [T-071](../tasks/T-071-provider-resilience-guard.md)：REQ-071-1/-7/-8、Boundaries、AC-071-2 | 使用有界不透明 provider-resource alias + effective model；身份区分 effective endpoint；同后端可共享、不同后端隔离；mock 不读写 live breaker；公开数据只用安全别名 | 已形成修订；AMENDMENT PROPOSED / 待重审，未宣告关闭 |
+| S12-02 / P2 | [T-075](../tasks/T-075-unified-run-preflight-validator.md)：REQ-075-2/-7、AC-075-3 | 保留所有请求适用的安全、输入、速率计数及静态检查；先确认 ownership，再判断新容量；follower 仅有界等待；T-072 原子接纳负责 owner 饱和及竞争失败 | 已形成修订；AMENDMENT PROPOSED / 待重审，未宣告关闭 |
+| S12-03 / P2 | [T-076](../tasks/T-076-java-maven-repository-profile-and-cms-flow-benchmark.md)：REQ-076-3/-5/-11、Boundaries、AC-076-6 | Java/POM/受支持配置的有效读取面同步 early snapshot、equivalence key、T-074 cache key/validation；补齐语义版本和未来实施文件；保持读取限额及 Python benchmark 含义 | 已形成修订；AMENDMENT PROPOSED / 待重审，未宣告关闭 |
+| S12-04 / P2 | [T-077](../tasks/T-077-guarantee-boundary-ledger.md)：REQ-077-4/-8、AC-077-5 | 确定性绑定 declaration/source、tested-code/config、显式 evidence set、rules/schema；允许有效新证据改变判断；排除输出自反馈，保留有效反证及四条件验证 | 已形成修订；AMENDMENT PROPOSED / 待重审，未宣告关闭 |
+
+四份规范顶部均标注本次日期、来源提交、待重审状态及实施门未因此满足。
+
+### 关键反例与交叉契约核对
+
+1. **S12-01：资源隔离。** AC-071-2 要求 same protocol/model + different backend
+   时 A 熔断不阻断 B，same backend/effective model 时可共享；mock 不读写状态或
+   消耗 probe。REQ-071-8 对齐 T-073 的有界别名和 DLP 要求，不把原始 URL、凭据或
+   用户/仓库内容作为公开 metrics、trace、artifact 数据。M9 freeze report 中旧
+   `(provider, model)` 表述保留为冻结时的历史决定，本次 amendment 明确提出替代身份。
+2. **S12-02：follower 与容量。** AC-075-3 分别要求：饱和同 key 可加入 owner；饱和
+   不同 key 由原子接纳拒绝；同 key 仍须通过认证、repo 授权及速率门；观察有容量但
+   admission race 失败时显式返回 T-072 饱和结果。对应 T-070 REQ-070-2/-3/-6 和
+   T-072 REQ-072-8，保留独立审计身份、既有计数与清理语义，没有第二份昂贵执行。
+3. **S12-03：未来读取面的身份覆盖。** 在固定提交的
+   `src/specflow/single_flight.py`，`_EVIDENCE_PATTERNS` 仅列 Python/Markdown/YAML/
+   TOML/CFG；`repository_snapshot()` 依此筛选，`prepare_run()` 将其摘要与
+   `CONTRACT_VERSIONS` 纳入 key。本轮源码阅读确认此过滤边界，未重新执行附件所述
+   文件变更实验。当前 Python-only 读取面不据此判为现有运行时缺陷；Java 成为真实
+   evidence 输入时，T-070 REQ-070-1 和 T-074 REQ-074-2/-3 要求同步覆盖。AC-076-6
+   明确未来 POM/Java/properties/YAML 内容及语义版本变化的身份回归，保留无关/排除
+   文件对照和 Python 12-case 原意。该约束不要求原子全仓库快照或运行期 mutation 支持。
+4. **S12-04：完整确定性输入。** 相同 checkout 可以显式收到新的有效 execution
+   evidence；此时 `declared` 依法变为 `verified` 不违反确定性。AC-077-5 改为
+   比较完整输入相同的 normalized body，排除输出 ledger 隐式回流。skipped、
+   version-mismatched、unexecuted evidence 不能验证声明，有效反证仍为 `refuted`，
+   重跑或汇总不能隐去；REQ-M10-2 的四个独立条件全部保留。
+
+依赖顺序保持：
+
+- M9：T-070 → T-071 → T-072 → T-073 → T-074 → T-075 → runtime review → T-076。
+- M10：T-077 → T-078 → T-080 → T-079 → assurance review；完整 REQ-M10-12 仍适用，
+  T-079/T-080 的字段级细化与冻结要求不变，T-076 仍不是 M10 前置条件。
+
+没有修改 TASK-IDENTITY-MAP、历史 M9/M10 freeze report 或其他 task spec；历史
+“当时冻结/当时依赖未满足”记录不改写成本轮结论。没有宣告 T-071 可实施、T-077
+解锁、M9/M10 完成、M10 assurance passed 或学习 Gate 完成。
+
+### 本轮验证记录
+
+本节仅记录本轮实际命令，不复用上方初次发布或历史 freeze report 的测试数量。
+验证运行于 Windows、Python 3.12.10，使用现有 `uv.lock`，以 `UV_FROZEN=true`
+避免锁文件更新；不升级依赖、不修改测试或增加 skip，不调用 live provider。
+
+| 命令 / 检查 | Exit code | 本轮实际结果 |
+| --- | --- | --- |
+| `uv run python --version` | 0 | Python 3.12.10 |
+| `uv run pytest -v` | 0 | 920 passed、0 failed、3 skipped、3 warnings，26.91s |
+| `uv run ruff check .` | 0 | All checks passed!；本轮无 Ruff warning |
+| `uv run ruff format --check .` | 0 | 213 files already formatted |
+| `git diff --check` | 0 | 无空白错误；最终报告更新后再次检查 |
+| `uv run python <本轮日志目录>/check_documents.py` | 0 | 仅五份允许文件；REQ/AC 定义及编号未改变，92 个引用、22 个相对链接及锚点解析通过；四项映射和依赖顺序通过 |
+| `git branch --show-current` / `git rev-parse HEAD` | 0 | 分支与完整 HEAD 仍为上列固定对象 |
+| `git status --short` | 0 | 恰有五份允许文档为未暂存 `M`；无暂存或未跟踪文件 |
+
+三项 skip 分别为 `tests/test_repository_tools.py:238`、`tests/test_runs.py:566`、
+`tests/test_scanner.py:148` 的 Windows symlink 权限限制。三项 warning 为
+`TestStrategyAgent`、`TestStrategyOutput` 的 pytest collection warning，以及
+Starlette/httpx deprecation warning。没有新增 skip 或修改任何测试。
+
+一次性文档检查初次 exit 1 的原因是检查脚本未匹配带缩进的 Markdown 依赖表；
+仅修正仓库外脚本的匹配规则后通过，没有为检查通过修改 M9/M10 依赖表。Git 曾
+提示工作区 LF 将按既有配置转换为 CRLF；交付文件恢复该工作区换行形式，未修改
+Git 配置。最终 `git diff --check` 无此提示及空白错误。
+
+本轮原始 pytest 日志及文档检查脚本位于仓库外：
+`C:/Users/50469/temp/specflow-pr12-amendment-20260913/`。本轮通过数量恰与旧记录
+相同，以上数字来自新执行的 `pytest.log`，并非复制历史结果。既有回归通过只证明
+当前测试套件通过，不证明尚未实现的 breaker/preflight/Java/ledger 新验收行为。
+
+### 未决项与本地交付边界（发布授权前记录）
+
+四项修订均已映射到 REQ/AC，仍等待外部重审；未来行为测试属于各自实施任务，
+本轮文档修改和既有回归通过均不能代替它们。目前未发现需要第六份文档才能消除
+的真实规范冲突，因此不请求扩大范围。未提交、推送、合并、APPROVE 或关闭 PR，
+不自动启动下一任务。完成本地验证及 Diff 交付后停止。
+
+### 后续发布授权（2026-09-13）
+
+本地交付后，用户要求让 GPT 能访问本轮修订，因此授权将上述五份文档提交并
+推送到现有 `docs/t071-t080-spec-review` 分支，更新现有 PR #12 的正文和固定
+文件链接。上节“未提交、未推送”是该次本地交付时的状态，不代表后续发布状态。
+发布提交的完整 SHA 及可访问性由 PR 正文和 GitHub 提交记录提供，避免在文档中
+循环登记自身提交。PR 保持草稿，四项 amendment 仍待外部重审；发布不构成
+规范批准、PR 合并或任何运行时任务的实施许可。

@@ -1,5 +1,10 @@
 # T-071 — Provider Resilience Guard
 
+> **修订说明（2026-09-13）：AMENDMENT PROPOSED / 待重审。** 来源为
+> PR #12 固定提交 `558004b2bfc46ddcf76317ba30123a12f486445f` 的外部规范重审
+> S12-01 / P2。本次修订后端资源身份，不代表实现完成或 dependency gate 已满足。
+> 下方 FROZEN 为既有冻结记录；本修订尚待重审，不构成实施放行。
+
 **Status:** FROZEN. Implementation requires T-070 to be closed and a new focused
 session.
 
@@ -13,9 +18,16 @@ mock, schema, and audit semantics.
 ## Requirements
 
 - **REQ-071-1 — Scope state by provider resource.** Maintain independent
-  process-local state for the exact `(provider, model)` key authorized here.
-  The key must use bounded normalized identifiers and must not contain base
-  URLs, API keys, prompts, request bodies, repository data, or tenant/user data.
+  process-local state for `(provider_resource_alias, effective_model)`.
+  `provider resource identity` 指有效配置实际连接的后端资源身份，必须能够
+  区分不同 effective endpoint；`openai-compatible` 等协议名不是唯一后端身份。
+  使用有界、不透明的 provider-resource alias 表示该身份，并使用有界、规范化的
+  effective model 身份。同一真实 backend + effective model 可以合法共享
+  breaker；不同 backend 即使协议名和 model 标签相同，也不得共享失败状态。
+  别名与有效后端的绑定不得把不同 endpoint 合并成同一资源；不得仅凭协议或
+  调用方提供的同名标签推断等价。原始 URL 仅用于已有配置边界内的资源解析，
+  不得作为 breaker registry key 或公开标签；API key、prompt、request body、
+  repository data、tenant/user data 同样不得进入该 key。
 - **REQ-071-2 — Implement the state machine.** Provide explicit
   `CLOSED → OPEN → HALF_OPEN → CLOSED/OPEN` behavior with configurable positive
   thresholds, open duration, and bounded half-open probe count. Use an injected
@@ -43,11 +55,14 @@ mock, schema, and audit semantics.
   probes, and remains deterministic.
 - **REQ-071-7 — Clean up safely.** Every permitted call must release its probe
   slot after success or failure. Exceptions must not strand a HALF_OPEN probe or
-  corrupt another provider/model's state. State access must be thread-safe.
+  corrupt another provider-resource/effective-model's state. State access must
+  be thread-safe.
 - **REQ-071-8 — Keep audit data bounded.** Expose only safe state, transition,
-  rejection, failure-count, provider alias, and model alias metadata required by
-  T-073. Do not log exception bodies, credentials, prompts, raw provider output,
-  or unbounded registry keys.
+  rejection, failure-count, provider-resource alias, and model alias metadata
+  required by T-073. 公开 metrics、trace、artifact 中的身份字段仅可使用有界安全别名，
+  不得包含原始 URL、API key、prompt、repository data、tenant/user data、
+  exception body、raw provider output 或无界 registry key。别名不得直接拼入
+  这些原始值；公开 model alias 同样受既有 sanitization/DLP 边界约束。
 - **REQ-071-9 — Expected implementation surface.** Expected production files
   are a focused `src/specflow/llm/resilience.py`,
   `src/specflow/llm/providers/openai_compatible.py` or a shared LLM decorator,
@@ -67,8 +82,8 @@ The following are explicit non-goals for T-071:
   compatible audit hooks.
 - No Resilience4j or other third-party resilience dependency unless a separately
   reviewed spec amendment proves the standard library design insufficient.
-- No Agent-level circuit: six agents sharing one provider/model share that
-  provider resource state; Agent IDs do not create separate breakers.
+- No Agent-level circuit: six agents sharing one backend resource and effective
+  model share that resource state; Agent IDs do not create separate breakers.
 - No distributed breaker, persistence across restart, external health probe,
   provider failover router, load balancer, or background recovery task.
 - No new retry budget, unbounded probe traffic, sleep-based tests, or network
@@ -82,8 +97,13 @@ The following are explicit non-goals for T-071:
   threshold opening, OPEN rejection without transport calls, clock-driven
   transition to HALF_OPEN, probe success closing, probe failure reopening, and
   excess probe rejection.
-- **AC-071-2:** Separate provider/model keys do not share failure state; bounded
-  registry behavior and thread safety are covered.
+- **AC-071-2:** 测试覆盖以下资源身份与共享边界，并验证 registry 有界及线程安全：
+  - same protocol + same model + different backend resource（不同 effective
+    endpoint）→ breaker state isolated；后端 A 打开熔断不阻断健康后端 B；
+  - same backend resource + same effective model → breaker state legitimately
+    shared；不同 effective model 的状态独立；
+  - mock → neither reads nor mutates live breaker state，也不消耗 half-open probe；
+  - registry key 与公开 metrics/trace/artifact 不泄露 REQ-071-1/-8 禁止的数据。
 - **AC-071-3:** Tests prove counted transient failures versus excluded auth,
   model, JSON, schema, security, and internal failures using the existing
   taxonomy.
