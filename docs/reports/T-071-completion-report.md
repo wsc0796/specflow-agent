@@ -173,3 +173,91 @@ rotation 跨 tenancy 合并、live provider 验证或生产容量结论。regist
 本轮保证公开 guard snapshot、分类错误和应用产物不携带内部身份；不声称抵御
 进程内任意对象反射、调试器内存读取或外部日志系统自行记录 transport 请求。
 不开始 T-072/T-073/cache/preflight/Java/M10，不自动合并 PR，不自行宣布任务关闭。
+
+## 2026-09-13 外部独立审查结算
+
+**当前状态：T-071 — REVIEW PASSED / READY FOR MERGE。** 本节追加最新登记，
+前文“待外部独立审查”及实现阶段验证保留为历史。本轮只登记审查结论，不修改
+T-071 运行时代码，不开始 T-072，也不宣布 T-071 CLOSED。
+
+### 固定对象与 disposition
+
+- External independent review target：
+  `a69e15ee9aaaad9a0bedb8a6c7b645f2c82e4eec`。
+- implementation base / 权威规范与 T-070 closure：
+  `339e6e28e1d8c7bd79ac6e7303c0e1c5717c45da`。
+- 仓库：`wsc0796/specflow-agent`；[PR #13](https://github.com/wsc0796/specflow-agent/pull/13)；
+  分支：`feat/t071-provider-resilience-guard`。
+- 开始登记时 HEAD 精确等于被审提交，`git status --short` 无输出；PR 远端 head
+  同样匹配，状态 OPEN / Draft，mergeCommit 为空。main 核对为
+  `2959a2f9ac8c7d0d3b5a2217102d0ce0ed223ed0`。
+- 结论来源：用户转交的固定提交外部独立静态实现复审；本执行者负责登记，
+  不冒充再次独立审查或 GitHub 正式 APPROVE。
+- **Disposition：PASS / no P1-P2 blocking finding found in reviewed T-071 scope.**
+
+外部复审在已审 T-071 范围内确认：
+
+- endpoint/model/provider-tenancy breaker identity 符合规范，guard 位于真实
+  OpenAI-compatible provider attempt 边界。
+- 未增加第二套 retry/fallback owner；legacy 与 multi-agent live pipeline
+  复用同一 guard contract，mock 不触碰 live breaker。
+- HALF_OPEN probe bound、generation 与许可释放逻辑符合冻结契约；availability
+  failure 与排除错误分类保持分离。
+- `PROVIDER_CIRCUIT_REJECTED` 在 multi-agent handoff 前 fail closed。
+- registry 保持有界、单进程；未发现内部 credential/resource identity 进入
+  已检查公开应用产物的路径。
+- 本次审查范围内未发现新的 P1/P2 blocking correctness finding。
+
+### 四类证据分开记录
+
+| 证据类型 | 对象与结论 | 不能替代的事实 |
+| --- | --- | --- |
+| implementation evidence | 本报告此前记录的 `a69e15e` 实现、55 个新增场景、定向/全量回归、benchmark 与安装 smoke | 不把旧执行数量当成本次文档登记新执行结果 |
+| external static review | 上述固定 SHA 的外部静态复审 PASS，由用户转交并在本节登记 | 不冒充审查者执行了未声明的测试，也不等于 GitHub APPROVE 或合并 |
+| remote CI | [CI 34751160302](https://github.com/wsc0796/specflow-agent/actions/runs/34751160302) 的 headSha 为 `a69e15ee9aaaad9a0bedb8a6c7b645f2c82e4eec`；quality、benchmark、security、smoke 全部 success，本轮已重新读取状态 | 该记录绑定 implementation 提交；登记提交推送后的新 CI 另看 PR checks |
+| live-provider validation | 未执行 | 不证明 live provider 质量、真实生产 rate-limit/latency、多进程协调、重启持久化或生产容量 |
+
+### 非阻塞 T-073 alias note
+
+`CircuitSnapshot.provider_resource_alias` / `model_alias` 当前是 **registry
+resident-slot scoped aliases**。这不阻塞 T-071 closure，不登记为 T-071 blocking
+finding。T-073 实施 metrics 时，未经定义不得将其解释为跨 entry / 跨运行稳定的
+provider/model identity。本轮只记录该约束，不修改 T-073 规范或实现 metrics。
+
+### 关闭规则与当前停留状态
+
+已读取的 `AGENTS.md` Mandatory workflow 第 4–6 项、M9 REQ-M9-3 及 T-071
+AC-071-7/-8 要求质量门、报告、聚焦提交和停止点，但没有明确授权“仅凭静态审查
+PASS 就自动 CLOSED”。规范审查入口又明确区分审批、实现关闭和实际合并；既有
+T-070 的关闭记录是在合入 main 后核验 integrated tree、报告及 CI，不能把该个案
+表述为未写明的全仓库硬性规则。
+
+因此，本轮依用户给定的结论边界登记 **REVIEW PASSED / READY FOR MERGE**。
+这里的 READY FOR MERGE 表示审查处置，不自动改变 GitHub Draft 状态，也不授权
+合并。PR #13 实际进入 main 后，仍须核对 integrated tree、对应 CI、可读完成报告
+及未处理阻塞项，再单独登记 T-071 — CLOSED。本轮不执行该后续登记，不启动 T-072，
+不声称 M9 完成、live provider validated 或 production ready。
+
+### 本次文档登记验证
+
+依据 `AGENTS.md` Mandatory workflow 第 4 项，即使本轮仅追加报告，仍执行
+完整 pytest 与 Ruff 门禁，另检查 diff 和单文件范围。使用 Windows / Python
+3.12.10、现有 `uv.lock`，设置 `UV_FROZEN=true`，结果如下：
+
+| 命令 / 检查 | Exit code | 本次文档登记的实际结果 |
+| --- | --- | --- |
+| `uv run pytest -v` | 0 | 975 passed、3 skipped、3 warnings，23.80s |
+| `uv run ruff check .` | 0 | All checks passed! |
+| `uv run ruff format --check .` | 0 | 215 files already formatted |
+| `git diff --check` | 0 | 无空白错误，最终追加内容完成后再次检查 |
+| `git diff --name-only` 与 append-only 核对 | 0 | 只有本报告；被审提交的原报告正文保留为完整前缀 |
+| 对被审 SHA 比较源码、测试、依赖与基准 | 0 | `src/`、`tests/`、`pyproject.toml`、`uv.lock`、`benchmarks/` 无差异 |
+
+三个 skip 为既有 Windows symlink 权限限制；三个 warning 为两项 pytest class
+收集警告和 Starlette/httpx 弃用提示，未新增 skip。此处 23.80s 是本轮新执行结果，
+不是前文 implementation 阶段 22.58s 的重复引用。原始日志保存在
+`C:/Users/50469/temp/specflow-t071-review-registration-20260913/pytest.log`。
+
+依用户长期交付约定，本次只提交并推送该报告登记，更新现有 PR 供 GPT 读取；
+登记提交 SHA 在 PR 正文与交付回复记录。implementation 审查目标始终固定为
+`a69e15ee9aaaad9a0bedb8a6c7b645f2c82e4eec`，不因追加报告改变被审对象。
