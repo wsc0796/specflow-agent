@@ -768,7 +768,19 @@ def _validate_stage_results(
 ) -> None:
     """Fail closed before outputs can become inter-agent handoffs."""
     for agent_id, result in stage.agent_results.items():
-        if result.get("agent_id") != agent_id or not result.get("success", True):
+        if result.get("agent_id") != agent_id:
+            raise ValueError("AGENT_EXECUTION_FAILED")
+        if not result.get("success", True):
+            output = result.get("output")
+            if (
+                isinstance(output, dict)
+                and output.get("error_code") == ErrorCode.PROVIDER_CIRCUIT_REJECTED.value
+            ):
+                raise SpecFlowError(
+                    ErrorCode.PROVIDER_CIRCUIT_REJECTED.value,
+                    "Provider circuit rejected the attempt.",
+                    retryable=False,
+                )
             raise ValueError("AGENT_EXECUTION_FAILED")
         if result.get("schema_validated") is False:
             raise ValueError("SCHEMA_VALIDATION_FAILED")

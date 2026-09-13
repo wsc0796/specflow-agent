@@ -1,0 +1,175 @@
+# T-071 — Provider Resilience Guard 完成报告
+
+日期：2026-09-13。状态：实现及本地质量门通过，独立只读代码复核无阻塞；
+交付待外部独立审查，不自动关闭 T-071。
+
+## 基线与实施授权
+
+- 仓库：`wsc0796/specflow-agent`。
+- 工作分支：`feat/t071-provider-resilience-guard`。
+- implementation base / 开始时 HEAD：`339e6e28e1d8c7bd79ac6e7303c0e1c5717c45da`。
+- `git branch --show-current`、`rev-parse HEAD` 与指定对象匹配；开始时
+  `git status --short` 无输出，`merge-base --is-ancestor 339e6e2 HEAD` exit 0。
+- 用户本轮任务明确指定这是新的 focused implementation session。
+  T-070 CLOSED、规范 findings CLOSED、权威 amendment 可读、正确分支与 clean
+  基线均满足，因此本轮开始时 **T-071 implementation gate satisfied**。
+- 已完整读取 AGENTS、冻结基线、M9、T-070 规范及关闭报告、T-071 完整规范与
+  规范复审登记。T-071 正文包含 endpoint/model/tenancy 内部身份及公开审计分离。
+- 最终 implementation HEAD 在聚焦提交后由 PR 正文和交付记录给出，避免报告
+  循环登记自身 SHA。PR #12 规范与关闭登记是本分支祖先，本轮不自行合并它。
+
+## 实际调用链与最小接入设计
+
+| 对象 | 实际 file:symbol 与职责 |
+| --- | --- |
+| CLI | `src/specflow/cli.py:main` 分派 legacy/multi-agent |
+| legacy client 与预算 | `src/specflow/runner.py:_run_owned` / `_create_llm_client` / `_PolicyBoundLLMClient.complete`，构建共享真实 client，保留原调用预算 |
+| legacy retry/fallback owner | `src/specflow/fallback/manager.py:FallbackManager.execute` 调用 `strategies.py:RetryStrategy.run`；终态异常经 `RuleBaselineStrategy.build` 返回 degraded、requires_review；未新增重试层 |
+| multi-agent client | `src/specflow/runner_multi.py:_create_real_llm_client` 使用准备好的 config，timeout 仍受 run deadline 上限约束 |
+| multi-agent retry / failure envelope | `src/specflow/agents/adapter.py:AgentRunner.execute` 保留原 `_max_retries` 循环和 fail-closed envelope；默认调用仍不额外增加 retry |
+| planning fallback | `src/specflow/plan/enricher.py:SemanticPlanEnricher.enrich` 对失败的 enrichment 生成既有 degraded brief，无重试；与 AgentRunner 使用同一 provider client |
+| 公共实际 transport | `src/specflow/llm/providers/openai_compatible.py:OpenAICompatibleLLMClient.complete` → `_complete_once` → `httpx.Client.post`，每次被允许的调用至多一次 HTTP POST |
+| 有效配置 | `src/specflow/llm/providers/config.py:OpenAICompatibleConfig.from_env` / `__post_init__` / `completions_url`；显式 config 或 `SPECFLOW_LLM_*` 环境，wire model 使用 config.model，而非 request.model |
+| mock | legacy `_create_mock_clients`、multi-agent `_make_mock_llm_client` 与直接 mock Agent 执行均独立于真实 provider；无需触碰 guard registry |
+| 错误分类 | `src/specflow/policy/errors.py:ErrorCode` / `is_retryable`；provider 在已知 transport/status 分支赋予可选 ErrorCode，guard 不分析任意异常文本 |
+
+状态由唯一默认进程级 `ProviderResilienceGuard` 拥有，也允许构造时注入独立 guard
+及 monotonic clock。没有新增 run 配置字段、policy hash 变更或 T-070 key 变更；
+固定状态机默认配置属于进程 guard，runner 沿用原配置与 budget。两条真实 pipeline
+自然复用 provider 接入点，legacy runner 不需要修改。
+
+## 内部身份与公开数据
+
+内部 key 为三个固定长度 SHA-256：规范化实际 `completions_url`、effective model、
+credential。URL 使用实际 HTTP URL 的规范化表示；已有 config 已去尾斜线并拒绝
+嵌入凭据/query/fragment。key 不含 raw API key、endpoint 或 model 字符串，repr
+隐藏摘要；所有状态只在进程内，不落盘、不写日志或产物。
+
+默认按 credential fingerprint 隔离 tenancy；本轮未引入跨 credentials 的共享
+alias 配置。不同 endpoint、model 或 credential 分离；同配置的多个 client/Agent
+共享同一状态。timeout 和请求 model 标签不改变实际后端/tenancy 身份。
+
+`CircuitSnapshot` 只包含有界的 `resource-N` / `model-N` 别名、状态、健康失败计数、
+连续失败数、活动调用/probe 数、拒绝数和迁移数。这些别名只标识当前 registry 中
+的驻留槽位，可在安全回收后复用，不是跨重启或持久化身份，不能反推内部指纹。
+本轮只提供只读安全观察接口，不实现 T-073 metrics 字段或 exporter。
+
+## 状态机、释放及 registry 上限
+
+- `ResilienceSettings` 提供正整数 failure_threshold（默认 5）、half-open probe
+  上限（默认 1）、registry 上限（默认 128）及正且有限的 open_seconds（默认 30）。
+  配置通过 guard 构造注入，不增加依赖、CLI 参数或后台配置系统。
+- `attempt()` 在锁内领取；CLOSED 连续可计数失败达到阈值进入 OPEN；未过冷却期
+  明确拒绝且不执行 transport。冷却后由下一次真实调用触发 HALF_OPEN，不依赖 timer。
+- HALF_OPEN 许可受配置上限约束。有效 probe 的 availability failure 重新 OPEN；
+  最后一个活动 probe 成功后才 CLOSED，避免较早成功掩盖同批尚未返回的失败。
+- 每次 attempt 的 `finally` 释放活动调用/probe，覆盖成功、已分类失败、普通异常、
+  SystemExit、KeyboardInterrupt。排除错误不改变健康判断；HALF_OPEN 槽释放后可再探测。
+- generation 防止旧 CLOSED/probe 结果覆盖后续代次；旧调用仍释放资源，真实已分类
+  availability failure 仍只累计一次。失败总数与阈值用的连续失败数分开。
+- 满 registry 只回收无活动调用、无连续失败的健康 CLOSED 条目。OPEN、HALF_OPEN、
+  仍执行或已累积失败的条目不被驱逐；无可回收槽时明确拒绝新资源，不创建无界状态。
+- 冷却后的 probe 必须经正常请求触发；没有外部探测、后台线程、分布式状态或重启恢复。
+
+## 分类、重试与失败产物
+
+只计入 `PROVIDER_TIMEOUT`、`PROVIDER_RATE_LIMITED`、`PROVIDER_SERVER_ERROR`、
+`PROVIDER_CONNECTION_ERROR`。provider 在 httpx timeout/request-error 和 HTTP
+429/5xx 分支显式赋值；任意 transport coding error 的文本即使含 `500/rate/timeout`
+也不会误计入。auth、404 model-not-found、JSON、schema、安全、policy、internal
+错误均不计入 health；下游 JSON/schema 校验仍由原组件负责。
+
+`LLMError` 增加可选 code，原异常类型和安全消息保持兼容。AgentRunner 优先消费
+明确 ErrorCode，未标注的旧 provider/fake 仍走原分类器。这也使真实 HTTP 404
+使用现有 MODEL_NOT_FOUND、其他 5xx 使用现有 SERVER_ERROR，而不被旧字符串
+匹配遗漏。legacy `RetryStrategy` 的原分类逻辑、预算和 backoff 没有修改。
+
+新 `LLMCircuitError` 使用 `PROVIDER_CIRCUIT_REJECTED`，归入既有不可重试类别，
+reason 仅为 `open`、`probe_limit`、`registry_capacity`。既有 legacy retry owner
+遇到该安全异常立即停止；FallbackManager 可按原契约返回明确 degraded baseline，
+不伪装成 provider 成功。multi-agent 阶段结果检查只对该新错误保留安全 SpecFlowError，
+经已有失败 writer 写入；不让它丢失为通用错误，也不放行失败 Agent 输出到 handoff。
+
+## 改动范围与验收映射
+
+生产文件仅为 `llm/resilience.py`、`llm/exceptions.py`、
+`llm/providers/openai_compatible.py`、`policy/errors.py`、`agents/adapter.py`、
+`runner_multi.py`。测试为新增 `tests/test_provider_resilience.py` 及现有 provider
+单测的独立 guard 注入；原断言保留。未修改其他 task spec、数据库、拓扑、schema、
+DLP、revision、学习记录、依赖、benchmark baseline 或后续任务实现。
+
+| AC | 行为证据 |
+| --- | --- |
+| AC-071-1 | threshold/open/clock/probe 恢复与失败重开、真实双 probe 上限及较早成功不能掩盖晚失败 |
+| AC-071-2 | endpoint/model/tenancy 隔离、同资源共享、8 个并发失败只创建一个 entry、registry 回收/满容量拒绝 |
+| AC-071-3 | 参数化 transport/status 分类、auth/model/JSON/schema/security/policy/internal 排除、half-open auth 释放 |
+| AC-071-4 | FallbackManager 原重试次数与真实 POST 次数；circuit 后不再 retry，baseline 明确 degraded；AgentRunner 保留 circuit code |
+| AC-071-5 | 两条真实 mock CLI 在 guard/key 构造被禁止的测试中仍成功；所有 HTTP 使用 MockTransport 或既有离线阻断 |
+| AC-071-6 | provider、fallback、CLI、T-070 并发、安全/schema/DLP 及完整回归，结果见下 |
+| AC-071-7 | 定向、全量 pytest、Ruff、diff，以及补充 benchmark 和 installed-wheel smoke，结果见下 |
+| AC-071-8 | 本报告、独立只读复核、聚焦 implementation commit 与独立审查 PR；交付后停止 |
+
+## 本轮验证记录
+
+环境：Windows / Python 3.12.10，原 `uv.lock`，命令设置 `UV_FROZEN=true`。
+原始日志目录：`C:/Users/50469/temp/specflow-t071-implementation-20260913/`。
+
+- 初始红阶段：42 failed，exit 1，因尚无 resilience 模块；随后核心 42 passed。
+- 集成红阶段：修正测试夹具调用的 registry 方法后，3 failed / 49 passed，确认
+  AgentRunner 丢失 circuit/404 分类及 multi-agent 失败产物丢失 circuit code。
+  最小分类/失败映射后 52 passed。
+- 双半开 probe 红阶段：1 failed，较早成功错误关闭 circuit；改为等待活动 probe
+  结束后恢复，新增混合结果及并发计数回归。
+
+| 命令 / 验证 | Exit code | 本轮实际结果 |
+| --- | --- | --- |
+| T-071 + provider 独立只读复核 | 0 | 81 passed，1.09s；复核者另用 Event 验证同批半开 probe 先成功、后失败仍重开，未发现剩余 blocking finding |
+| 受影响十二文件定向 pytest | 0 | 295 passed、1 skipped、1 warning，16.80s |
+| `uv run pytest -v` | 0 | 975 passed、3 skipped、3 warnings，22.58s；含 55 个新增 T-071 场景 |
+| `uv run ruff check .` | 0 | All checks passed! |
+| `uv run ruff format --check .` | 0 | 215 files already formatted |
+| `uv run python scripts/check_secrets.py` | 0 | 无发现；暂存新文件后再次扫描 |
+| `git diff --check` / `git diff --cached --check` | 0 | 提交前检查无空白错误 |
+| 12-case benchmark / normalized baseline 比对 | 0 / 0 | case_count=12、status=passed；既有 baseline 无差异 |
+| 首轮 installed smoke | 1 | 环境阻塞：pip 获取锁定 annotated-doc==0.0.4 时 TLS EOF；两轮运行检查均未启动，不计为通过 |
+| 指定官方 PyPI 后重跑 installed smoke | 0 | 新 wheel 与 standalone sdist-rebuilt wheel 各 10 项 PASS，非 editable 安装 |
+
+定向命令：
+
+```text
+uv run pytest tests/test_provider_resilience.py tests/test_openai_compatible_provider.py tests/test_fallback.py tests/test_agent_adapter.py tests/test_cli.py tests/test_cli_multi_agent.py tests/test_run_single_flight.py tests/test_runs.py tests/test_api_security.py tests/test_runner_dlp.py tests/test_required_output_validity.py tests/test_runtime_repair_integration.py -v
+uv run specflow benchmark --suite benchmarks/cases --repo benchmarks/fixtures/portfolio-python --output artifacts/t071-validation-20260913 --baseline artifacts/t071-validation-20260913/baseline.json
+git diff --no-index --exit-code benchmarks/results/mock-baseline.json artifacts/t071-validation-20260913/baseline.json
+uv run python scripts/smoke_installed_wheel.py
+```
+
+smoke 恢复只设置本次命令进程的 `PIP_CONFIG_FILE=NUL`、
+`PIP_INDEX_URL=https://pypi.org/simple`、空 `PIP_EXTRA_INDEX_URL` 和关闭 pip
+版本提示，未改系统配置、依赖版本、TLS 校验、锁文件或 smoke 脚本。预先从官方
+源成功取得同版本 annotated-doc；smoke 仍按原脚本的 `--require-hashes` 安装。
+首次失败日志 `smoke.log` 与恢复日志 `smoke-official-index.log` 均保留。
+
+两轮 wheel SHA-256 均为
+`813b438aba38013ff3be3414441d35debc924320d06b79cb4a034eea3c3b2b0f`；
+sdist 为 `7a1c4f62fc8cbb58a976b033974accc33371679b7c1a3a7b824ae6c36bb93114`。
+这些构建使用最终运行时代码、报告结算前的文档树，是安装验证产物，不是发布版本。
+
+全量三项 skip 是 `test_repository_tools.py:238`、`test_runs.py:566`、
+`test_scanner.py:148` 的既有 Windows symlink 权限限制；三项 warning 是
+TestStrategyAgent/TestStrategyOutput 收集警告和 Starlette/httpx 弃用提示。
+定向仅含 runs 的 skip 与后一个 warning。未新增 skip 或通过修改依赖隐藏警告。
+格式检查曾要求调整 provider 单测 helper 排版，修正后 215 文件检查通过。
+
+实现相对 `339e6e2` 仅九份授权文件；提交后发布独立 Draft PR 供外部审查。
+若 PR 以 main 为 base，其累计 Diff 还会显示祖先 PR #12 的六份已审文档，
+不是本轮新增规范修改；本轮实现提交自身仅包含上述九份文件。远端 CI 在推送后
+按实际检查结果单独报告，不用本地结果冒充尚未执行的远端结果。
+
+## 已知限制与停止点
+
+只有当前进程中的同步 provider 调用共享状态。无跨进程/跨重启保障、credential
+rotation 跨 tenancy 合并、live provider 验证或生产容量结论。registry 极端情况下
+无可回收槽会明确拒绝新资源，需现有资源恢复或进程生命周期结束，不做后台清理。
+本轮保证公开 guard snapshot、分类错误和应用产物不携带内部身份；不声称抵御
+进程内任意对象反射、调试器内存读取或外部日志系统自行记录 transport 请求。
+不开始 T-072/T-073/cache/preflight/Java/M10，不自动合并 PR，不自行宣布任务关闭。
