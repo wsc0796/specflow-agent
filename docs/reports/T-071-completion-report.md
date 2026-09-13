@@ -261,3 +261,93 @@ T-070 的关闭记录是在合入 main 后核验 integrated tree、报告及 CI�
 依用户长期交付约定，本次只提交并推送该报告登记，更新现有 PR 供 GPT 读取；
 登记提交 SHA 在 PR 正文与交付回复记录。implementation 审查目标始终固定为
 `a69e15ee9aaaad9a0bedb8a6c7b645f2c82e4eec`，不因追加报告改变被审对象。
+
+## T-071 closure
+
+日期：2026-09-13。**状态：T-071 — CLOSED。** 本节是 PR #13 实际合并并通过
+集成核验后的关闭登记。前文 REVIEW PASSED / READY FOR MERGE 保留为历史阶段，
+不改写成当时已经关闭；本次不修改任何运行时代码或开始 T-072。
+
+### 固定版本与合并证据
+
+- authoritative spec / gate base：`339e6e28e1d8c7bd79ac6e7303c0e1c5717c45da`。
+- implementation commit：`a69e15ee9aaaad9a0bedb8a6c7b645f2c82e4eec`。
+- independent review registration：`8ded8a4d568d131082cf5b0664a63d80741cbf88`。
+- integrated main SHA：`129783b24f2222d98e099d2184ed4108b75a606d`。
+- [PR #13](https://github.com/wsc0796/specflow-agent/pull/13)：GitHub 状态 MERGED，
+  mergedAt=`2026-09-13T11:19:30Z`，mergeCommit 与上述 integrated main SHA 一致。
+  合并前 head 精确匹配 `8ded8a4`，四项 PR 检查通过、无冲突；依据用户随后明确
+  授权执行 merge commit，未 squash/rebase、强推或改写已审历史。
+- `git switch main` / `git pull --ff-only` 成功，更新后 `git status --short` 无输出。
+  implementation 与 review-registration 两条 `merge-base --is-ancestor ... HEAD`
+  检查均 exit 0。此前合并前检查的 exit 1 保留为先前阶段事实，本次不复用它。
+
+### Integrated-tree 与契约核对
+
+`git diff --exit-code 8ded8a4d568d131082cf5b0664a63d80741cbf88 HEAD` 返回 0：
+审查登记提交与 integrated main 的**完整 tree** 同为
+`3ae2ad7178f2c04993fdf8947d8244df3d7db885`，没有合并时额外修改。
+
+另与 implementation `a69e15e` 比较 `src/`、`tests/`、`pyproject.toml`、
+`uv.lock`、`benchmarks/`、`scripts/`、`prompts/`，diff exit 0。包括用户指定的
+`llm/resilience.py`、`llm/exceptions.py`、`llm/providers/openai_compatible.py`、
+`policy/errors.py`、`agents/adapter.py`、`runner_multi.py` 与
+`tests/test_provider_resilience.py`，均保留被审字节，没有未经审查的语义增量。
+
+已结合 main 源码核对以下契约仍适用：endpoint/model/tenancy 内部身份；
+PROVIDER_CIRCUIT_REJECTED 不可重试；原 retry/fallback owner；mock bypass；
+HALF_OPEN probe 上限与 generation；finally 许可释放；仅计入明确 availability
+failure；multi-agent 在 handoff 前 fail closed；有界进程内 registry。
+未重新开发测试矩阵，也未借 closure 修改任何上述实现。
+
+### 合并后 main CI
+
+[CI run 34754138442](https://github.com/wsc0796/specflow-agent/actions/runs/34754138442)
+是 **main push** 事件，headSha 精确为
+`129783b24f2222d98e099d2184ed4108b75a606d`，总体 conclusion=success。
+
+| Job | Conclusion |
+| --- | --- |
+| quality | success |
+| benchmark | success |
+| security | success |
+| smoke | success |
+
+该记录是本次实际读取的 merge-after CI；前文 PR #13 的合并前 CI 不作为它的
+替代。main 上的权威规范、完成报告及独立审查登记均可读，外部静态复审 PASS
+继续适用于相同实现 tree；已审 T-071 范围内没有未处理 P1/P2 finding。
+
+### 本地 closure 验证与登记范围
+
+依据 AGENTS 的本地质量门，使用 Windows / Python 3.12.10、原 `uv.lock`、
+`UV_FROZEN=true` 在上述 integrated main 上新执行：
+
+| 命令 | Exit code | 本次实际结果 |
+| --- | --- | --- |
+| `uv run pytest -v` | 0 | 975 passed、3 skipped、3 warnings，23.83s |
+| `uv run ruff check .` | 0 | All checks passed! |
+| `uv run ruff format --check .` | 0 | 215 files already formatted |
+| `git diff --check` | 0 | 无空白错误；追加 closure 后再次检查 |
+
+三项 skip 为既有 Windows symlink 权限限制，三项 warning 为两项 pytest class
+收集警告和 Starlette/httpx 弃用提示。没有新增 skip、修改测试或升级依赖。
+本轮日志：`C:/Users/50469/temp/specflow-t071-main-closure-20260913/pytest.log`。
+
+关闭登记从已核验 main 创建 `docs/t071-closure-20260913` 分支，只追加本报告。
+按既有交付约定提交、推送并发布单独文档 PR；closure commit SHA 在交付及 PR
+正文提供，不循环写入自身提交。该文档 PR 的后续处理与已合并的 T-071 实现
+分开记录，本轮不自动合并新的文档 PR。
+
+### 保留限制与停止点
+
+- no live-provider quality claim；本次未执行 live-provider validation。
+- no production rate-limit/latency/capacity claim。
+- no multi-process guarantee；仅进程内同步 provider attempt 协调。
+- no restart persistence。
+- CircuitSnapshot 的 provider_resource_alias / model_alias 仍为 resident-slot
+  aliases；未来 T-073 不得自动将其解释为跨 entry / 跨运行稳定 provider/model
+  identity。该非阻塞说明不被关闭登记抹去。
+
+本次 **T-071 — CLOSED** 只结算已审、已集成并有上述证据的任务范围，不代表 M9
+或 M10 完成。登记后停止，不实现 execution lanes、T-073 metrics 或其他后续功能。
+只有下一次新的 focused session 才评估 T-072 开工门。
