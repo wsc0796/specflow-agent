@@ -224,6 +224,10 @@ The serialized evidence is injected into `WorkerContext.project_context` for
 consumption by the Analyze/Generate/Review Worker chain. All tool calls are
 recorded as sanitized `ToolCallRecord` entries. The pipeline enforces hard
 limits on keywords, tool calls, selected files, and total evidence characters.
+The multi-agent runner also fails closed with `EVIDENCE_NOT_FOUND` before
+Coordinator planning when collection produces zero usable evidence excerpts;
+it does not allow deterministic Mock Agents to turn an ungrounded request into
+a successful run.
 
 Example process configuration (use your own provider values and never commit the
 real key):

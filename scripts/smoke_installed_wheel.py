@@ -114,7 +114,22 @@ class Smoke:
             api_dir = work / "api"
             repo_dir = api_dir / "fake-repo"
             repo_dir.mkdir(parents=True)
-            (repo_dir / "app.py").write_text("def main():\n    pass\n", encoding="utf-8")
+            # The fixture must satisfy the evidence gate that the mock run below
+            # exercises: the requirement ("Add a health endpoint.") has to match
+            # repository vocabulary literally, otherwise the run stops with
+            # EVIDENCE_NOT_FOUND before planning.  Keep a real health endpoint
+            # here so this stays a positive end-to-end path.
+            (repo_dir / "app.py").write_text(
+                "from fastapi import FastAPI\n"
+                "\n"
+                "app = FastAPI()\n"
+                "\n"
+                "\n"
+                '@app.get("/health")\n'
+                "def health() -> dict[str, str]:\n"
+                '    return {"status": "ok"}\n',
+                encoding="utf-8",
+            )
             _run([sys.executable, "-m", "venv", str(venv)])
 
             if not self.check("clean venv + wheel install", lambda: self._install(pip, venv)):

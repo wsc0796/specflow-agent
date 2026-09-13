@@ -27,12 +27,14 @@ from specflow.tools.repository_tools import _read_text
 CONTRACT_VERSIONS = (
     ("key", "1"),
     ("topology", "fixed-six-v1"),
-    ("schema", "strict-v1"),
+    ("schema", "strict-minimum-content-t081-v1"),
     ("prompt", "workers-v1"),
+    ("prompt_loader", "packaged-t082-v1"),
     ("enrichment", "1.0.0"),
     ("sanitizer", "t063-v1"),
     ("artifacts", "t069-v1"),
-    ("evidence", "bounded-python-v1"),
+    ("evidence", "bounded-python-required-t083-v1"),
+    ("handoff_integrity", "classified-t084-v1"),
 )
 SNAPSHOT_MAX_ENTRIES = 10_000
 SNAPSHOT_MAX_BYTES = 8 * 1024 * 1024

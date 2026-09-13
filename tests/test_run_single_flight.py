@@ -213,10 +213,12 @@ def test_semantic_key_changes_never_join_existing_owner(tmp_path, monkeypatch, c
         "topology",
         "schema",
         "prompt",
+        "prompt_loader",
         "enrichment",
         "sanitizer",
         "artifacts",
         "evidence",
+        "handoff_integrity",
     ],
 )
 def test_each_behavior_contract_version_is_part_of_key(tmp_path, contract):
@@ -396,6 +398,7 @@ def test_follower_exit_keeps_the_owner_and_later_follower(tmp_path, monkeypatch,
 
     repo = tmp_path / "repo"
     repo.mkdir()
+    (repo / "feature.py").write_text("def feature(): return 1\n", encoding="utf-8")
     entered, release, joined = Event(), Event(), Event()
     coordinator = SingleFlightCoordinator()
     original = runner_multi.EvidenceCollector.collect
@@ -448,6 +451,7 @@ def test_partial_artifact_failure_is_not_shared_as_completed(tmp_path, monkeypat
 
     repo = tmp_path / "repo"
     repo.mkdir()
+    (repo / "feature.py").write_text("def feature(): return 1\n", encoding="utf-8")
     original = runner_multi._safe_write
 
     def fail_metrics(*args, **kwargs):
@@ -458,7 +462,7 @@ def test_partial_artifact_failure_is_not_shared_as_completed(tmp_path, monkeypat
     monkeypatch.setattr(runner_multi, "_safe_write", fail_metrics)
     result = runner_multi.run_multi_agent(
         repo=repo,
-        requirement="x",
+        requirement="feature",
         output=tmp_path / "out",
         mock=True,
     )
@@ -473,6 +477,7 @@ def test_artifact_io_failure_is_an_explicit_runtime_result(tmp_path, monkeypatch
 
     repo = tmp_path / "repo"
     repo.mkdir()
+    (repo / "feature.py").write_text("def feature(): return 1\n", encoding="utf-8")
     original_write = runner_multi._safe_write
     original_mkdir = Path.mkdir
 
@@ -491,7 +496,7 @@ def test_artifact_io_failure_is_an_explicit_runtime_result(tmp_path, monkeypatch
     coordinator = SingleFlightCoordinator()
     result = runner_multi.run_multi_agent(
         repo=repo,
-        requirement="x",
+        requirement="feature",
         output=tmp_path / "out",
         mock=True,
         _coordinator=coordinator,
@@ -505,9 +510,10 @@ def test_artifact_io_failure_is_an_explicit_runtime_result(tmp_path, monkeypatch
 def test_missing_completion_marker_cannot_publish_success(tmp_path, monkeypatch):
     repo = tmp_path / "repo"
     repo.mkdir()
+    (repo / "feature.py").write_text("def feature(): return 1\n", encoding="utf-8")
     monkeypatch.setattr(runner_multi, "_finalize_run_directory", lambda *args: None)
     result = runner_multi.run_multi_agent(
-        repo=repo, requirement="x", output=tmp_path / "out", mock=True
+        repo=repo, requirement="feature", output=tmp_path / "out", mock=True
     )
     assert result == 3
     assert result.error_code == "ARTIFACT_WRITE_FAILED"
@@ -519,6 +525,7 @@ def test_primary_failure_survives_unavailable_diagnostic_artifacts(tmp_path, mon
 
     repo = tmp_path / "repo"
     repo.mkdir()
+    (repo / "feature.py").write_text("def feature(): return 1\n", encoding="utf-8")
 
     def fail_stage(*args, **kwargs):
         raise SpecFlowError("CALL_BUDGET_EXCEEDED", "safe")
@@ -529,7 +536,7 @@ def test_primary_failure_survives_unavailable_diagnostic_artifacts(tmp_path, mon
     monkeypatch.setattr(runner_multi, "_run_and_accumulate", fail_stage)
     monkeypatch.setattr(runner_multi, "_safe_write", fail_write)
     result = runner_multi.run_multi_agent(
-        repo=repo, requirement="x", output=tmp_path / "out", mock=True
+        repo=repo, requirement="feature", output=tmp_path / "out", mock=True
     )
     assert result == 3
     assert result.error_code == "CALL_BUDGET_EXCEEDED"
@@ -547,18 +554,19 @@ def test_completed_results_are_not_cached(tmp_path, monkeypatch):
     monkeypatch.setattr(runner_multi.EvidenceCollector, "collect", collect)
     repo = tmp_path / "repo"
     repo.mkdir()
+    (repo / "feature.py").write_text("def feature(): return 1\n", encoding="utf-8")
     first = runner_multi.run_multi_agent(
-        repo=repo, requirement="x", output=tmp_path / "a", mock=True
+        repo=repo, requirement="feature", output=tmp_path / "a", mock=True
     )
     second = runner_multi.run_multi_agent(
-        repo=repo, requirement="x", output=tmp_path / "b", mock=True
+        repo=repo, requirement="feature", output=tmp_path / "b", mock=True
     )
     assert first == second == 0
     assert calls == [1, 1]
     assert first.single_flight["role"] == second.single_flight["role"] == "owner"
     assert first.artifact_directory != second.artifact_directory
     conflict = runner_multi.run_multi_agent(
-        repo=repo, requirement="x", output=tmp_path / "a", mock=True
+        repo=repo, requirement="feature", output=tmp_path / "a", mock=True
     )
     assert conflict == 3 and conflict.artifact_directory is None
 
@@ -653,11 +661,15 @@ def test_api_single_flight_dto_is_durable_without_new_columns(tmp_path: Path):
 
     repo = tmp_path / "repo"
     repo.mkdir()
+    (repo / "feature.py").write_text("def feature(): return 1\n", encoding="utf-8")
     with client_for(tmp_path) as client:
         project = register_project(client, repo)
-        response = client.post("/api/v1/runs", json={"project_id": project, "requirement": "x"})
+        response = client.post(
+            "/api/v1/runs", json={"project_id": project, "requirement": "feature"}
+        )
         assert response.status_code == 201
         body = response.json()
+        assert body["status"] == "completed"
         expected = {"role": "owner", "owner_run_id": body["id"]}
         assert body["single_flight"] == expected
         with client.app.state.database.factory() as session:

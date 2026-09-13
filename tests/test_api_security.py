@@ -161,6 +161,7 @@ def test_reviewer_label_allowlist(tmp_path: Path) -> None:
     repository = tmp_path / "repository"
     repository.mkdir()
     (repository / "README.md").write_text("# repo\n", encoding="utf-8")
+    (repository / "search.py").write_text("# Add search\n", encoding="utf-8")
     security = ApiSecurity(
         api_key="test-api-key",
         allowed_repository_roots=(str(repository),),

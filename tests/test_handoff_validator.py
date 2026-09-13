@@ -126,3 +126,34 @@ class TestHandoffValidator:
                 sender,
                 {"stage-0/sender": payload},
             )
+
+    def test_payload_mutated_after_hash_raises_integrity_error(self) -> None:
+        """A post-hash payload change must fail with a classified handoff error."""
+        sender = _make_identity(
+            "sender", AgentRole.REPOSITORY_ANALYST, output_schema_id="sender/output"
+        )
+        payload = {
+            "agent_id": "sender",
+            "role": "repository_analyst",
+            "output": {"summary": "Original"},
+        }
+        handoff = AgentHandoff(
+            **{
+                **_make_handoff(source_output_schema_id="sender/output").__dict__,
+                "payload_ref": "agent-outputs.json#stage-0/sender",
+                "output_hash": sha256(canonical_json_bytes(payload)).hexdigest(),
+            }
+        )
+
+        payload["output"]["summary"] = "Tampered"
+
+        with pytest.raises(HandoffValidationError, match="output_hash") as exc_info:
+            HandoffValidator().validate_payload(handoff, sender, {"stage-0/sender": payload})
+
+        assert type(exc_info.value).__name__ == "HandoffIntegrityError"
+        assert exc_info.value.audit_context == {
+            "handoff_id": "h1",
+            "from_agent_id": "sender",
+            "to_agent_id": "receiver",
+            "payload_ref": "agent-outputs.json#stage-0/sender",
+        }

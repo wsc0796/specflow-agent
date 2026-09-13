@@ -212,6 +212,7 @@ def test_caller_cancellation_keeps_running_api_work_and_permit(tmp_path, monkeyp
     monkeypatch.setattr(Flight, "wait", wait)
     repo = tmp_path / "repo"
     repo.mkdir()
+    (repo / "feature.py").write_text("def feature(): return 1\n", encoding="utf-8")
     with client_for(tmp_path) as client, ThreadPoolExecutor(2) as pool:
         project = register_project(client, repo)
         payload = {"project_id": project, "requirement": "feature"}
@@ -267,6 +268,7 @@ def test_api_follower_timeout_is_durable_and_does_not_release_owner(tmp_path, mo
     monkeypatch.setattr(Flight, "wait", lambda self, timeout: original_wait(self, 0))
     repo = tmp_path / "repo"
     repo.mkdir()
+    (repo / "feature.py").write_text("def feature(): return 1\n", encoding="utf-8")
     with client_for(tmp_path) as client, ThreadPoolExecutor(1) as pool:
         project = register_project(client, repo)
         payload = {"project_id": project, "requirement": "feature"}
@@ -319,6 +321,7 @@ def test_api_cannot_share_direct_owner_artifacts_outside_its_root(tmp_path, monk
     monkeypatch.setattr(Flight, "wait", wait)
     repo = tmp_path / "repo"
     repo.mkdir()
+    (repo / "feature.py").write_text("def feature(): return 1\n", encoding="utf-8")
     with client_for(tmp_path) as client, ThreadPoolExecutor(2) as pool:
         project = register_project(client, repo)
         owner = pool.submit(
@@ -385,6 +388,7 @@ def test_create_get_and_list_mock_run_artifacts(tmp_path: Path) -> None:
     repository = tmp_path / "repository"
     repository.mkdir()
     (repository / "README.md").write_text("# Fixture repository\n", encoding="utf-8")
+    (repository / "orders.py").write_text("# Add an order search endpoint\n", encoding="utf-8")
 
     with client_for(tmp_path) as client:
         project_id = register_project(client, repository)
@@ -414,6 +418,30 @@ def test_create_get_and_list_mock_run_artifacts(tmp_path: Path) -> None:
         assert artifacts.json()["run_id"] == body["id"]
         assert "manifest.json" in artifacts.json()["files"]
         assert all("/" not in name and "\\" not in name for name in artifacts.json()["files"])
+
+
+def test_run_api_persists_no_evidence_failure(tmp_path: Path) -> None:
+    repository = tmp_path / "repository"
+    repository.mkdir()
+    (repository / "app.py").write_text("def existing_feature():\n    return True\n")
+
+    with client_for(tmp_path) as client:
+        project_id = register_project(client, repository)
+        created = client.post(
+            "/api/v1/runs",
+            json={
+                "project_id": project_id,
+                "requirement": "totally_missing_symbol_xyz_74219",
+            },
+        )
+
+        assert created.status_code == 201
+        body = created.json()
+        assert body["status"] == "failed_runtime"
+        assert body["result_status"] == "failed_runtime"
+        assert body["error_code"] == "EVIDENCE_NOT_FOUND"
+        assert body["artifact_available"] is True
+        assert repository.resolve().as_posix() not in json.dumps(body)
 
 
 def test_run_api_rejects_invalid_resources_and_non_mock_execution(tmp_path: Path) -> None:
@@ -599,6 +627,7 @@ def test_completed_run_exposes_review_package_and_append_only_decisions(tmp_path
     repository = tmp_path / "repository"
     repository.mkdir()
     (repository / "README.md").write_text("# Fixture repository\n", encoding="utf-8")
+    (repository / "orders.py").write_text("# Add an order search endpoint\n", encoding="utf-8")
 
     with client_for(tmp_path) as client:
         project_id = register_project(client, repository)
