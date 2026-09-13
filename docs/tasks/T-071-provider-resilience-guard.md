@@ -5,6 +5,11 @@
 > S12-01 / P2。本次修订后端资源身份，不代表实现完成或 dependency gate 已满足。
 > 下方 FROZEN 为既有冻结记录；本修订尚待重审，不构成实施放行。
 
+> **后续修订（2026-09-13）：AMENDMENT PROPOSED / 待重审。** 固定提交
+> `a178735b335628d650e9755c91545c94af926c9b` 的复审发现 R12-01 / P2 接续
+> S12-01：在 endpoint 隔离基础上补充内部 provider tenancy 身份，与公开审计别名
+> 分离。本次仍为规范修订，不代表实现完成或实施门已满足。
+
 **Status:** FROZEN. Implementation requires T-070 to be closed and a new focused
 session.
 
@@ -18,16 +23,29 @@ mock, schema, and audit semantics.
 ## Requirements
 
 - **REQ-071-1 — Scope state by provider resource.** Maintain independent
-  process-local state for `(provider_resource_alias, effective_model)`.
-  `provider resource identity` 指有效配置实际连接的后端资源身份，必须能够
-  区分不同 effective endpoint；`openai-compatible` 等协议名不是唯一后端身份。
-  使用有界、不透明的 provider-resource alias 表示该身份，并使用有界、规范化的
-  effective model 身份。同一真实 backend + effective model 可以合法共享
-  breaker；不同 backend 即使协议名和 model 标签相同，也不得共享失败状态。
-  别名与有效后端的绑定不得把不同 endpoint 合并成同一资源；不得仅凭协议或
-  调用方提供的同名标签推断等价。原始 URL 仅用于已有配置边界内的资源解析，
-  不得作为 breaker registry key 或公开标签；API key、prompt、request body、
-  repository data、tenant/user data 同样不得进入该 key。
+  process-local state for the internal breaker key:
+
+  ```text
+  (backend_resource_identity, effective_model, provider_tenancy_discriminator)
+  ```
+
+  `backend_resource_identity` 以有界不透明身份表示有效配置实际连接的后端，
+  必须区分不同 effective endpoint；`openai-compatible` 等协议名不是唯一后端
+  身份。`effective_model` 使用有界、规范化身份。原始 URL 仅在已有配置边界内
+  用于后端解析，不作为 registry key 或公开标签。
+  `provider_tenancy_discriminator` 必须区分会影响 availability/rate-limit domain
+  的 credential/provider tenancy。默认采用仅驻留进程内、抗碰撞的不可逆凭据
+  指纹（例如 SHA-256）；raw API key 绝不能放入 key。也可采用明确配置的有界
+  不透明 provider-project/tenant alias，但其绑定必须区分相关配额/可用性域。
+  不得仅因 endpoint/model 相同或公开 alias 相同就共享状态。若不同 credentials
+  的 tenancy 要共享，必须明确说明为何其 availability/rate-limit domain 可安全
+  共享，并提供对应测试证据；否则按凭据隔离。同一真实后端、effective model
+  和 tenancy 可以合法共享 breaker。
+  内部 discriminator（无论凭据指纹还是 opaque tenancy alias）仅用于内部 breaker
+  identity，不持久化，也不进入 metrics、trace、artifact 或日志。内部 key 与
+  REQ-071-8 的公开 audit alias 分离，公开 alias 不能用作完整内部 key 的替代。
+  raw API key、prompt、request body、repository data、原始 tenant/user data 均
+  不得进入 key；允许内部使用派生指纹/不透明 tenancy 标识，不等于允许公开它们。
 - **REQ-071-2 — Implement the state machine.** Provide explicit
   `CLOSED → OPEN → HALF_OPEN → CLOSED/OPEN` behavior with configurable positive
   thresholds, open duration, and bounded half-open probe count. Use an injected
@@ -55,14 +73,16 @@ mock, schema, and audit semantics.
   probes, and remains deterministic.
 - **REQ-071-7 — Clean up safely.** Every permitted call must release its probe
   slot after success or failure. Exceptions must not strand a HALF_OPEN probe or
-  corrupt another provider-resource/effective-model's state. State access must
+  corrupt another backend/model/tenancy key's state. State access must
   be thread-safe.
 - **REQ-071-8 — Keep audit data bounded.** Expose only safe state, transition,
   rejection, failure-count, provider-resource alias, and model alias metadata
-  required by T-073. 公开 metrics、trace、artifact 中的身份字段仅可使用有界安全别名，
+  required by T-073. 公开 metrics、trace、artifact、日志中的身份字段仅可使用有界安全别名，
   不得包含原始 URL、API key、prompt、repository data、tenant/user data、
   exception body、raw provider output 或无界 registry key。别名不得直接拼入
   这些原始值；公开 model alias 同样受既有 sanitization/DLP 边界约束。
+  完整 internal breaker key、credential fingerprint 及 internal tenancy
+  discriminator 均不得输出；不得直接用指纹充当公开 provider-resource alias。
 - **REQ-071-9 — Expected implementation surface.** Expected production files
   are a focused `src/specflow/llm/resilience.py`,
   `src/specflow/llm/providers/openai_compatible.py` or a shared LLM decorator,
@@ -82,8 +102,8 @@ The following are explicit non-goals for T-071:
   compatible audit hooks.
 - No Resilience4j or other third-party resilience dependency unless a separately
   reviewed spec amendment proves the standard library design insufficient.
-- No Agent-level circuit: six agents sharing one backend resource and effective
-  model share that resource state; Agent IDs do not create separate breakers.
+- No Agent-level circuit: six agents sharing one backend resource, effective
+  model, and provider tenancy share that state; Agent IDs do not create separate breakers.
 - No distributed breaker, persistence across restart, external health probe,
   provider failover router, load balancer, or background recovery task.
 - No new retry budget, unbounded probe traffic, sleep-based tests, or network
@@ -100,10 +120,16 @@ The following are explicit non-goals for T-071:
 - **AC-071-2:** 测试覆盖以下资源身份与共享边界，并验证 registry 有界及线程安全：
   - same protocol + same model + different backend resource（不同 effective
     endpoint）→ breaker state isolated；后端 A 打开熔断不阻断健康后端 B；
-  - same backend resource + same effective model → breaker state legitimately
-    shared；不同 effective model 的状态独立；
+  - same endpoint + same effective model + different credential/provider tenancy
+    → rate-limit/failure state isolated；A 因多次 429 打开 breaker 后，健康 B 仍被允许；
+  - same real backend resource + same effective model + same tenancy → breaker
+    state legitimately shared；不同 effective model 的状态独立；
   - mock → neither reads nor mutates live breaker state，也不消耗 half-open probe；
-  - registry key 与公开 metrics/trace/artifact 不泄露 REQ-071-1/-8 禁止的数据。
+  - internal key 的 tenancy 分量仅使用进程内不可逆指纹或明确配置的不透明标识，
+    不含 raw credential；metrics/trace/artifact/log 均无 raw credential、fingerprint
+    或 internal tenancy discriminator，符合 REQ-071-1/-8；
+  - authentication failure 仍按 REQ-071-3 排除在 breaker health 计数之外，
+    不能因加入 credential identity 而改变既有错误分类。
 - **AC-071-3:** Tests prove counted transient failures versus excluded auth,
   model, JSON, schema, security, and internal failures using the existing
   taxonomy.

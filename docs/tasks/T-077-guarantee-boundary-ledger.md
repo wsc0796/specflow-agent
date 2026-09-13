@@ -6,6 +6,11 @@
 > 完成或 dependency gate 已满足。下方 REVISION 4 为既有冻结记录；本修订尚待
 > 重审，不改变 REQ-M10-12 或放行 T-077。
 
+> **后续修订（2026-09-13）：AMENDMENT PROPOSED / 待重审。** 固定提交
+> `a178735b335628d650e9755c91545c94af926c9b` 的复审发现 R12-02 / P2 接续
+> S12-04：保留完整输入确定性，将反证保留限定在显式 evidence snapshot 及其
+> 判断谱系内，不引入跨运行历史存储。本次不代表实现完成或实施门已满足。
+
 **Status:** SPECIFICATION FROZEN — REVISION 4. Implementation is blocked until the
 full REQ-M10-12 gate is satisfied: independently approved M10 specification
 freeze (decision and commit), readable declaration sources at their named source
@@ -78,9 +83,12 @@ and "contradicted" become distinguishable by machine.
   扫描新生成的 ledger 来替代实际 execution evidence。同一 checkout 后续显式
   提供有效证据，可以使 `declared` 依法变为 `verified`，但仍须逐项满足
   REQ-M10-2 的四条件；skipped、version-mismatched 或 unexecuted evidence
-  均不能产生 `verified`。对同一声明及 tested-code/config，已登记的有效反证
-  必须在输入与结果中显式保留，不能因重跑、添加支持证据或悄悄移除反证而降级
-  `refuted`；缺失反证输入必须显式报告，不得伪装成无反证的成功判断。
+  均不能产生 `verified`。在同一个 explicit evidence-input-set snapshot 中，
+  有效反证必须产生 `refuted`；该 snapshot 产生的 normalized ledger、rollup 和
+  summary 均须保留它，不能因同集合中也有支持证据而降级或隐藏。
+  另一份 evidence snapshot 是新的判断输入，必须按 REQ-077-8 显示不同的
+  `evidence_set_id`。本任务不维护独立历史真相源，因此不承诺仅凭当前集合自动
+  检测或报告“过去的反证已被删除”，也不能据此声称跨运行 anti-removal。
 
 - **REQ-077-5 — Judgement and justification are separate fields.** The ledger
   records the state (`verified`, `declared`, `refuted`, `not_applicable`) and its
@@ -92,6 +100,10 @@ and "contradicted" become distinguishable by machine.
   `refuted` into `declared`, `unverified`, `not_applicable`, or any "known
   issues" bucket that is not separately reported. Downgrading a judgement so a
   summary reads better violates REQ-M10-5.
+  此保证覆盖同一显式 evidence snapshot 及其产生的全部 assurance evidence
+  lineage：重复生成、汇总或展示均不能隐去该集合的 `refuted`。若并列展示不同
+  evidence set，须按 `evidence_set_id` 区分判断及其来源，不能用新集合的结论
+  覆盖、冒充旧集合的连续判断。该规则不隐含自动检索历史集合或累积存储能力。
 
 ### Validation mechanics
 
@@ -116,7 +128,7 @@ and "contradicted" become distinguishable by machine.
   Normalized Ledger = f(
     declaration registry/source snapshot,
     tested-code commit + effective configuration,
-    explicit evidence-input-set snapshot,
+    explicit evidence-input-set snapshot + evidence_set_id,
     judgement-rule/schema version
   )
   ```
@@ -127,7 +139,15 @@ and "contradicted" become distinguishable by machine.
   REQ-077-4/-5/-6 和 REQ-M10-2 改变。
   evidence set 必须显式、有界、可版本绑定、可重现：记录规范排序的成员清单、
   可解析的证据引用及内容/版本身份、实际执行结果与 tested-code/config 绑定；
-  空集合也须明确表示。重现须使用同一固定集合，不能把“目录当前有哪些文件”
+  空集合也须明确表示。每个集合使用稳定、有界的 `evidence_set_id`，由规范化的
+  evidence manifest 内容计算抗碰撞摘要（例如 SHA-256），并核验 ID 与实际 manifest
+  一致。成员清单、证据内容/版本或执行绑定变化必须改变 ID；不得对不同集合复用
+  人工标签来伪装同一身份。manifest 是当前显式输入的描述，不是新增的累积历史库。
+  该 ID 进入 normalized ledger 输入身份，并在 ledger 及其 rollup/summary 中
+  可见；不同集合即使得到相同 judgement，也必须显示不同 ID。
+  不同 evidence set 的后续执行可以依法产生不同 judgement，但不得宣称与旧集合
+  属于同一连续 evidence lineage。相同完整输入（包括相同 ID）仍须得到相同
+  normalized ledger。重现须使用同一固定集合，不能把“目录当前有哪些文件”
   当作未记录的隐式输入。当前输出 ledger 及其完成标记不自动成为下一次运行的
   输入，避免 self-referential result drift；ledger 状态本身不替代底层有效证据。
   已有完成标记的 `completed_at` 来自 wall clock，仍不要求整个包字节相同；
@@ -183,6 +203,10 @@ The following are explicit non-goals for T-077:
   `refuted` entry.
 - Do not decide that a declaration holds because a similarly named test exists.
   REQ-077-4 governs.
+- 不新增 cumulative evidence history、跨运行 anti-removal 或历史删除/回滚检测。
+  如需此类保证，必须另行明确权威 manifest 的创建者、更新者、存放位置、版本化、
+  输入绑定、离线只读边界及删除/回滚验收，并取得范围批准；输出 ledger 不充当
+  隐式历史真相源。
 
 ## Acceptance
 
@@ -199,14 +223,17 @@ The following are explicit non-goals for T-077:
   configured length bound.
 - **AC-077-5:** 测试按 REQ-077-8 的完整输入验证以下情形；比较 normalized body，
   package completion marker 可以不同：
-  - same declaration/source + same tested-code/config + same evidence set + same
-    judgement rules/schema → normalized result identical；
-  - same checkout，显式新增满足 REQ-M10-2 四条件的有效 evidence → `declared`
-    可以合法变成 `verified`；
+  - same declaration/source + same tested-code/config + same evidence set 及
+    evidence_set_id + same judgement rules/schema → normalized result identical；
+  - new evidence set 的 membership、证据内容/版本或执行绑定变化 → evidence_set_id
+    visibly changes；不匹配的 manifest/ID 不能被接受为同一输入身份；
+  - same checkout，显式提供另一集合且其有效证据满足 REQ-M10-2 四条件 →
+    judgement 可以依法不同，例如 `declared` 变为 `verified`；必须展示新 ID，
+    不得冒充旧集合的同一连续判断，或据此重标记旧集合中的 `refuted`；
   - 仅提供 skipped、version-mismatched 或 unexecuted evidence → 仍为 `declared`，
-    不得 `verified`（已有有效反证时仍按下一项保留 `refuted`）；
-  - valid contradicting evidence → `refuted`，重跑和 rollup 均保留；悄悄移除已登记
-    反证不得产生降级后的成功判断；
+    不得 `verified`（同一集合内有有效反证时仍按下一项保留 `refuted`）；
+  - same evidence set contains valid refutation → 每次 normalized ledger 生成及
+    每个 rollup/summary 均保留 `refuted`，不合并或隐藏；
   - evidence set 的成员/内容/版本绑定可重现且有界；输出 ledger 的出现或
     completion marker 的时间变化不自动改变下一次输入或 normalized result。
 - **AC-077-6:** Tests prove the command writes only inside the declared output

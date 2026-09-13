@@ -2,9 +2,9 @@
 
 日期：2026-09-13。审查基线：`2959a2f9ac8c7d0d3b5a2217102d0ce0ed223ed0`。
 
-> 当前工作区包含针对 PR #12 固定提交 `558004b2bfc46ddcf76317ba30123a12f486445f`
-> 的四项规范修订，状态为 **AMENDMENT PROPOSED / 待重审**。下文初次交付与发布
-> 验证记录保留为历史；本轮修改及新执行的验证见“外部重审修订结算”，不代表实现放行。
+> 当前修订基于 PR #12 固定提交 `a178735b335628d650e9755c91545c94af926c9b`。
+> 最新处置见“a178735 复审结算与 R12 修订”；此前交付、验证和发布记录保留为历史。
+> R12-01/R12-02 修订为 **AMENDMENT PROPOSED / 待重审**，不代表实现放行。
 
 ## 初次交付与审查对象（558004b 历史记录）
 
@@ -196,3 +196,100 @@ Git 配置。最终 `git diff --check` 无此提示及空白错误。
 发布提交的完整 SHA 及可访问性由 PR 正文和 GitHub 提交记录提供，避免在文档中
 循环登记自身提交。PR 保持草稿，四项 amendment 仍待外部重审；发布不构成
 规范批准、PR 合并或任何运行时任务的实施许可。
+
+## a178735 复审结算与 R12 修订
+
+### 固定对象与复审来源
+
+- 日期：2026-09-13；分支：`docs/t071-t080-spec-review`。
+- 固定复审提交、本轮起点及当前完整 HEAD：`a178735b335628d650e9755c91545c94af926c9b`。
+- 修改前 `git status --short` 无输出，本地 HEAD 与 PR #12 远端 head 均匹配固定提交。
+- 来源：用户转交的针对该固定提交的静态规范复审及修订指令；以下 S12 结算登记该
+  复审结论，不冒充本执行者完成了独立运行时验证或 GitHub 正式 APPROVE。
+- 本轮仅修改 [T-071](../tasks/T-071-provider-resilience-guard.md)、
+  [T-077](../tasks/T-077-guarantee-boundary-ledger.md) 和本报告，交付为未提交 Diff。
+
+审查使用 T-070～T-080 十一份完整规范及 AGENTS、冻结基线、PR 正文、M9/M10
+总规范与冻结报告、编号映射和 `single_flight.py`。本会话此前已完整阅读的未改
+材料，经 Git 比对确认与当前固定提交一致；T-071/T-077 和本入口重新读取完整
+当前正文。T-075/T-076 沿用此前完整阅读及修订内容，本轮不重新修改其已关闭发现。
+
+### 旧发现的最新 disposition
+
+| 发现 | 固定提交 a178735 的静态复审结论 | 当前 disposition / 边界 |
+| --- | --- | --- |
+| S12-01 / P2 | endpoint 隔离方向正确，但遗漏 provider tenancy discriminator | superseded by R12-01 / P2；继续 open |
+| S12-02 / P2 | preflight 与 follower 容量边界问题已解决 | **RESOLVED / CLOSED BY STATIC SPEC RE-REVIEW**；仅关闭规范发现，不代表 T-075 已实现 |
+| S12-03 / P2 | Java 读取面同步 equivalence/cache identity 的规范问题已解决 | **RESOLVED / CLOSED BY STATIC SPEC RE-REVIEW**；仅关闭规范发现，不代表 T-076 已实现 |
+| S12-04 / P2 | 核心 determinism 问题已解决，但跨运行 refutation anti-removal 的 source-of-truth 不明确 | superseded by R12-02 / P2；继续 open |
+
+### R12 修订与验收映射
+
+| 发现 | 修改条款 | 关键 Diff | 本轮 disposition |
+| --- | --- | --- | --- |
+| R12-01 / P2 | T-071 REQ-071-1/-7/-8、Boundaries、AC-071-2 | 内部 key 为 backend resource + effective model + provider tenancy discriminator；保留 endpoint 隔离，默认按凭据/tenancy 隔离配额域；公开 audit 只用安全别名，内部指纹不输出或持久化 | open；修订已形成，AMENDMENT PROPOSED / 待重审 |
+| R12-02 / P2 | T-077 REQ-077-4/-6/-8、Boundaries、AC-077-5 | `refuted` 保留限定在同一显式 evidence snapshot 及其 lineage；manifest 派生的 evidence_set_id 进入输入与输出身份；不同集合的判断显式分开；删除无历史真相源的自动 anti-removal 承诺 | open；修订已形成，AMENDMENT PROPOSED / 待重审 |
+
+**R12-01 的依据与预期验收。** 当前 `prepare_run()` 已将
+`sha256(config.api_key.encode()).hexdigest()` 放入仅驻留进程内的 effective-provider
+身份，源码说明不同凭据可能对应不同 provider tenancy。REQ-071-3 又允许 429
+rate-limit failure 计入健康状态，因此同 endpoint/model 不足以证明可共享 breaker。
+本轮 AC-071-2 要求 A/B tenancy 的失败计数隔离，A 熔断时健康 B 仍允许；同资源、
+model、tenancy 可共享；raw credential 不进入 key，internal fingerprint/discriminator
+不进入 metrics/trace/artifact/log；auth failure 仍不计入 breaker health。若不同
+credentials 的 tenancy 要共享，须说明配额/可用性域可安全共享并有对应测试证据。
+本轮仅依据源码与规范修订未来验收，未执行 live provider 或 breaker 实验。
+
+**R12-02 的依据与预期验收。** 采用当前显式 evidence set 方案，不引入 cumulative
+history。集合 X 含有效反证时，由 X 产生的每个 ledger/rollup/summary 都保留
+`refuted`；集合 Y 的成员不同则其 `evidence_set_id` 必须不同。Y 可依法得出另一
+判断，但不能冒充 X 的同一连续 evidence lineage，也不能重标记所展示的 X 反证。
+仅给定 Y 不能知道 X 是否曾存在，因此移除“必须自动检测/报告过去反证缺失”的
+强要求。AC-077-5 同时验证相同完整输入的确定性、集合 ID 的可见变化、反证在
+同一谱系中的保留，以及输出 ledger 不自动成为后续输入；无效或未执行证据仍
+不能产生 `verified`。M10 的四条件验证及 summary/rollup 不隐藏反证的规则不变。
+
+### 本轮独立验证记录
+
+环境为 Windows、Python 3.12.10，现有 `uv.lock` 与 `.venv` 可用，设置
+`UV_FROZEN=true`。下面只填本轮实际执行结果，不复用先前 26.91s 的测试记录。
+
+| 命令 / 检查 | Exit code | 本轮实际输出 |
+| --- | --- | --- |
+| `uv run python --version` | 0 | Python 3.12.10 |
+| `uv run pytest -v` | 0 | 920 passed、0 failed、3 skipped、3 warnings，51.05s |
+| `uv run ruff check .` | 0 | All checks passed!；本轮无 Ruff warning |
+| `uv run ruff format --check .` | 0 | 213 files already formatted |
+| `git diff --check` | 0 | 无空白错误，最终报告更新后复查 |
+| `uv run python <本轮日志目录>/check_documents.py` | 0 | 恰好三份允许文件；REQ/AC 定义无丢失或重复；60 个引用及 24 个相对链接/锚点解析通过；两项 R12 映射和 M9/M10 顺序通过 |
+| `git branch --show-current` / `git rev-parse HEAD` | 0 | `docs/t071-t080-spec-review` / `a178735b335628d650e9755c91545c94af926c9b` |
+| `git status --short` | 0 | 仅 T-071、T-077、本报告为未暂存 `M`；无暂存或未跟踪文件 |
+
+三项 skip 为 `tests/test_repository_tools.py:238`、`tests/test_runs.py:566`、
+`tests/test_scanner.py:148` 的 Windows symlink 权限限制；三项 warning 为
+`TestStrategyAgent`、`TestStrategyOutput` 的 pytest collection warning 和
+Starlette/httpx deprecation warning。未修改测试或新增 skip。
+Git 初次检查提示 LF 将按既有配置转为 CRLF；三份交付文件保留工作区 CRLF
+形式，未修改 Git 配置，最终 diff 检查无空白问题。
+
+本轮日志目录：`C:/Users/50469/temp/specflow-pr12-r12-20260913/`，包含新执行的
+`pytest.log`、一次性文档检查脚本和交付 Diff。历史日志未覆盖，本轮数量取自
+本轮原始输出。上述回归结果不替代尚未实施的 tenancy breaker 或 ledger 验收。
+
+### 规范冲突与停止边界
+
+未发现必须扩大到第四份文件才能消除的规范冲突。内部 tenancy 身份不公开，符合
+M9/T-073 的安全观测边界；同一 evidence snapshot 的反证保留符合 M10 与
+T-079 的汇总规则，不借新集合隐去旧结论。M9/M10 依赖顺序、编号映射及历史
+freeze report 均保持不变，未修改 T-075/T-076，也未新增持久化系统。
+R12-01/R12-02 保持 open 等待外部重审；规范修订和既有测试结果均不代表产品能力
+已验证或依赖门满足。本轮按用户要求停在本地未提交 Diff，不 commit/push，
+不 merge、APPROVE、关闭 PR 或启动任何运行时实现。
+
+### R12 本地交付后的发布授权（2026-09-13）
+
+用户随后明确约定：以后修改及验证完成后直接提交，方便 GPT 审查。本次据此将
+R12 的三份文档提交并推送至现有审查分支，更新 PR #12 的固定提交与文件链接。
+上节本地停止状态及验证时的 HEAD/status 保留为阶段记录；发布提交的完整 SHA
+以 PR 正文和 GitHub 提交记录为准。PR 保持草稿；R12 两项仍待外部重审，
+不因发布而关闭规范发现、合并 PR 或启动运行时实现。
