@@ -61,6 +61,12 @@ def fixture_repo(tmp_path):
 
 
 def run_cli(tmp_path, monkeypatch, provider):
+    # T-070 validates the effective provider configuration before ownership.
+    # Supply explicit offline configuration; the transport guard remains active.
+    monkeypatch.setenv("SPECFLOW_LLM_BASE_URL", "https://offline.invalid/v1")
+    monkeypatch.setenv("SPECFLOW_LLM_API_KEY", "test-offline-recording-provider")
+    monkeypatch.setenv("SPECFLOW_LLM_MODEL", "offline-recording-provider")
+    monkeypatch.setenv("SPECFLOW_LLM_TIMEOUT_SECONDS", "30")
     monkeypatch.setattr("specflow.runner_multi._create_real_llm_client", lambda *a, **k: provider)
     with pytest.raises(SystemExit) as outcome:
         main(

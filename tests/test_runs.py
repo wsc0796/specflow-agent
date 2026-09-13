@@ -1,7 +1,9 @@
 import json
 import os
 import sqlite3
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from threading import Event
 
 import pytest
 from fastapi import FastAPI
@@ -13,7 +15,339 @@ from specflow.db import WorkflowRun
 from specflow.main import create_app
 from specflow.policy import RunStatus
 
+
+@pytest.mark.parametrize(
+    "terminal", ["success", "reject", "classified", "exception", "artifact", "evidence"]
+)
+def test_overlapping_api_requests_keep_audit_security_and_capacity(
+    tmp_path,
+    monkeypatch,
+    caplog,
+    terminal,
+):
+    from sqlalchemy import select
+
+    import specflow.runner_multi as runner
+    import specflow.runs as runs
+    from specflow.policy import SpecFlowError
+    from specflow.single_flight import Flight, SingleFlightCoordinator
+
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "feature.py").write_text("def feature(): return 1\n")
+    coordinator = SingleFlightCoordinator()
+    monkeypatch.setattr(runs, "DEFAULT_COORDINATOR", coordinator)
+    entered, release, joined = Event(), Event(), Event()
+    original_collect, original_wait = runner.EvidenceCollector.collect, Flight.wait
+    calls = []
+
+    def collect(self, **kwargs):
+        calls.append("evidence")
+        entered.set()
+        assert release.wait(5)
+        if terminal == "evidence":
+            raise OSError("sensitive-api-failure-text")
+        return original_collect(self, **kwargs)
+
+    def wait(self, timeout):
+        joined.set()
+        return original_wait(self, timeout)
+
+    monkeypatch.setattr(runner.EvidenceCollector, "collect", collect)
+    monkeypatch.setattr(Flight, "wait", wait)
+    if terminal == "classified":
+
+        def fail_budget(*args, **kwargs):
+            raise SpecFlowError("CALL_BUDGET_EXCEEDED", "safe")
+
+        monkeypatch.setattr(runner, "_run_and_accumulate", fail_budget)
+    elif terminal == "reject":
+
+        def reject(self, context):
+            return {
+                "agent_id": "review-agent-v1",
+                "role": "review",
+                "output": {
+                    "decision": "REJECT",
+                    "summary": "Business rejection.",
+                    "target_agent_id": "design-agent-v1",
+                },
+            }
+
+        monkeypatch.setattr(runner.ReviewAgent, "execute", reject)
+    elif terminal == "exception":
+
+        def fail_plan(*args, **kwargs):
+            raise RuntimeError("sensitive-api-failure-text")
+
+        monkeypatch.setattr(runner.Coordinator, "plan", fail_plan)
+    elif terminal == "artifact":
+
+        def fail_write(*args, **kwargs):
+            raise OSError("sensitive-api-failure-text")
+
+        monkeypatch.setattr(runner, "_safe_write", fail_write)
+    app = create_app(
+        f"sqlite:///{(tmp_path / 'test.db').as_posix()}",
+        artifact_root=tmp_path / "run-artifacts",
+        security=ApiSecurity(
+            api_key=TEST_API_KEY,
+            allowed_repository_roots=(str(repo),),
+            max_runs_per_minute=2,
+            max_concurrent_runs=1,
+        ),
+    )
+    with TestClient(app, headers={"X-API-Key": TEST_API_KEY}) as client:
+        project = register_project(client, repo)
+        from specflow.db import Project
+
+        with app.state.database.factory() as session:
+            outside = Project(name="old-project", repository_path=str(tmp_path / "outside"))
+            session.add(outside)
+            session.commit()
+            outside_id = outside.id
+        payload = {"project_id": project, "requirement": "feature"}
+        with ThreadPoolExecutor(2) as pool:
+            owner = pool.submit(client.post, "/api/v1/runs", json=payload)
+            try:
+                assert entered.wait(5)
+                assert (
+                    client.post(
+                        "/api/v1/runs", json=payload, headers={"X-API-Key": "wrong"}
+                    ).status_code
+                    == 401
+                )
+                assert (
+                    client.post(
+                        "/api/v1/runs", json={**payload, "project_id": outside_id}
+                    ).status_code
+                    == 403
+                )
+                # A different key is still denied; this rejection consumes no rate quota.
+                assert (
+                    client.post(
+                        "/api/v1/runs", json={**payload, "requirement": "other"}
+                    ).status_code
+                    == 429
+                )
+                follower = pool.submit(client.post, "/api/v1/runs", json=payload)
+                assert joined.wait(5)
+                assert not owner.done() and not follower.done()
+                assert calls == ["evidence"] and coordinator.active_count == 1
+                assert client.post("/api/v1/runs", json=payload).status_code == 429
+                with app.state.database.factory() as session:
+                    rows = list(session.scalars(select(WorkflowRun)))
+                    assert len(rows) == 2
+                    assert {row.current_state for row in rows} == {"running"}
+                    assert {row.state_payload["single_flight"]["role"] for row in rows} == {
+                        "owner",
+                        "follower",
+                    }
+            finally:
+                release.set()
+            responses = [owner.result(5), follower.result(5)]
+        assert [response.status_code for response in responses] == [201, 201]
+        first, second = [response.json() for response in responses]
+        assert first["id"] != second["id"]
+        assert first["single_flight"] == {"role": "owner", "owner_run_id": first["id"]}
+        assert second["single_flight"] == {"role": "follower", "owner_run_id": first["id"]}
+        expected_status = {"success": "completed", "reject": "rejected"}.get(
+            terminal, "failed_runtime"
+        )
+        assert first["status"] == second["status"] == expected_status
+        if terminal == "reject":
+            assert first["error_code"] is None
+        assert first["error_code"] == second["error_code"]
+        if terminal == "classified":
+            assert second["error_code"] == "CALL_BUDGET_EXCEEDED"
+        if terminal == "success":
+            assert first["artifact_available"] and second["artifact_available"]
+            assert (
+                client.get(f"/api/v1/runs/{first['id']}/artifacts").json()["files"]
+                == (client.get(f"/api/v1/runs/{second['id']}/artifacts").json()["files"])
+            )
+        with app.state.database.factory() as session:
+            first_row, second_row = [
+                session.get(WorkflowRun, data["id"]) for data in (first, second)
+            ]
+            assert first_row.artifact_directory == second_row.artifact_directory
+            assert second_row.state_payload["single_flight"] == second["single_flight"]
+        assert not (tmp_path / "run-artifacts" / second["id"]).exists()
+        assert coordinator.active_count == 0
+        # Only the minute quota is exhausted: execution capacity was returned.
+        permit = app.state.security._rate_limiter._semaphore.acquire(blocking=False)
+        assert permit
+        app.state.security._rate_limiter._semaphore.release()
+    assert "sensitive-api-failure-text" not in caplog.text
+
+
 TEST_API_KEY = "test-api-key"
+
+
+@pytest.mark.parametrize("cancel_role", ["owner", "follower"])
+def test_caller_cancellation_keeps_running_api_work_and_permit(tmp_path, monkeypatch, cancel_role):
+    import asyncio
+
+    import specflow.runner_multi as runner
+    import specflow.runs as runs
+    from specflow.single_flight import Flight, SingleFlightCoordinator
+
+    coordinator = SingleFlightCoordinator()
+    monkeypatch.setattr(runs, "DEFAULT_COORDINATOR", coordinator)
+    entered, joined, release = Event(), Event(), Event()
+    original_collect, original_wait = runner.EvidenceCollector.collect, Flight.wait
+    calls = []
+
+    def collect(self, **kwargs):
+        calls.append(1)
+        entered.set()
+        assert release.wait(5)
+        return original_collect(self, **kwargs)
+
+    def wait(self, timeout):
+        joined.set()
+        return original_wait(self, timeout)
+
+    monkeypatch.setattr(runner.EvidenceCollector, "collect", collect)
+    monkeypatch.setattr(Flight, "wait", wait)
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    with client_for(tmp_path) as client, ThreadPoolExecutor(2) as pool:
+        project = register_project(client, repo)
+        payload = {"project_id": project, "requirement": "feature"}
+        raw_owner = pool.submit(client.post, "/api/v1/runs", json=payload)
+        try:
+            assert entered.wait(5)
+            raw_follower = pool.submit(client.post, "/api/v1/runs", json=payload)
+            assert joined.wait(5)
+
+            async def abandon_wait():
+                caller = asyncio.wrap_future(raw_owner if cancel_role == "owner" else raw_follower)
+                caller.cancel()
+                with pytest.raises(asyncio.CancelledError):
+                    await caller
+
+            asyncio.run(abandon_wait())
+            assert not raw_owner.done() and not raw_follower.done()
+            assert coordinator.active_count == 1 and calls == [1]
+            assert (
+                client.post("/api/v1/runs", json={**payload, "requirement": "other"}).status_code
+                == 429
+            )
+        finally:
+            release.set()
+        first, second = raw_owner.result(5).json(), raw_follower.result(5).json()
+        assert first["status"] == second["status"] == "completed"
+        assert coordinator.active_count == 0
+        # The original execution actually finished before another owner enters.
+        again = client.post("/api/v1/runs", json=payload)
+        assert again.status_code == 201
+        assert again.json()["single_flight"]["role"] == "owner"
+        assert calls == [1, 1]
+
+
+def test_api_follower_timeout_is_durable_and_does_not_release_owner(tmp_path, monkeypatch):
+    import specflow.runner_multi as runner
+    import specflow.runs as runs
+    from specflow.single_flight import Flight, SingleFlightCoordinator
+
+    coordinator = SingleFlightCoordinator()
+    monkeypatch.setattr(runs, "DEFAULT_COORDINATOR", coordinator)
+    entered, release = Event(), Event()
+    original_collect, original_wait = runner.EvidenceCollector.collect, Flight.wait
+    calls = []
+
+    def collect(self, **kwargs):
+        calls.append(1)
+        entered.set()
+        assert release.wait(5)
+        return original_collect(self, **kwargs)
+
+    monkeypatch.setattr(runner.EvidenceCollector, "collect", collect)
+    monkeypatch.setattr(Flight, "wait", lambda self, timeout: original_wait(self, 0))
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    with client_for(tmp_path) as client, ThreadPoolExecutor(1) as pool:
+        project = register_project(client, repo)
+        payload = {"project_id": project, "requirement": "feature"}
+        owner = pool.submit(client.post, "/api/v1/runs", json=payload)
+        try:
+            assert entered.wait(5)
+            timeout = client.post("/api/v1/runs", json=payload)
+            assert timeout.status_code == 201
+            body = timeout.json()
+            assert body["status"] == "failed_runtime"
+            assert body["error_code"] == "SINGLE_FLIGHT_WAIT_TIMEOUT"
+            assert body["single_flight"]["role"] == "follower"
+            assert not body["artifact_available"]
+            assert coordinator.active_count == 1 and calls == [1]
+            assert (
+                client.post("/api/v1/runs", json={**payload, "requirement": "other"}).status_code
+                == 429
+            )
+        finally:
+            release.set()
+        assert owner.result(5).json()["status"] == "completed"
+        assert client.get(f"/api/v1/runs/{body['id']}").json()["error_code"] == (
+            "SINGLE_FLIGHT_WAIT_TIMEOUT"
+        )
+    assert coordinator.active_count == 0
+
+
+def test_api_cannot_share_direct_owner_artifacts_outside_its_root(tmp_path, monkeypatch):
+    import specflow.runner_multi as runner
+    import specflow.runs as runs
+    from specflow.single_flight import Flight, SingleFlightCoordinator
+
+    coordinator = SingleFlightCoordinator()
+    monkeypatch.setattr(runs, "DEFAULT_COORDINATOR", coordinator)
+    entered, joined, release = Event(), Event(), Event()
+    original_collect, original_wait = runner.EvidenceCollector.collect, Flight.wait
+    calls = []
+
+    def collect(self, **kwargs):
+        calls.append(1)
+        entered.set()
+        assert release.wait(5)
+        return original_collect(self, **kwargs)
+
+    def wait(self, timeout):
+        joined.set()
+        return original_wait(self, timeout)
+
+    monkeypatch.setattr(runner.EvidenceCollector, "collect", collect)
+    monkeypatch.setattr(Flight, "wait", wait)
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    with client_for(tmp_path) as client, ThreadPoolExecutor(2) as pool:
+        project = register_project(client, repo)
+        owner = pool.submit(
+            runner.run_multi_agent,
+            repo=repo,
+            requirement="feature",
+            output=tmp_path / "direct-output",
+            mock=True,
+            _coordinator=coordinator,
+        )
+        try:
+            assert entered.wait(5)
+            follower = pool.submit(
+                client.post, "/api/v1/runs", json={"project_id": project, "requirement": "feature"}
+            )
+            assert joined.wait(5)
+            assert calls == [1] and coordinator.active_count == 1
+        finally:
+            release.set()
+        assert owner.result(5) == 0
+        response = follower.result(5)
+        assert response.status_code == 201
+        body = response.json()
+        assert body["single_flight"]["role"] == "follower"
+        assert body["status"] == "failed_security"
+        assert body["error_code"] == "SINGLE_FLIGHT_ARTIFACT_UNAVAILABLE"
+        assert not body["artifact_available"]
+        assert client.get(f"/api/v1/runs/{body['id']}/artifacts").status_code == 404
+    assert coordinator.active_count == 0
 
 
 def app_for(database_url: str, artifact_root: Path) -> FastAPI:
