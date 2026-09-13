@@ -9,7 +9,8 @@ handling, and returns structured prompt definitions.
 
 ## In scope
 
-- Root-level `prompts/` assets managed by Git.
+- Root-level `prompts/` assets managed by Git (historical layout; T-082 relocates
+  the sole authoritative copy to `src/specflow/prompt_assets/` for installation).
 - Versioned prompt metadata files named like `v1.0.0.yaml`.
 - Markdown template files referenced by version metadata. If `template_path` is
   omitted, the loader uses `template.md`.

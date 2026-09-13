@@ -7,6 +7,11 @@
   registered output schema. Historical M6 claims are limited to their observed
   best-effort contract; no new live evaluation or quality advantage is claimed.
 
+- T-082 packages the versioned prompts as `specflow/prompt_assets` and loads them
+  using importlib.resources. The default legacy CLI now runs after wheel install
+  from unrelated directories. Installed smoke covers default/explicit legacy,
+  multi-agent, mock Run API, custom/CWD prompt isolation and standalone sdist rebuilds.
+
 - Made repository scanning reparse-point aware on Windows, including junction
   escape protection and case-insensitive ignored-directory matching.
 - Isolated repository-derived prompt content as untrusted data in legacy
