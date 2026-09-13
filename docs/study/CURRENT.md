@@ -3,72 +3,75 @@
 - Roadmap: [ROADMAP_V5_3_2.md](ROADMAP_V5_3_2.md)
 - Roadmap version: V5.3.2 Learning Effectiveness Patch
 - Campaign phase: Understand & Correct (Day 1-7)
-- Study status: DAY 6 COMPLETE: TYPED HANDOFF AND INTEGRITY
-- Day: 6
-- Current mode: SURVEY
-- Updated on: 2026-09-11
+- Study status: DAY 7 COMPLETE: WEEK 1 OWNERSHIP GATE (IMPROVING)
+- Day: 7
+- Current mode: REVIEW
+- Updated on: 2026-09-13
 
 ## Completed objective
 
-Trace Coordinator → Repository Analyst → Design/Test/Risk → Synthesis →
-Review → Revision/Artifact. Distinguish direct Schema compatibility from a
-receiver payload that becomes legal only after explicit field projection, then
-audit payload integrity, receiver field minimization, failure propagation,
-bounded Revision, terminal semantics, Trace, and Artifact boundaries.
+Recover one concrete mock Multi-Agent path from test input through Evidence,
+Agent stages, Review, Artifact, and terminal return; retest Day 4/5/6 partial
+items on changed surfaces; produce Control Matrix v1; test Tool Permission
+reachability; and complete one learner-predicted correctness-failure loop.
 
 ## Completed deliverables
 
-- Handoff contract map covering sender business output, full execution
-  envelope, `payload_ref`, `output_hash`, field projection, and Receiver Input
-  Schema.
-- Schema compatibility judgment separating registry existence, Identity ID
-  matching, and concrete Receiver Input validation.
-- Two failure hypotheses: Schema incompatible and Integrity tamper.
-- Receiver isolation judgment separating `validated_input`, Executor Context,
-  and `LLMRequest.messages`.
-- Failure/Revision/Artifact analysis covering required/optional declarations,
-  Synthesis fan-in, second `REJECT`, Revision instruction visibility, legal
-  terminal states, Trace granularity, and write-side Artifact integrity.
-- T-073 implemented and verified the Integrity Tamper boundary with a dedicated
-  error, Receiver non-execution, and bounded Manifest/Trace diagnostics at
-  commit `6c69308`.
+- One source-grounded mock Run trace using
+  `test_run_multi_agent_mock_mode`, with explicit test-evidence boundaries.
+- Changed-surface Day 4/5/6 retests for path validation, Context visibility,
+  and Handoff failure propagation.
+- Control Matrix v1 covering Coordinator LLM, Specialist/Reviewer LLM,
+  Evidence Tools, and Artifact Write with scoped `✓ / × / unknown` results.
+- Tool Permission reachability judgment: no current standard
+  `AgentRunner → ToolExecutor` path was proven.
+- T-074: reproduced ignored `policy.repository.max_file_bytes`, froze a task,
+  implemented one shared translation for both runners, and verified the fix at
+  commit `952a952`.
+- Retest Queue v1 with all role-critical Week 1 items retained as `improving`
+  rather than promoted from AI-generated summaries.
 
 ## Evidence
 
-- [Day 6 evidence card](evidence/day-06.md)
-- `docs/tasks/T-073-handoff-integrity-failure-observability.md`
-- `docs/reports/T-073-completion-report.md`
-- Focused affected tests: `58 passed`
-- Full validation: `775 passed, 3 skipped, 3 known warnings`
-- Ruff lint, Ruff format, and `git diff --check`: passed
+- [Day 7 evidence card](evidence/day-07.md)
+- `docs/study/control-coverage-backlog.md`
+- `docs/tasks/T-074-repository-file-limit-policy-wiring.md`
+- `docs/reports/T-074-completion-report.md`
+- T-074 RED: `2 failed` because both ToolCall records had `truncated=false`.
+- T-074 GREEN: `2 passed`; affected paths `107 passed, 1 skipped`.
+- Full validation: `777 passed, 3 skipped, 3 known warnings`.
+- Ruff lint, Ruff format, and `git diff --check`: passed.
 
 ## Completion boundary
 
-Day 6 teaching content is complete. The user explicitly cancelled closed-note
-recitation and a final learner capability rating, so neither is a completion
-blocker. Content completion does not retroactively claim a closed-book Project
-Ownership certification.
+Week 1 teaching content and the T-074 technical loop are complete. Learner
+ownership is `improving / partial`: the learner personally reproduced and
+located the failure, selected the design, challenged its consequences, and
+reviewed the critical Diff; Codex authored the task specification, tests,
+product Patch, report, and commit. This does not claim independent manual
+product coding or `stable` closed-note mastery.
 
 ## Current mode contract
 
-This record is administratively synchronized and Day 6 is closed. Do not add
-more Day 6 questions or infer entry into Day 7. Any future study task requires
-an explicit user transition and must re-read the current roadmap, evidence, and
-relevant source/tests.
+This record closes Day 7 in REVIEW. Do not extend T-074 or promote any
+`improving` item to `stable` without a changed-surface retest. Any future study
+task requires an explicit user transition and must re-read the current roadmap,
+evidence, backlog, and relevant source/tests.
 
 ## Forbidden until an explicit transition
 
-- Do not enter Day 7 or start its Retest Queue/Patch work.
+- Do not enter Day 8 or create Eval/Dataset assets.
 - Do not start Repository RAG, Vector, Hybrid, Rerank, or external-donor work.
-- Do not modify product functionality, tests, or learning records without a new
-  explicit request and the applicable mode/task boundary.
+- Do not patch Control Coverage backlog items without a new reproduction,
+  explicit approval, and frozen task specification.
 
 ## Stop condition
 
-Day 6 content and administrative synchronization are complete. Closed-note
-recitation and a final capability rating were cancelled by the user and do not
-block closure.
+Day 7 content, T-074 validation, evidence capture, Control Matrix v1, and Retest
+Queue v1 are complete. Remaining `improving` and `unknown` items are carried
+forward rather than forced closed.
 
 ## Next action
 
-Stop at Day 6 and wait for the learner to explicitly choose the next task.
+Stop at Day 7. Wait for the learner to explicitly start Day 8 in a separate
+teaching task; do not infer the transition from Week 1 completion.
