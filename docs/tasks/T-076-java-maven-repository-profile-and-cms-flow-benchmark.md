@@ -1,5 +1,11 @@
 # T-076 — Java/Maven Repository Profile and `cms-flow` Benchmark
 
+> **修订说明（2026-09-13）：AMENDMENT PROPOSED / 待重审。** 来源为
+> PR #12 固定提交 `558004b2bfc46ddcf76317ba30123a12f486445f` 的外部规范重审
+> S12-03 / P2。本次补齐未来 Java evidence 与 equivalence/cache identity 的同步
+> 范围，不代表实现完成或 dependency gate 已满足。下方 FROZEN 为既有冻结记录；
+> 本修订尚待重审，不构成实施放行。
+
 **Status:** FROZEN. Implementation requires closed T-070 through T-075, an
 approved M9 runtime review, and a new focused session.
 
@@ -39,6 +45,9 @@ compiler, Maven runner, or polyglot parser platform.
     `application.properties` configuration files.
   Every detected fact must carry a real relative file locator and bounded
   matched evidence. Missing or unresolved data remains unknown.
+  本 profile 使用的全部有效 evidence read surface 必须同步进入 T-070
+  REQ-070-1 的 bounded early snapshot identity，包括实际使用的 POM、Java
+  source 和受支持的 application configuration；不得只扩大 collector 读取面。
 - **REQ-076-4 — Parse Maven safely and incompletely on purpose.** Use Python
   standard-library/local parsing over files already admitted by the safe scan.
   Reject or ignore DOCTYPE/external entities, never resolve network resources,
@@ -52,6 +61,15 @@ compiler, Maven runner, or polyglot parser platform.
   Extend evidence file patterns narrowly for `pom.xml`, `*.java`, and supported
   Spring configuration files while preserving sensitive-file, symlink/reparse,
   size, count, path, and DLP boundaries.
+  对这些有效读取面的语义内容变化，single-flight equivalence key 必须能够
+  区分；T-074 REQ-074-2/-3 的 cache key 与 hit validation 必须同步 Java
+  profile 的 source/config/version identity，旧或不匹配条目按 miss/recompute
+  处理。会改变 Java evidence 语义的 detector、selector、profile、sanitizer
+  及读取配置版本必须进入兼容版本身份，不能沿用无法区分新语义的旧 key。
+  snapshot、collection 和 cache validation 均遵守已有 path boundary、sensitive
+  path rule、symlink/reparse protection、file/count/byte bounds 与适用的 DLP。
+  身份覆盖有效的有界读取窗口；无法安全建立等价时遵循 T-070 fail-closed 边界，
+  不得为扩大 Java 读取面突破读取限制。
 - **REQ-076-6 — Preserve Python and existing benchmark contracts.** All existing
   Python detector/scanner/tool/evidence tests and the committed 12-case mock
   portfolio baseline remain unchanged in meaning. Additive Java fields use safe
@@ -92,10 +110,15 @@ compiler, Maven runner, or polyglot parser platform.
   `src/specflow/tools/repository_policy.py`,
   `src/specflow/evidence/collector.py`, `src/specflow/technology.py`, one focused
   Java/Maven detector/profile module, `src/specflow/evaluation/benchmark.py`,
-  and minimal CLI/profile serialization integration. Expected tests include
+  `src/specflow/single_flight.py`（包括 `_EVIDENCE_PATTERNS`、
+  `repository_snapshot()`、`CONTRACT_VERSIONS` 与 `prepare_run()` 的最小 profile
+  identity 接入）、T-074 的 `src/specflow/evidence/cache.py` 及必要的 evidence
+  source/config/version 适配，以及 minimal CLI/profile serialization integration。
+  这些是未来 T-076 实现的范围，本次规范修订不修改这些文件。Expected tests include
   `tests/test_java_maven_profile.py`, `tests/test_technology.py`,
   `tests/test_scanner.py`, `tests/test_repository_tools.py`,
-  `tests/test_evidence_collector.py`, and `tests/test_benchmark.py`, plus the
+  `tests/test_evidence_collector.py`, `tests/test_run_single_flight.py`,
+  `tests/test_evidence_cache.py`, and `tests/test_benchmark.py`, plus the
   sanitized fixture, five case files, and a normalized deterministic baseline if
   the benchmark contract requires one. Files outside this surface require a
   spec amendment before editing.
@@ -111,6 +134,8 @@ The following are explicit non-goals for T-076:
   build/test execution, dependency download, or transitive resolution.
 - No Java code generation or modification, no target-repository write, and no
   running fixture application or network service.
+- 不提供 full repository atomic snapshot、filesystem watcher、repository lock
+  或 runtime mutation support；身份同步不扩大为运行期间的 freshness 保证。
 - No copying `cms-flow` production code into SpecFlow runtime. The fixture is a
   minimal sanitized evidence corpus only.
 - No `target/`, `.idea/`, `.mvn/`, `.feisuan/`, `*.iml`, `.class`, generated
@@ -140,6 +165,15 @@ The following are explicit non-goals for T-076:
 - **AC-076-6:** Exactly five dedicated Java/Maven cases pass with stable expected
   evidence and hashes; the existing 12-case normalized portfolio benchmark also
   passes unchanged in meaning.
+  另以聚焦回归测试验证 REQ-076-3/-5 的身份同步，不扩大五案例 benchmark 的数量：
+  - 分别改变有效读取窗口内的 `pom.xml`、`*.java`、受支持的
+    `application.properties` 内容 → equivalence/cache identity 均变化，旧 cache
+    不得命中；受支持的 `application.yml`/`application.yaml` 同样覆盖；
+  - Java profile 的 source/config 或 detector/selector/profile/sanitizer 语义版本
+    变化 → 相应身份变化，cache validation 拒绝不兼容条目；
+  - 与语义输入无关或被排除文件的内容变化 → 不自动改变 semantic identity；
+    该断言不豁免已有安全检查及 file/count/byte bounds；
+  - 既有 Python 12-case benchmark 保持原有含义，不把历史结果改称 Java 验证。
 - **AC-076-7:** Tests prove no subprocess/Maven/compiler/network call and no
   fixture modification during detection or benchmark execution.
 - **AC-076-8:** Targeted tests pass, followed by `uv run pytest -v`,

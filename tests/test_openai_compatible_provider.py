@@ -13,6 +13,7 @@ from specflow.llm import (
     OpenAICompatibleConfig,
     OpenAICompatibleLLMClient,
 )
+from specflow.llm.resilience import ProviderResilienceGuard
 
 _TEST_CREDENTIAL = "test-credential-not-a-real-key"
 
@@ -63,7 +64,11 @@ def _response() -> httpx.Response:
 
 
 def _client(handler: Callable[[httpx.Request], httpx.Response]) -> OpenAICompatibleLLMClient:
-    return OpenAICompatibleLLMClient(_config(), transport=httpx.MockTransport(handler))
+    return OpenAICompatibleLLMClient(
+        _config(),
+        transport=httpx.MockTransport(handler),
+        resilience_guard=ProviderResilienceGuard(),
+    )
 
 
 def test_explicit_configuration_is_valid() -> None:

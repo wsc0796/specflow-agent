@@ -1,5 +1,9 @@
 # T-070 — Run Single-Flight and Early Idempotency 完成报告
 
+> **当前状态（2026-09-13）：T-070 — CLOSED。** 本次按用户授权，在核对已合并
+> main、A01、组合回归、独立复审处置和 CI 后登记关闭，依据见文末关闭章节。
+> 以下初始交付/A01 待评审状态及验证数字保留为历史，不改写成当时已经关闭。
+
 初始交付：2026-09-11；A01 修复更新：2026-09-12。状态：实现交付待评审。本地验证结果见下，不自行宣布独立验收通过。
 
 ## 实现基线、分支与远端状态
@@ -179,3 +183,103 @@ PIP_CONSTRAINT 在 Windows 本轮命令进程内赋值；最后一行是其简�
 这是 in-flight 协调：同键注册在锁内只产生一个 owner，follower 只等待它；超时分支不会重新 claim。entry 随 owner 实际终态清理，后续请求重新执行，所以不是结果缓存。状态只存在当前进程内，所以不是分布式幂等。
 
 实现提交和独立 PR 交付后停止；不继续 T-071、T-077 或任何 M10 实现。不自行宣布独立验收通过。
+
+## 2026-09-13 关闭登记：T-070 — CLOSED
+
+本次用户明确要求核验七项 closure 条件，全部可证明时登记关闭。登记仅针对
+已经合并的 T-070，在下述固定版本及单进程边界内完成；不修改运行时代码，不
+以 PR #12 的规范 findings 关闭替代 T-070 实现证据。
+
+### 固定版本与证据归属
+
+- 规范来源：`02c1d3fe9bcd8c95d6bb7cf3959328844598e473` 中的
+  [T-070 规范](../tasks/T-070-run-single-flight-and-early-idempotency.md)。
+- 初始 implementation commit：`7856e3a1bff737282f7cf9cece2e38f2fe7895f9`。
+- A01 修复/source commit：`c54aaf703313764cf4ea1605eb883d8263ae9e52`。
+- 集成修复及外部被审候选：`04cd641a1c5178795fd92f205016e2e629097103`。
+- integrated main commit：`2959a2f9ac8c7d0d3b5a2217102d0ce0ed223ed0`；
+  [PR #11](https://github.com/wsc0796/specflow-agent/pull/11) 于
+  `2026-09-13T06:08:25Z` 合并，GitHub mergeCommit 与 main ref 均匹配。
+- `04cd641` 与 integrated main 的完整 tree 同为
+  `d4b76cd2cfd8fd0428886cadcb9e3a0f270e8d48`；二者不是仅文件名相同，而是
+  Git 完整文件树相同。初始实现与 A01 提交均经 `merge-base --is-ancestor` 确认。
+- [main 上的原完成报告](https://github.com/wsc0796/specflow-agent/blob/2959a2f9ac8c7d0d3b5a2217102d0ce0ed223ed0/docs/reports/T-070-completion-report.md)
+  与 A01 source commit 中的报告无差异；本章节在该历史报告之后追加。
+- [main 上的集成报告](https://github.com/wsc0796/specflow-agent/blob/2959a2f9ac8c7d0d3b5a2217102d0ce0ed223ed0/docs/reports/runtime-repairs-integration-2026-09-13.md)
+  保存组合失败、适配、INT-01 与 R1 修复过程，不把其中待发布状态当成当前远端事实。
+
+### 七项 closure 检查
+
+| 检查 | 核验结果及证据 |
+| --- | --- |
+| 1. 实现已进入 main | **满足**：`7856e3a`、`c54aaf7` 为 `2959a2f` 祖先；PR #11 已合并 |
+| 2. completion report 可读 | **满足**：上述 main 固定链接可读取原报告；原有 REQ/AC 映射、真实测试记录和限制保留 |
+| 3. REQ/AC 组合证据适用于 main | **满足**：被审候选与 main tree 完全一致；本轮源码/测试静态追溯无断链，定向回归覆盖原 T-070 与组合路径；main 自身 CI 全量通过 |
+| 4. A01 后续修复已包含 | **满足**：直接 RunResult、整数兼容和冻结结果、只检验完成定位均保留；legacy 0/120000/140000 字符三档并发回归通过 |
+| 5. 独立发现已处置 | **满足**：初始 model-key 遗漏及 A01 已修复复核；集成 INT-01 的过宽关闭经 R1 修复纠正；`04cd641` 外部复审明确关闭已复现 R1/P2，本地锁定 32 探针通过 |
+| 6. CI/benchmark/smoke/security 可读 | **满足**：main CI `34742011953` 的元数据、步骤和完整日志本轮已读取，四 job 均 success；benchmark 基线比对和 installed smoke 步骤均成功 |
+| 7. 无未处理的 T-070 blocking finding | **满足**：现有发现链均有上述处置；本轮独立只读源码/测试复核未发现未处理的 T-070 blocking finding，不扩为任意攻击面的完整证明 |
+
+### 组合契约与复审证据
+
+本轮独立只读复核以 `main=2959a2f` 的源码/测试为对象，核对 `prepare_run()` /
+`repository_snapshot()`、协调器 `claim()` / `Flight.wait()`、两个 owned runner、
+RunService、API admission 和 scheduler 的等待清理。未修改文件，也未把静态
+检查当成执行结果。原 REQ/AC 表仍有效，组合回归补充如下：
+
+| REQ / AC | main 上的实现及测试证据 |
+| --- | --- |
+| REQ-070-1；AC-070-2 | `single_flight.py` 的完整语义键、安全有界快照；`test_run_single_flight.py` 的差异键/版本/读取边界及重叠 owner 测试 |
+| REQ-070-2/-3/-6；AC-070-1/-4 | 锁内 claim/admission、独立 WorkflowRun 身份和安全共享引用；`test_runs.py`、`test_api_security.py`、跨入口双向集成回归 |
+| REQ-070-4/-5/-8；AC-070-3/-5 | 安全终态、超时、不重复执行、finally 清理；`test_runtime_repair_integration.py` 的真实 worker 取消与 peer 退栈后释放，及无证据/无效输出/失信 payload 组合失败 |
+| REQ-070-7；AC-070-6 | 两条 CLI/mock、API 认证/allowlist/限流、DLP、产物及启动恢复的既有回归；main CI 的 benchmark 和安装 smoke |
+| REQ-070-9；AC-070-7/-8 | 本报告、聚焦实现及 A01 commit、最新集成提交、定向与全量门禁；关闭登记不改变产品实现面 |
+
+外部复审来源为用户此前提供的 `specflow-review-04cd641-evidence.zip`，报告
+`specflow-review-04cd641/REVIEW-04cd641.md` 的 SHA-256 为
+`5250665ebd65f7056cceb830e09b73717b748769bc966f495a7620242fdeca6d`。
+报告绑定 `04cd641`，结论为复审通过、原 R1/P2 已复现缺陷关闭、未发现新的可复现
+阻塞项。其 Linux/Python 3.13 非锁定结果作为补充证据，不冒充 Windows 锁定验证。
+原证据包及报告保留于本机；本章节登记其结论、身份与边界，供远端审查追溯。
+
+本地历史锁定复验记录在
+`C:/Users/50469/temp/specflow-04cd641-review-recheck-20260913/LOCKED-RECHECK.md`：
+5 个原探针与 27 个跨阶段探针共 **32 passed、1 warning、3.67s、exit 0**。
+这是当时新执行的复验，本轮只核对其记录及树适用性，不将其记为本轮重新运行。
+API owner 最终 `Session.commit` 失败的独立注入结果来自本报告 A01 证据表；本轮
+源码仍是 `_finish_run()` 先于 `flight.complete()`。该历史独立实验不称为仓库内
+专门回归，也未在本轮重新执行；现有异常/清理测试与组合测试仍分别保留其覆盖。
+
+### main CI 与本轮验证
+
+[合并后 main CI](https://github.com/wsc0796/specflow-agent/actions/runs/34742011953)
+为 push 事件，headSha 精确等于 `2959a2f`；quality、benchmark、security、smoke
+均 completed/success。日志中的全量结果为 **923 passed、3 warnings、12.71s**，
+Ruff 通过、213 files formatted；benchmark 生成结果后与既有基线比对成功。
+这是 main 的历史 CI 执行记录，由本轮读取确认，不是本地新跑的测试数字。
+候选 CI `34740864163` 与规范分支 CI `34746093700` 也已核对 success，但不以
+它们替代 main 自身的 CI 证据。
+
+本轮定向回归运行在文档分支的 `c14e038` 加关闭登记文档上；其 `src/`、`tests/`、
+benchmark、scripts、prompts、依赖与 main 比对无差异。使用 Windows / Python
+3.12.10、现有 `uv.lock`、`UV_FROZEN=true`，没有 live provider 调用。
+
+```text
+uv run pytest tests/test_run_single_flight.py tests/test_runs.py tests/test_api_security.py tests/test_runtime_repair_integration.py tests/test_cli.py tests/test_cli_multi_agent.py tests/test_runner_dlp.py tests/test_handoff_validator.py -v
+```
+
+实际结果：**175 passed、1 skipped、1 warning、23.96s，exit 0**。skip 为
+Windows symlink 权限，warning 为 Starlette/httpx 弃用提示，没有新增 skip。
+本次登记后的完整质量门及最终工作区状态见
+[规范结算与开工门报告](T-071-T-080-spec-review-entry.md) 的“本次登记验证”。
+本轮日志保存于 `C:/Users/50469/temp/specflow-t071-gate-closure-20260913/`。
+
+### 关闭范围与下一门
+
+**T-070 — CLOSED**，仅指以上固定实现、证据和范围的任务关闭。已知限制不变：
+单进程 in-flight 合并，无跨进程/分布式协调、无跨重启保障、无完成结果缓存；
+follower 超时不强停同步 owner，运行中的仓库 mutation 不受支持；没有 live-provider
+语义质量或生产容量结论。bounded Python evidence snapshot 不宣称全仓库原子快照。
+
+本次不关闭来源 PR #8、不合并 PR #12、不启动 T-071。T-071 仍须使用已通过
+静态复审的权威 amendment，在干净、独立分支上的新 focused session 单独开工。

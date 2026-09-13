@@ -10,6 +10,12 @@ import httpx
 from specflow.llm.exceptions import LLMResponseError, LLMTimeoutError
 from specflow.llm.models import LLMRequest, LLMResponse, LLMUsage
 from specflow.llm.providers.config import OpenAICompatibleConfig
+from specflow.llm.resilience import (
+    DEFAULT_RESILIENCE_GUARD,
+    ProviderResilienceGuard,
+    resource_identity,
+)
+from specflow.policy.errors import ErrorCode
 
 
 class OpenAICompatibleLLMClient:
@@ -20,11 +26,16 @@ class OpenAICompatibleLLMClient:
         config: OpenAICompatibleConfig,
         *,
         transport: httpx.BaseTransport | None = None,
+        resilience_guard: ProviderResilienceGuard | None = None,
     ) -> None:
         if not isinstance(config, OpenAICompatibleConfig):
             raise TypeError("config must be an OpenAICompatibleConfig")
         self._config = config
         self._transport = transport
+        self._resilience = (
+            resilience_guard if resilience_guard is not None else DEFAULT_RESILIENCE_GUARD
+        )
+        self._resource = resource_identity(config)
 
     def __repr__(self) -> str:
         return (
@@ -38,6 +49,10 @@ class OpenAICompatibleLLMClient:
         """Map one provider-neutral request to one safe HTTP request and response."""
         if not isinstance(request, LLMRequest):
             raise LLMResponseError("OpenAI-compatible Provider requires an LLMRequest")
+        with self._resilience.attempt(self._resource):
+            return self._complete_once(request)
+
+    def _complete_once(self, request: LLMRequest) -> LLMResponse:
         started = perf_counter()
         response: httpx.Response | None = None
         transport_failure: str | None = None
@@ -65,9 +80,11 @@ class OpenAICompatibleLLMClient:
             transport_failure = "transport"
 
         if transport_failure == "timeout":
-            raise LLMTimeoutError("LLM provider request timed out")
+            raise LLMTimeoutError("LLM provider request timed out", code=ErrorCode.PROVIDER_TIMEOUT)
         if transport_failure == "network":
-            raise LLMResponseError("LLM provider network request failed")
+            raise LLMResponseError(
+                "LLM provider network request failed", code=ErrorCode.PROVIDER_CONNECTION_ERROR
+            )
         if transport_failure == "transport":
             raise LLMResponseError("LLM provider transport failed")
         if response is None:
@@ -158,7 +175,20 @@ class OpenAICompatibleLLMClient:
         if status_code < 400:
             return
         if status_code in {401, 403}:
-            raise LLMResponseError(f"LLM provider authentication failed (HTTP {status_code})")
+            raise LLMResponseError(
+                f"LLM provider authentication failed (HTTP {status_code})",
+                code=ErrorCode.PROVIDER_AUTH_FAILURE,
+            )
         if status_code == 429:
-            raise LLMResponseError("LLM provider rate limited the request (HTTP 429)")
-        raise LLMResponseError(f"LLM provider is unavailable (HTTP {status_code})")
+            raise LLMResponseError(
+                "LLM provider rate limited the request (HTTP 429)",
+                code=ErrorCode.PROVIDER_RATE_LIMITED,
+            )
+        code = (
+            ErrorCode.PROVIDER_MODEL_NOT_FOUND
+            if status_code == 404
+            else ErrorCode.PROVIDER_SERVER_ERROR
+            if 500 <= status_code < 600
+            else None
+        )
+        raise LLMResponseError(f"LLM provider is unavailable (HTTP {status_code})", code=code)

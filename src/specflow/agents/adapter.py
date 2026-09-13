@@ -8,6 +8,7 @@ from typing import Any
 
 from specflow.agents.models import AgentIdentity
 from specflow.llm.client import LLMClient
+from specflow.llm.exceptions import LLMError
 from specflow.llm.models import LLMMessage, LLMRequest
 from specflow.policy.errors import ErrorCode
 from specflow.policy.errors import is_retryable as _is_retryable_error
@@ -144,6 +145,8 @@ class AgentRunner:
 
 def _error_to_code(error: Exception) -> ErrorCode:
     """Classify a provider error; unknown failures are never retried."""
+    if isinstance(error, LLMError) and error.code is not None:
+        return error.code
     err = str(error).lower()
     if "401" in err or "auth" in err or "unauthorized" in err:
         return ErrorCode.PROVIDER_AUTH_FAILURE
