@@ -68,8 +68,9 @@ dependencies or exceed revision and token limits.
 
 The benchmark demonstrates reproducible contract enforcement and artifact
 integrity. It does not measure live model quality or real provider cost. A
-previous M6 live-provider validation remains documented separately; T-049 was
-skipped for this portfolio release because no provider credentials were present.
+previous M6 execution record used best-effort pass-through for five unvalidated
+role outputs; see [the evidence correction](../reports/T-081-evidence-correction.md).
+T-049 was skipped for this portfolio release because no provider credentials were present.
 
 ## 6. Optional business-loop proof
 

@@ -37,5 +37,10 @@ class DesignAgent:
         return {
             "agent_id": self.agent_id,
             "role": self.role.value,
-            "output": {"summary": "Deterministic mock design."},
+            "output": {
+                "summary": "Deterministic mock design.",
+                "implementation_steps": [
+                    "Mock plan: inspect the relevant route and describe the requested change."
+                ],
+            },
         }

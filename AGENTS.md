@@ -8,10 +8,12 @@ strict payload-schema follow-up work:
 - M3: Agent Runtime Foundation
 - M4: Agent Workflow
 - M5: Tool Use & Repository Intelligence
-- M6: Multi-Agent Orchestration (Live Provider validated)
+- M6: Multi-Agent Orchestration (historical best-effort execution; see T-081 evidence correction)
 - M7: Evaluation, Demo & Resume (portfolio-ready)
 
-771 passing tests, 3 skipped, 3 known warnings after T-069.
+The T-069 baseline had 771 passing tests, 3 skipped, 3 known warnings.
+T-081 tightens minimum role content and explicit schema-failure handling;
+see its completion report for current offline verification.
 M8 production hardening remains limited to the implemented policy, schema,
 fallback, evidence, and artifact boundaries; it does not claim a new
 live-provider validation or deployment work. T-056 adds a separately specified

@@ -630,6 +630,8 @@ def _validate_stage_results(
     for agent_id, result in stage.agent_results.items():
         if result.get("agent_id") != agent_id or not result.get("success", True):
             raise ValueError("AGENT_EXECUTION_FAILED")
+        if result.get("schema_validated") is False:
+            raise ValueError("SCHEMA_VALIDATION_FAILED")
         output = _sanitize_artifact_value(result.get("output"))
         if not isinstance(output, dict):
             raise ValueError("AGENT_OUTPUT_NOT_OBJECT")

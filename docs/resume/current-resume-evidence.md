@@ -38,7 +38,8 @@ The concise, application-ready version is
 
 - Do not claim production deployment, user traffic, semantic accuracy, or live
   provider quality from the mock benchmark.
-- The documented M6 live-provider run is historical evidence; no later live run
-  is claimed without authorized credentials and a separate validation record.
+- M6 is historical best-effort execution evidence: five of six outputs were not
+  schema-validated. It does not prove current strict-contract live success.
+  See [the dated correction](../reports/T-081-evidence-correction.md).
 - A reviewer decision is unverified display metadata, not an authenticated
   approval or multi-user collaboration claim.

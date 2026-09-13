@@ -36,8 +36,8 @@ Actions
   artifact/trace/schema contracts、read-only repository access。
 - 不要宣称：生产部署、真实用户流量、模型语义准确率、成本节省或 mock
   benchmark 的 live-model 质量。
-- 历史 M6 曾在授权环境完成 DeepSeek live-provider 验证；这是单独的历史
-  记录，不是 v1.1.0 当前候选的验证证据。除非面试官追问，不放进主 bullet。
+- 历史 M6 留有旧版 best-effort 的 DeepSeek 执行记录，五个角色的输出当时未通过
+  schema；不能证明当前严格契约已完成 live 验证。见[日期更正](../reports/T-081-evidence-correction.md)。
 
 ## 面试追问时的证据入口
 

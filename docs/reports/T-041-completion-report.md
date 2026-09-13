@@ -1,5 +1,11 @@
 # T-041 Completion Report — Strict Agent Payload Schema
 
+> Correction (2026-09-11, T-081): baseline receiver inputs use dict fields with
+> defaults; they do not independently enforce nested role content. The actual
+> runner rejects invalid required outputs at stage validation before handoff.
+> T-081 adds missing minimum-content and explicit schema-failure regressions.
+> The original 656-test record below is historical, not rerun evidence.
+
 ## Result
 **PASS.** All T-041 acceptance criteria met.
 
