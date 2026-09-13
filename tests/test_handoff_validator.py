@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+from copy import deepcopy
 from hashlib import sha256
 
 import pytest
 
 from specflow.agents.models import AgentIdentity, AgentRole
-from specflow.handoff.exceptions import HandoffValidationError
+from specflow.handoff.exceptions import HandoffIntegrityError, HandoffValidationError
 from specflow.handoff.models import AgentHandoff
 from specflow.handoff.validator import HandoffValidator
 from specflow.plan.hash_utils import canonical_json_bytes
@@ -157,3 +158,90 @@ class TestHandoffValidator:
             "to_agent_id": "receiver",
             "payload_ref": "agent-outputs.json#stage-0/sender",
         }
+
+
+def _payload_case():
+    sender = _make_identity("sender", AgentRole.REPOSITORY_ANALYST)
+    payload = {
+        "agent_id": "sender",
+        "role": "repository_analyst",
+        "output": {"summary": "Original"},
+    }
+    handoff = AgentHandoff(
+        **{
+            **_make_handoff().__dict__,
+            "payload_ref": "agent-outputs.json#stage-0/sender",
+            "output_hash": sha256(canonical_json_bytes(payload)).hexdigest(),
+        }
+    )
+    return sender, payload, handoff
+
+
+@pytest.mark.parametrize("field", ["summary", "agent_id", "role", "output", "container", "null"])
+def test_hash_changes_take_precedence_over_envelope_validation(field):
+    sender, payload, handoff = _payload_case()
+    if field == "summary":
+        payload["output"]["summary"] = "test-tampered"
+    elif field == "agent_id":
+        payload["agent_id"] = "test-tampered"
+    elif field == "role":
+        payload["role"] = {"untrusted": "test-tampered"}
+    elif field == "output":
+        payload["output"] = "test-tampered"
+    elif field == "container":
+        payload = ["test-tampered"]
+    else:
+        payload = None
+    assert sha256(canonical_json_bytes(payload)).hexdigest() != handoff.output_hash
+    with pytest.raises(HandoffIntegrityError) as failure:
+        HandoffValidator().validate_payload(handoff, sender, {"stage-0/sender": payload})
+    assert failure.value.audit_context["handoff_id"] == handoff.handoff_id
+    assert "test-tampered" not in str(failure.value)
+
+
+@pytest.mark.parametrize("field", ["agent_id", "role", "output", "container", "null"])
+def test_matching_hash_does_not_reclassify_invalid_envelopes_as_integrity_failure(field):
+    sender, payload, handoff = _payload_case()
+    if field == "agent_id":
+        payload["agent_id"] = "wrong-sender"
+    elif field == "role":
+        payload["role"] = {"not": "a string"}
+    elif field == "output":
+        payload["output"] = "not a dict"
+    elif field == "container":
+        payload = ["not", "an", "envelope"]
+    else:
+        payload = None
+    handoff = AgentHandoff(
+        **{**handoff.__dict__, "output_hash": sha256(canonical_json_bytes(payload)).hexdigest()}
+    )
+    with pytest.raises(HandoffValidationError) as failure:
+        HandoffValidator().validate_payload(handoff, sender, {"stage-0/sender": payload})
+    assert type(failure.value) is HandoffValidationError
+
+
+@pytest.mark.parametrize("kind", ["set", "cycle", "mixed-keys"])
+def test_unverifiable_payload_is_safe_without_claiming_hash_mismatch(kind):
+    sender, payload, handoff = _payload_case()
+    if kind == "set":
+        payload["role"] = {"test-untrusted"}
+    elif kind == "cycle":
+        payload["output"]["cycle"] = payload
+    else:
+        payload["output"] = {1: "test-untrusted", "summary": "test-untrusted"}
+    with pytest.raises(HandoffValidationError) as failure:
+        HandoffValidator().validate_payload(handoff, sender, {"stage-0/sender": payload})
+    assert not isinstance(failure.value, HandoffIntegrityError)
+    assert type(failure.value).__name__ == "HandoffPayloadError"
+    assert "test-untrusted" not in str(failure.value)
+    assert failure.value.audit_context["payload_ref"] == handoff.payload_ref
+
+
+def test_missing_payload_reference_retains_ordinary_validation_error():
+    sender, payload, handoff = _payload_case()
+    with pytest.raises(HandoffValidationError) as failure:
+        HandoffValidator().validate_payload(handoff, sender, {})
+    assert type(failure.value) is HandoffValidationError
+    unchanged = deepcopy(payload)
+    HandoffValidator().validate_payload(handoff, sender, {"stage-0/sender": payload})
+    assert payload == unchanged

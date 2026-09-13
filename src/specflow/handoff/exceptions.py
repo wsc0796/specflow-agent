@@ -9,8 +9,12 @@ class HandoffValidationError(HandoffError):
     """A handoff failed runtime validation."""
 
 
-class HandoffIntegrityError(HandoffValidationError):
-    """A referenced handoff payload no longer matches its recorded hash."""
+class HandoffPayloadError(HandoffValidationError):
+    """A referenced payload cannot be trusted; its contents must be quarantined.
+
+    Canonicalization failure does not establish a hash mismatch. The dedicated
+    integrity subclass below is reserved for an actual comparison mismatch.
+    """
 
     def __init__(
         self,
@@ -33,3 +37,7 @@ class HandoffIntegrityError(HandoffValidationError):
     def audit_context(self) -> dict[str, str]:
         """Return bounded identifiers safe for failure artifacts and traces."""
         return dict(self._audit_context)
+
+
+class HandoffIntegrityError(HandoffPayloadError):
+    """A referenced handoff payload no longer matches its recorded hash."""

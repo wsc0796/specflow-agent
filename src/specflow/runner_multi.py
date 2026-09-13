@@ -31,7 +31,7 @@ from specflow.coordinator.state_machine import MultiAgentWorkflowState
 from specflow.evaluation.metrics import AgentMetrics, RunMetrics
 from specflow.evidence import EvidenceCollector
 from specflow.evidence.models import EvidenceCollectionConfig
-from specflow.handoff.exceptions import HandoffIntegrityError
+from specflow.handoff.exceptions import HandoffIntegrityError, HandoffPayloadError
 from specflow.handoff.models import AgentHandoff
 from specflow.handoff.validator import HandoffValidator
 from specflow.llm import LLMClient, OpenAICompatibleConfig, OpenAICompatibleLLMClient
@@ -436,10 +436,14 @@ def _run_multi_agent_owned(
             MultiAgentWorkflowState.COMPLETED,
             "review passed" if decision == "PASS" else "revision limit reached",
         )
-    except HandoffIntegrityError as error:
-        error_code = ErrorCode.HANDOFF_INTEGRITY_FAILED.value
+    except HandoffPayloadError as error:
+        error_code = (
+            ErrorCode.HANDOFF_INTEGRITY_FAILED.value
+            if isinstance(error, HandoffIntegrityError)
+            else "MULTI_AGENT_RUN_FAILED"
+        )
         logger.error(
-            "run %s stopped by handoff integrity failure: code=%s phase=%s handoff_id=%s",
+            "run %s stopped by handoff payload verification: code=%s phase=%s handoff_id=%s",
             run_id,
             error_code,
             coordinator.engine.state.value,
@@ -457,6 +461,7 @@ def _run_multi_agent_owned(
             guard=guard,
             error=error_code,
             failure_context=error.audit_context,
+            quarantine_payloads=True,
         )
         return RunResult(3, error_code=error_code, artifact_directory=directory)
     except SpecFlowError as error:
@@ -1090,6 +1095,7 @@ def _persist_failed_run(
     guard: RuntimeGuard,
     error: str,
     failure_context: Mapping[str, str] | None = None,
+    quarantine_payloads: bool = False,
 ) -> Path | None:
     """Persist FAILED manifest, state history, and partial traces for audit."""
     try:
@@ -1133,7 +1139,7 @@ def _persist_failed_run(
             failed_manifest["failure_context"] = dict(failure_context)
         _safe_write(run_dir, "manifest.json", failed_manifest, guard)
         _safe_write(run_dir, "traces.json", traces, guard)
-        # Integrity failure invalidates the payload trust boundary. Stage
+        # Failed payload verification invalidates the trust boundary. Stage
         # results may alias the tampered object, so retain identifier-only
         # diagnostics and never serialize execution payloads on this path.
         agent_outputs = (
@@ -1142,7 +1148,7 @@ def _persist_failed_run(
                 for s in stages
                 for aid, result in s.agent_results.items()
             }
-            if error != ErrorCode.HANDOFF_INTEGRITY_FAILED.value
+            if not quarantine_payloads and error != ErrorCode.HANDOFF_INTEGRITY_FAILED.value
             else {}
         )
         _safe_write(run_dir, "agent-outputs.json", agent_outputs, guard, sort_keys=True)

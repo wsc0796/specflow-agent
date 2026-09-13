@@ -1,5 +1,6 @@
 """Cross-PR contracts: typed failures remain shared and fail closed."""
 
+import json
 from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
 from threading import Event
@@ -24,6 +25,12 @@ from specflow.single_flight import Flight, SingleFlightCoordinator
         ("invalid-output", "MULTI_AGENT_RUN_FAILED"),
         ("handoff-tamper", "HANDOFF_INTEGRITY_FAILED"),
         ("handoff-inplace", "HANDOFF_INTEGRITY_FAILED"),
+        ("handoff-agent-id", "HANDOFF_INTEGRITY_FAILED"),
+        ("handoff-role", "HANDOFF_INTEGRITY_FAILED"),
+        ("handoff-output", "HANDOFF_INTEGRITY_FAILED"),
+        ("handoff-unhashable", "MULTI_AGENT_RUN_FAILED"),
+        ("handoff-cycle", "MULTI_AGENT_RUN_FAILED"),
+        ("handoff-mixed-keys", "MULTI_AGENT_RUN_FAILED"),
     ],
 )
 def test_equivalent_api_requests_share_classified_failures(tmp_path, monkeypatch, fault, expected):
@@ -39,6 +46,7 @@ def test_equivalent_api_requests_share_classified_failures(tmp_path, monkeypatch
     original_collect, original_wait = runner.EvidenceCollector.collect, Flight.wait
     original_complete = runner.MockLLMClient.complete
     collections, completions, receivers = [], [], []
+    recorded_hashes = []
 
     def collect(self, **kwargs):
         collections.append(1)
@@ -74,13 +82,30 @@ def test_equivalent_api_requests_share_classified_failures(tmp_path, monkeypatch
                 "output": {},
             },
         )
-    elif fault in {"handoff-tamper", "handoff-inplace"}:
+    elif fault.startswith("handoff-"):
         original_validate = runner.HandoffValidator.validate_payload
 
         def tamper(self, handoff, sender, payloads):
-            changed = payloads if fault == "handoff-inplace" else deepcopy(payloads)
+            changed = deepcopy(payloads) if fault == "handoff-tamper" else payloads
             key = handoff.payload_ref.removeprefix("agent-outputs.json#")
-            changed[key]["output"]["summary"] = "test-private-payload"
+            recorded_hashes.append(handoff.output_hash)
+            if fault == "handoff-agent-id":
+                changed[key]["agent_id"] = "test-private-payload"
+            elif fault == "handoff-role":
+                changed[key]["role"] = {"untrusted": "test-private-payload"}
+            elif fault == "handoff-output":
+                changed[key]["output"] = "test-private-payload"
+            elif fault == "handoff-unhashable":
+                changed[key]["role"] = {"test-private-payload"}
+            elif fault == "handoff-cycle":
+                changed[key]["output"]["test-private-payload"] = changed[key]
+            elif fault == "handoff-mixed-keys":
+                changed[key]["output"] = {
+                    1: "test-private-payload",
+                    "summary": "test-private-payload",
+                }
+            else:
+                changed[key]["output"]["summary"] = "test-private-payload"
             return original_validate(self, handoff, sender, changed)
 
         monkeypatch.setattr(runner.HandoffValidator, "validate_payload", tamper)
@@ -115,14 +140,54 @@ def test_equivalent_api_requests_share_classified_failures(tmp_path, monkeypatch
         assert indexes[0]["files"] == indexes[1]["files"]
         assert "_COMPLETE" in indexes[0]["files"]
         owner_directory = next((tmp_path / "run-artifacts" / first["id"]).glob("run-multi-*"))
-        if fault in {"handoff-tamper", "handoff-inplace"}:
+        if fault.startswith("handoff-"):
+            manifest = json.loads((owner_directory / "manifest.json").read_text(encoding="utf-8"))
+            assert set(manifest["failure_context"]) == {
+                "handoff_id",
+                "from_agent_id",
+                "to_agent_id",
+                "payload_ref",
+            }
             for artifact in owner_directory.iterdir():
                 if artifact.is_file():
-                    assert "test-private-payload" not in artifact.read_text(encoding="utf-8")
+                    contents = artifact.read_text(encoding="utf-8")
+                    assert "test-private-payload" not in contents
+                    assert all(digest not in contents for digest in recorded_hashes)
         assert not (tmp_path / "run-artifacts" / second["id"]).exists()
     assert coordinator.active_count == 0
     assert not receivers
     assert len(completions) == (0 if fault == "no-evidence" else 6)
+
+
+@pytest.mark.parametrize(
+    "failure, expected",
+    [
+        ("budget", "CALL_BUDGET_EXCEEDED"),
+        ("runtime", "MULTI_AGENT_RUN_FAILED"),
+    ],
+)
+def test_unrelated_failures_keep_trusted_stage_diagnostics(
+    service_context, monkeypatch, failure, expected
+):
+    from specflow.policy import SpecFlowError
+
+    repo, db, security, coordinator, service, create = service_context
+
+    def fail_design(self, context):
+        if failure == "budget":
+            raise SpecFlowError("CALL_BUDGET_EXCEEDED", "safe budget failure")
+        raise RuntimeError("test-runtime-failure")
+
+    monkeypatch.setattr(runner.DesignAgent, "execute", fail_design)
+    result = create()
+    assert result.current_state == "failed_runtime"
+    assert result.error_code == expected
+    assert result.artifact_directory is not None
+    directory = service.artifact_root / result.artifact_directory
+    outputs = json.loads((directory / "agent-outputs.json").read_text(encoding="utf-8"))
+    assert outputs["stage-0/repository-analyst-agent-v1"]["output"]["summary"]
+    assert (directory / "_COMPLETE").is_file()
+    assert coordinator.active_count == 0
 
 
 # Promote the verified independent cancellation/cross-entry probes into regression coverage.

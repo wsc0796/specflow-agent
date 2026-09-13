@@ -1,6 +1,6 @@
 # 并行修复契约协调与隔离集成报告
 
-日期：2026-09-13。状态：**本地集成验证通过，待审查候选**。
+日期：2026-09-13。状态：**外部审查 R1 修复后本地验证通过，待重审候选**。
 
 本轮未推送集成分支，未合并、关闭或 APPROVE 来源 PR，未改动远端 main。
 没有开始 M9 T-071 或任何 M10 运行时实现。
@@ -74,10 +74,71 @@
 - 修复：仅对 HANDOFF_INTEGRITY_FAILED 写空的 agent-outputs.json，保留安全 manifest/trace 标识及完成记录，不序列化该失信执行的 payload。其他失败仍保留既有阶段诊断输出。
 - 新增原地篡改用例先红后绿，扫描全部失败产物确认不存在 sentinel。
 - 独立复查确认原地篡改无泄漏；另外复验 CALL_BUDGET_EXCEEDED、MULTI_AGENT_RUN_FAILED 两类失败，分类与正常阶段诊断输出均保留，三条路径均正确清理。
-- 当前状态：**fixed，已有独立复验证据**。没有遗留的已确认阻塞发现。
+- e19ec4f 当轮结论只验证了 summary 篡改分支。后续外部 R1 证明其他 envelope 变更会绕过专用分类；此前对完整缺陷族的关闭判断过宽，修复与复验见下一节。
 
 独立复查产物：`C:/Users/50469/temp/integration-handoff-recheck-ze_jn708`。
 这不等同于 GitHub 正式 APPROVE 或整个 M9/M10 已验收。
+
+## 外部审查 R1 / P2 修复（2026-09-13）
+
+修复起点：`e19ec4f4b10d4bdb0b29c931d5c676ed69c25aae`。用户提供的证据包
+`specflow-review-e19ec4f-evidence.zip` 内 22 个文件校验和一致。本地 Windows /
+Python 3.12 锁定环境只读复验为 4 failed、1 passed，与外部 Linux 补充测试发现一致；
+随后用户明确授权修复。旧 bundle 和旧审查证据保持不变。
+
+根因：hash 生成后修改 agent_id、role/output 类型时，envelope 检查先退出，实际
+mismatch 未进入 HandoffIntegrityError；通用运行失败路径继续持久化含失信内容的
+stage outputs。仅按错误字符串触发的旧隔离没有覆盖这些分支。
+
+本轮生产修改限于 `handoff/validator.py`、`handoff/exceptions.py` 和 `runner_multi.py`：
+
+1. 引用前缀与存在性检查后，先使用原 canonical_json_bytes 计算并比较当前 payload hash，
+   再检查 envelope 语义。缺失引用保持普通校验错误；存在但为 null 的 payload 与缺失引用区分。
+2. 真实 mismatch 仍抛 HandoffIntegrityError，并返回 HANDOFF_INTEGRITY_FAILED。
+   hash 匹配但 envelope 原本非法时，仍抛普通 HandoffValidationError，不伪造完整性错误。
+3. 新增窄 HandoffPayloadError 基类，沿用原有四个 audit_context 标识。不能规范化的集合、
+   循环引用、混合键等以普通 MULTI_AGENT_RUN_FAILED 终止，但明确隔离失信 payload；
+   不声称进行过成功 hash 比较，不保留原始异常链。
+4. runner 对上述 payload-verification 家族显式传递 quarantine_payloads，失败 writer
+   不序列化相应执行 payload。普通预算与运行错误不设置该标记，保留原阶段诊断。
+
+未修改 canonical_json_bytes、RunResult/single-flight、数据库列、schema、prompt、
+重试、调度、冻结规范或学习状态。新增异常没有增加一种对外 Run 状态或错误码。
+
+| 最新验证 | 退出码 | 实际结果 |
+| --- | --- | --- |
+| 新单元测试红阶段 | 1 | 9 failed, 11 passed；覆盖 envelope 先检及无法规范化问题 |
+| API 组合红阶段抽查 | 1 | agent_id、不可规范化、混合键三个场景失败 |
+| 原外部审查完整探针 | 0 | 5 passed, 1 warning in 1.66s；四种 direct 篡改和 API 共享均正确隔离 |
+| 当前 validator + 组合测试独立复核 | 0 | 35 passed, 1 warning in 3.59s；未发现本轮阻塞问题 |
+| 本轮定向回归 | 0 | 197 passed, 1 skipped, 1 warning in 19.67s |
+| `uv run pytest -v` | 0 | 920 passed, 3 skipped, 3 warnings in 24.60s |
+| Ruff check / format | 0 / 0 | All checks passed；213 files already formatted |
+| secrets / diff / cached 检查 | 0 | 通过；提交前对暂存内容再次检查 |
+| 12-case benchmark / baseline 比对 | 0 / 0 | baseline 无变化 |
+| 新 wheel 与独立 sdist 重建 smoke | 0 | 两轮各 10 项 PASS，非 editable 安装 |
+
+本轮新增 23 个仓库场景：15 个 validator 场景与 8 个组合场景。覆盖真实 mismatch、
+hash 匹配但 envelope 非法、缺失引用、正常输入不被修改、不可规范化，以及普通预算/
+运行错误诊断保留。API 用例同时检查两个身份、一套工作、receiver 非执行、原 hash 和
+sentinel 不进入失败产物、安全上下文、完成标记与 entry 清理。
+
+本轮定向命令：
+
+```text
+uv run pytest tests/test_handoff_validator.py tests/test_runtime_repair_integration.py tests/test_run_single_flight.py tests/test_runs.py tests/test_api_security.py tests/test_cli_multi_agent.py tests/test_required_output_validity.py -v
+uv run pytest <证据解压目录>/repros/test_review_contract.py -v -s --tb=short
+uv run specflow benchmark --suite benchmarks/cases --repo benchmarks/fixtures/portfolio-python --output artifacts/envelope-fix-20260913 --baseline artifacts/envelope-fix-20260913/baseline.json
+git diff --no-index --exit-code benchmarks/results/mock-baseline.json artifacts/envelope-fix-20260913/baseline.json
+uv run python scripts/smoke_installed_wheel.py
+```
+
+本轮 wheel 与重建 wheel SHA-256 均为 `61662fb75aaf2c335411c9bf3527ba0020daaee2675b5d19a0d6d45e407034c3`；
+sdist 为 `a0bacfe018d1d2bc7707f45a82745ecd5a7b6b9f0a2d6655e2bd01be6a77e886`。
+它们是收尾文档更新前的最终运行时代码验证产物，不是发布版本。
+
+R1 的上述已复现分支现有修复和独立复验证据；本候选仍待外部重审，不把测试覆盖外的
+任意进程内对象修改或未授权攻击路径宣称为已证明安全。
 
 ## 组合行为覆盖
 
@@ -107,8 +168,8 @@ T-070 既有长 legacy manifest 回归、不可变结果、超时和取消回归
 | 成功夹具修正后相关检查 | 0 | 120 passed, 1 skipped, 1 warning in 9.78s |
 | INT-01 原地篡改回归修复前 | 1 | sentinel 出现在 agent-outputs.json，1 failed |
 | INT-01 修复后相关检查 | 0 | 23 passed, 1 warning in 3.38s |
-| 最终定向测试 | 0 | 209 passed, 1 skipped, 1 warning in 20.34s |
-| `uv run pytest -v` | 0 | 897 passed, 3 skipped, 3 warnings in 28.19s |
+| e19ec4f 当轮定向测试 | 0 | 209 passed, 1 skipped, 1 warning in 20.34s |
+| e19ec4f 当轮全量测试 | 0 | 897 passed, 3 skipped, 3 warnings in 28.19s |
 | `uv run ruff check .` | 0 | All checks passed |
 | `uv run ruff format --check .` | 0 | 213 files already formatted |
 | `uv run python scripts/check_secrets.py` | 0 | 无发现 |
@@ -118,7 +179,7 @@ T-070 既有长 legacy manifest 回归、不可变结果、超时和取消回归
 | 独立文档身份与冻结边界检查 | 完成 | 8 份文档及 mapping 本地链接可解析，15 份冻结文档未变 |
 | 独立运行契约复查 | 完成 | INT-01 修复并复验，无其他已确认重要问题 |
 
-最终定向与安装命令：
+e19ec4f 当轮定向与安装命令（最新 R1 结果见上节）：
 
 ```text
 uv run pytest tests/test_runtime_repair_integration.py tests/test_run_single_flight.py tests/test_runs.py tests/test_api_security.py tests/test_cli_multi_agent.py tests/test_required_output_validity.py tests/test_cli.py tests/test_prompts.py tests/test_handoff_validator.py -v
@@ -131,7 +192,7 @@ uv run python scripts/smoke_installed_wheel.py
 
 - 两份运行时 wheel 的 SHA-256 均为 `d5ea0ba7f6b642dd6f77d0d6959d8359a28569dfb7ec966156d8464dc8314e0b`。
 - 被独立重建的 sdist SHA-256 为 `cad139929667fae06f9ed399f8c319c8e967f8b47acfb4643e75ba58db6b4792`。
-- 构建使用最终运行时代码、收尾报告写入前的树；它们是脚本生成并清理的验证产物，不是已发布版本。
+- 上述两行构建身份属于 e19ec4f 当轮，使用该轮运行时代码、收尾报告写入前的树；它们是验证产物，不是已发布版本。
 
 没有新增 skip。3 个既有 Windows symlink skip 与 3 个 pytest warnings（两个 class 收集警告、Starlette/httpx 弃用警告）均保留。Ruff 首次检查报告既有 test_coordinator.py:113 的 invalid noqa 警告；Git 有既有 LF→CRLF 提示，未为消除提示修改配置。
 

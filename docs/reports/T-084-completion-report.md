@@ -2,6 +2,10 @@
 
 > Integration identity (2026-09-13): T-084, formerly PR #9 T-073. Source: `c6c893c3a723a3f62c33265394ed1fcbf1c6029b` at `docs/reports/T-073-completion-report.md`. Original branch names, commits, dates and standalone validation below remain historical evidence, not integrated acceptance.
 
+> 2026-09-13 修复更新：外部审查 R1 证明 e19ec4f 的 envelope 先检仍遗漏部分 hash 后篡改。
+> 用户授权后已改为先验证可规范化 payload 的 hash，再检查 envelope；无法规范化时单独安全失败并隔离 payload，普通 envelope/schema 错误不冒充完整性失败。
+> 原外部探针现为 5 passed；本地全量 920 passed、3 skipped、3 warnings。完整变更、红绿证据和剩余边界见 [集成报告](runtime-repairs-integration-2026-09-13.md)。以下保留原来源记录，不把历史结论冒充本轮完整证明。
+
 ## Outcome
 
 The multi-agent runner now classifies an output-hash mismatch as

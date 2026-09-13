@@ -13,7 +13,11 @@ from collections.abc import Mapping
 from hashlib import sha256
 
 from specflow.agents.models import AgentIdentity
-from specflow.handoff.exceptions import HandoffIntegrityError, HandoffValidationError
+from specflow.handoff.exceptions import (
+    HandoffIntegrityError,
+    HandoffPayloadError,
+    HandoffValidationError,
+)
 from specflow.handoff.models import AgentHandoff
 from specflow.plan.hash_utils import canonical_json_bytes
 
@@ -60,7 +64,7 @@ class HandoffValidator:
         self,
         handoff: AgentHandoff,
         sender: AgentIdentity,
-        payloads: Mapping[str, Mapping[str, object]],
+        payloads: Mapping[str, object],
     ) -> None:
         """Validate the concrete, immutable payload referenced by a handoff.
 
@@ -72,14 +76,27 @@ class HandoffValidator:
         if not handoff.payload_ref.startswith(prefix):
             raise HandoffValidationError("Handoff payload_ref must reference agent-outputs.json")
         payload_key = handoff.payload_ref.removeprefix(prefix)
-        payload = payloads.get(payload_key)
-        if payload is None:
+        if payload_key not in payloads:
             raise HandoffValidationError(f"Handoff payload is missing: {payload_key}")
-        if payload.get("agent_id") != sender.agent_id:
-            raise HandoffValidationError("Handoff payload agent_id does not match sender")
-        if not isinstance(payload.get("role"), str) or not isinstance(payload.get("output"), dict):
-            raise HandoffValidationError("Handoff payload does not match the agent output envelope")
-        expected_hash = sha256(canonical_json_bytes(dict(payload))).hexdigest()
+        payload = payloads[payload_key]
+        # Compare the referenced value before interpreting its envelope. A
+        # post-hash mutation can invalidate both integrity and structure.
+        expected_hash = None
+        try:
+            normalized = dict(payload) if isinstance(payload, Mapping) else payload
+            expected_hash = sha256(canonical_json_bytes(normalized)).hexdigest()
+        except Exception:
+            pass
+        if expected_hash is None:
+            # Raise outside except: retain neither raw payload nor exception
+            # text, and do not claim that a hash comparison took place.
+            raise HandoffPayloadError(
+                "Handoff payload cannot be canonicalized",
+                handoff_id=handoff.handoff_id,
+                from_agent_id=handoff.from_agent_id,
+                to_agent_id=handoff.to_agent_id,
+                payload_ref=handoff.payload_ref,
+            )
         if handoff.output_hash != expected_hash:
             raise HandoffIntegrityError(
                 "Handoff output_hash does not match payload",
@@ -88,3 +105,9 @@ class HandoffValidator:
                 to_agent_id=handoff.to_agent_id,
                 payload_ref=handoff.payload_ref,
             )
+        if not isinstance(payload, Mapping):
+            raise HandoffValidationError("Handoff payload does not match the agent output envelope")
+        if payload.get("agent_id") != sender.agent_id:
+            raise HandoffValidationError("Handoff payload agent_id does not match sender")
+        if not isinstance(payload.get("role"), str) or not isinstance(payload.get("output"), dict):
+            raise HandoffValidationError("Handoff payload does not match the agent output envelope")
