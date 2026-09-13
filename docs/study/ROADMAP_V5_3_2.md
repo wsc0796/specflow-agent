@@ -191,6 +191,14 @@ observable_evidence
 | 13 | 按 Failure Attribution Ladder 区分 Retrieval、Context Assembly、Agent Reasoning、Schema/Validation、Evaluator、Artifact/Persistence | Failure Attribution Report |
 | 14 | 写 Evidence Retrieval ADR：A 当前 keyword 足够；B semantic gap 明确；C 数据不足。同步确定 Tool Risk L0 至 L3 policy v0；重测 Week 2 partial 项 | Retrieval ADR + Safety Policy v0 + Retest Queue v2 + Week 2 Gate |
 
+Day 8/9 配套资料（2026-09-13 增补；只补必要概念，Week 2 Measure 主线不变）：
+
+- 教材根目录（只读）：`C:\Users\50469\python-learning\AI-Agent\22-llm-system-course-handbook`；入口为 `README.md`。
+- Day 8：定向学习 `01-知识手册/19-RAG基础.md`，30–45 分钟；重点为 Retrieval/Generation 边界、Chunk/Metadata 与证据条件是否保留，服务于 Eval/Evaluator Contract 定义。执行卡见 [day-08-execution-card.md](day-08-execution-card.md)。
+- Day 9：使用 `02-实验手册/19-21-RAG离线对照实验.md` 理解 Recall、Precision、RR 与 RRF；仅为离线概念对照，不替代 SpecFlow 的 gold/fixtures 与数据冻结工作。
+- 教材合成数据及其变体不得并入 SpecFlow Dev/Holdout；不以离线合成结果声称真实语义检索收益。
+- Milvus、Vector、Hybrid、Rerank 和相邻 `23-specflow-repository-rag` 最早 Day 15，且必须由 Day 14 ADR 触发；教材引用不改变 §6 的条件门，也不授权提前安装或实现。
+
 | 第二周 Gate<br>你必须能用真实 Dev 数据回答：Multi-Agent 比 baseline 好在哪里、代价是什么；现有 EvidenceCollector 真正失败在哪里；Vector 是否有必要。如果答案是“没有证据”，合法结论就是“不实现”。 |
 | --- |
 

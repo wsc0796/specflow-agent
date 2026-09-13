@@ -2,11 +2,37 @@
 
 - Roadmap: [ROADMAP_V5_3_2.md](ROADMAP_V5_3_2.md)
 - Roadmap version: V5.3.2 Learning Effectiveness Patch
-- Campaign phase: Understand & Correct (Day 1-7)
-- Study status: DAY 7 COMPLETE: WEEK 1 OWNERSHIP GATE (IMPROVING)
-- Day: 7
-- Current mode: REVIEW
+- Campaign phase: Measure (Day 8-14)
+- Study status: DAY 8 IN PROGRESS — execution plan ready; learner answer pending
+- Day: 8
+- Current mode: TUTOR
 - Updated on: 2026-09-13
+
+## Day 8 active contract
+
+用户明确授权开始 Day 8：先创建执行卡、最小补充 ROADMAP，然后直接教学。
+执行与恢复入口：[Day 8 执行卡](day-08-execution-card.md)。当前合同为草稿，
+还没有学习者验收证据；Day 7 ownership 保持 `IMPROVING`。
+
+- 目标：Eval/Evaluator Contract v1、20 Dev + 10 Holdout 的模板/ID、10 条 Behavior
+  模板与断言、非目标和数据纪律。AI 检索与排版，学习者负责判断和解释。
+- 每轮一个主要判断，同时展示源码；回答后无论对错都标【正确答案】并解释差异。
+- 本日允许学习行政文档更新，不构成产品 PATCH 授权。
+- 不写正式 30 条数据，不查看/运行/调参 Holdout，不跑新的 Dev baseline；不修改
+  产品、现有案例或依赖，不安装 Milvus/向量库，不进入 Day 9 或后续日程。
+- 第 19 章定向阅读 30–45 分钟；离线 Recall/Precision/RR/RRF 实验属于 Day 9。
+  教材合成数据不得进入项目 Dev/Holdout。
+- Milvus、Vector、Hybrid、Rerank、23-specflow-repository-rag 最早 Day 15 且由
+  Day 14 ADR 触发。不可证实的实现事实写 unknown。
+
+下一步：直接开始 R1，展示 `src/specflow/evaluation/benchmark.py:188–191`、`:235`
+及 `tests/test_benchmark.py:118–120`，判断 run_success_rate 是否能代表真实需求完成率。
+等待本题答案，不再等待“开始”。完成本日教学与证据记录后停止，不自动进入 Day 9。
+
+## Day 7 archived record
+
+以下各节保留 Day 7 收束时的历史状态与当时停止指令。用户于 2026-09-13 显式启动
+Day 8，当前模式和下一步以上方 Day 8 active contract 为准；不重做 Day 7/T-074。
 
 ## Completed objective
 
