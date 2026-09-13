@@ -23,6 +23,7 @@ from specflow.llm import (
     OpenAICompatibleLLMClient,
 )
 from specflow.policy import DEFAULT_POLICY, ExecutionBudget, ExecutionPolicy, PolicyValidator
+from specflow.policy.repository_limits import repository_tool_limits_from_policy
 from specflow.token_budget import BudgetPolicy, TokenBudgetManager
 from specflow.tools import ToolExecutor, ToolRegistry
 from specflow.tools.repository_tools import RepositoryToolSet
@@ -85,7 +86,10 @@ def run(
 
     registry = ToolRegistry()
     try:
-        RepositoryToolSet(repo).register_into(registry)
+        RepositoryToolSet(
+            repo,
+            limits=repository_tool_limits_from_policy(policy.repository),
+        ).register_into(registry)
     except Exception:
         _write_error_artifact(output, run_id, started_at, "REPOSITORY_TOOL_SETUP_FAILED")
         return 2

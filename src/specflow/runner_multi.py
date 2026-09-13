@@ -45,6 +45,7 @@ from specflow.policy import (
     RuntimeGuard,
     SpecFlowError,
 )
+from specflow.policy.repository_limits import repository_tool_limits_from_policy
 from specflow.tools import ToolExecutor, ToolRegistry
 from specflow.tools.repository_tools import RepositoryToolSet
 from specflow.tools.sanitization import final_dlp_scan
@@ -93,7 +94,10 @@ def run_multi_agent(
     referenced_file_count = 0
     try:
         tool_registry = ToolRegistry()
-        RepositoryToolSet(repo).register_into(tool_registry)
+        RepositoryToolSet(
+            repo,
+            limits=repository_tool_limits_from_policy(policy.repository),
+        ).register_into(tool_registry)
         tool_executor = ToolExecutor(tool_registry)
         collector = EvidenceCollector(
             tool_executor,
