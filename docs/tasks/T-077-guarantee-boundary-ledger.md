@@ -1,5 +1,13 @@
 # T-077 — Guarantee Boundary Ledger and Declaration Registry
 
+> **规范复审结案（2026-09-13）：AMENDMENT FROZEN。** 用户转交的外部静态规范
+> 复审确认固定提交 `c14e0380b6daa1be9fa49101bfd79ccb582cd46c` 中的
+> R12-02 / P2 为 **RESOLVED / CLOSED BY STATIC SPEC RE-REVIEW**，
+> S12-04 → R12-02 → CLOSED。本文件该提交的 REQ/AC 正文作为权威修订规范，
+> 以下两块“待重审”为历史阶段记录。本次不修改条款，不代表 T-077 已实现、
+> REQ-M10-12 已满足或 M10 保障验收通过。
+> 详细依据见[规范复审结算](../reports/T-071-T-080-spec-review-entry.md)。
+
 > **修订说明（2026-09-13）：AMENDMENT PROPOSED / 待重审。** 来源为
 > PR #12 固定提交 `558004b2bfc46ddcf76317ba30123a12f486445f` 的外部规范重审
 > S12-04 / P2。本次补齐 determinism 的 evidence-input-set 边界，不代表实现

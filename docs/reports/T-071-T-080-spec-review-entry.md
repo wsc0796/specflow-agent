@@ -2,9 +2,9 @@
 
 日期：2026-09-13。审查基线：`2959a2f9ac8c7d0d3b5a2217102d0ce0ed223ed0`。
 
-> 当前修订基于 PR #12 固定提交 `a178735b335628d650e9755c91545c94af926c9b`。
-> 最新处置见“a178735 复审结算与 R12 修订”；此前交付、验证和发布记录保留为历史。
-> R12-01/R12-02 修订为 **AMENDMENT PROPOSED / 待重审**，不代表实现放行。
+> 最新状态：固定提交 `c14e0380b6daa1be9fa49101bfd79ccb582cd46c` 的外部静态
+> 规范复审已结案，见文末“c14e038 规范结案与 T-071 开工门”。此前待重审、验证和
+> 发布记录保留为历史；规范 findings 关闭不代表任何运行时任务已实现或验收。
 
 ## 初次交付与审查对象（558004b 历史记录）
 
@@ -293,3 +293,71 @@ R12 的三份文档提交并推送至现有审查分支，更新 PR #12 的固�
 上节本地停止状态及验证时的 HEAD/status 保留为阶段记录；发布提交的完整 SHA
 以 PR 正文和 GitHub 提交记录为准。PR 保持草稿；R12 两项仍待外部重审，
 不因发布而关闭规范发现、合并 PR 或启动运行时实现。
+
+## c14e038 规范结案与 T-071 开工门
+
+### 外部静态规范复审登记（2026-09-13）
+
+固定被审提交：`c14e0380b6daa1be9fa49101bfd79ccb582cd46c`；核对时 PR #12
+为 OPEN / Draft，head 匹配。main 仍为 `2959a2f9ac8c7d0d3b5a2217102d0ce0ed223ed0`。
+以下登记用户本轮明确转交的外部静态复审结论，不冒充 GitHub 正式 APPROVE，
+不将其解释为 breaker、preflight、Java profile 或 ledger 的运行时验证。
+
+| 发现 | 外部复审 disposition |
+| --- | --- |
+| R12-01 / P2 | **RESOLVED / CLOSED BY STATIC SPEC RE-REVIEW** |
+| R12-02 / P2 | **RESOLVED / CLOSED BY STATIC SPEC RE-REVIEW** |
+| S12-01 | S12-01 → R12-01 → **CLOSED** |
+| S12-02 | **CLOSED**，仅规范发现 |
+| S12-03 | **CLOSED**，仅规范发现 |
+| S12-04 | S12-04 → R12-02 → **CLOSED** |
+
+外部静态复审结论：**未发现新的 P1/P2 规范阻塞项**。本轮不重写上述历史
+disposition，不重新修订已通过的条款。T-071/T-077 顶部登记 amendment 冻结；
+T-071 的权威 REQ/AC 是 `c14e038` 中包含 endpoint、tenancy 内部身份及公开
+audit 隔离的完整版本，不使用 main 上尚未含 amendment 的旧正文作为实现依据。
+T-075/T-076 的既有修订与静态结案保持原样，未改正文或旧冻结报告。
+
+### T-070 关闭核验
+
+详细七项核验、来源提交、集成主线、复审证据及单进程限制登记在
+[T-070 完成报告的关闭章节](T-070-completion-report.md)。该登记是对已经合并的
+T-070 实现结算，不新增运行时代码，也不由 PR #12 的规范复审代替实现证据。
+
+### 最终开工门的解释
+
+用户列出的四个检查条件逐项保留：权威 amendment、T-070 CLOSED、clean worktree、
+新 focused session / branch。不得把文档修改期间的工作区称为 clean，也不得把
+本次 gate-closure 会话自动当成新的 T-071 实现会话。
+
+本次将规范冻结与 T-070 关闭登记提交、推送到审查分支后，核验干净状态，并可
+从该登记提交准备独立的 T-071 分支。权威规范在命名提交上可读不等同于 PR #12
+已合并；本轮不自动合并。新实现会话须检出包含该规范和关闭记录的独立分支，
+重新核对其 HEAD/clean 状态，方可作出完整开工门通过结论。本轮停止于登记与
+交付，不启动 T-071，不把仍未建立的新 focused session 宣称为已满足。
+
+### 本次登记验证
+
+本轮使用 Windows / Python 3.12.10、现有 `uv.lock` 和 `UV_FROZEN=true`。
+执行对象为登记分支 `c14e038` 加本轮文档；与 main 的运行时代码、测试、基准、
+脚本、prompt 和依赖无差异，因此下列本地结果可作为 main 同一实现的补充证据。
+main 自身的 CI 结果及其精确 SHA 则单独记录在 T-070 关闭章节。
+
+| 命令 / 检查 | Exit code | 本轮实际结果 |
+| --- | --- | --- |
+| 定向 `uv run pytest ... -v`（八文件完整命令见 T-070 关闭章节） | 0 | 175 passed、1 skipped、1 warning，23.96s |
+| `uv run pytest -v` | 0 | 920 passed、3 skipped、3 warnings，22.64s |
+| `uv run ruff check .` | 0 | All checks passed! |
+| `uv run ruff format --check .` | 0 | 213 files already formatted |
+| `uv run python scripts/check_secrets.py` | 0 | 无凭据模式发现 |
+| `git diff --check` | 0 | 无空白错误，最终报告更新后再次检查 |
+| 文档范围与契约静态核对 | 0 | 仅 T-071/T-077 状态登记、T-070 完成报告与本入口；REQ/AC 正文、历史报告、编号和依赖顺序保留，相对链接可解析 |
+
+定向 skip 为 `test_runs.py:566` 的 Windows symlink 权限；全量另有
+`test_repository_tools.py:238` 与 `test_scanner.py:148` 同类 skip。全量三个
+warning 为 TestStrategyAgent/TestStrategyOutput 的收集警告及 Starlette/httpx
+弃用提示；定向只有后者。未新增 skip、未修改依赖或测试。
+证据目录：`C:/Users/50469/temp/specflow-t071-gate-closure-20260913/`。
+
+本轮提交前四份文档为已知未暂存改动；提交推送后须再次确认 clean，并在 PR
+正文记录实际登记提交及独立准备分支。文档自身不循环写入自己的提交 SHA。

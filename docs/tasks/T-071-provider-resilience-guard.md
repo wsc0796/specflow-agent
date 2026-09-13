@@ -1,5 +1,13 @@
 # T-071 — Provider Resilience Guard
 
+> **规范复审结案（2026-09-13）：AMENDMENT FROZEN。** 用户转交的外部静态规范
+> 复审确认固定提交 `c14e0380b6daa1be9fa49101bfd79ccb582cd46c` 中的
+> R12-01 / P2 为 **RESOLVED / CLOSED BY STATIC SPEC RE-REVIEW**，
+> S12-01 → R12-01 → CLOSED。本文件该提交的 REQ/AC 正文作为后续 T-071
+> 的权威规范，本次仅登记结案，不修改条款。以下两块“待重审”为此前阶段的历史
+> 记录；规范结案不代表实现或运行时验收，仍须满足 T-070 关闭及新 focused session。
+> 详细依据见[规范结算与开工门检查](../reports/T-071-T-080-spec-review-entry.md)。
+
 > **修订说明（2026-09-13）：AMENDMENT PROPOSED / 待重审。** 来源为
 > PR #12 固定提交 `558004b2bfc46ddcf76317ba30123a12f486445f` 的外部规范重审
 > S12-01 / P2。本次修订后端资源身份，不代表实现完成或 dependency gate 已满足。
