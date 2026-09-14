@@ -1,0 +1,53 @@
+{
+  "date": "2026-09-14",
+  "task": "T-075",
+  "implementation_status": "implemented_and_verified",
+  "day10_status": "blocked_live_identity",
+  "dataset_freeze_commit": "bf77d19455cb989984dc4f909e6e7ca4b4f91aaf",
+  "repository_revision": "08e5a66f8ea8216433c72744adab92aa07d99c45",
+  "source_profile": "authorized-source-v1",
+  "formal_dev": {"planned": 20, "attempted": 0, "not_started": 20},
+  "formal_multi_agent_baseline_executions": 0,
+  "holdout_content_read": false,
+  "holdout_executions": 0,
+  "tests": {
+    "command": "uv run --no-sync pytest -v --basetemp data/day10-full-pytest",
+    "passed": 802,
+    "skipped": 3,
+    "known_warnings": 3,
+    "new_tests": 25,
+    "elapsed_seconds": 40.11,
+    "log": "data/day10/pytest-full.log",
+    "evidence_state": "passed"
+  },
+  "ruff_lint": "passed",
+  "ruff_format": {"status": "passed", "files": 216},
+  "diff_check": "passed",
+  "input_isolation": {
+    "dev_loader": "explicit manifest.json and dev.json only",
+    "product_task_fields": ["requirement"],
+    "source_snapshot": "fixed Git revision and allowlist; checked against original contents",
+    "observation": "actual Legacy LLMClient requests; immutable copies; errors do not add retries",
+    "evidence_state": "passed"
+  },
+  "context_characterization": {
+    "fixture": "synthetic single-line repository excerpt marker",
+    "collector_marker_present": true,
+    "legacy_request_marker_present": false,
+    "receivers": ["analyze", "generate", "review"],
+    "scope": "one synthetic characterization, no semantic baseline claim"
+  },
+  "day11_mirror": {
+    "status": "plan_only",
+    "shared_projection_and_config_test": "passed",
+    "execution_disabled": true,
+    "actual_max_selected_files": {"legacy": 5, "multi_agent": 10},
+    "effective_limit_comparison": "not_comparable"
+  },
+  "live_identity_blocker": {
+    "SPECFLOW_LLM_BASE_URL_present": false,
+    "SPECFLOW_LLM_API_KEY_present": false,
+    "SPECFLOW_LLM_MODEL_present": false
+  },
+  "learner_evidence": "none added; AI artifacts do not establish ownership"
+}

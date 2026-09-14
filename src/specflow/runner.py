@@ -5,7 +5,8 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
-from dataclasses import asdict, is_dataclass
+from collections.abc import Callable
+from dataclasses import asdict, dataclass, is_dataclass
 from pathlib import Path
 
 from specflow.artifacts import ArtifactStore, RunManifest
@@ -37,6 +38,19 @@ from specflow.workers.review import ReviewWorker
 logger = logging.getLogger(__name__)
 
 
+@dataclass(frozen=True)
+class RequestObservation:
+    """Immutable copy at the budgeted Legacy client boundary; no credentials."""
+
+    worker: str
+    call_index: int
+    model: str
+    messages: tuple[tuple[str, str], ...]
+    temperature: float
+    max_tokens: int
+    response_format: str | None
+
+
 def run(
     *,
     repo: Path,
@@ -47,6 +61,7 @@ def run(
     mock: bool = False,
     max_files: int = 5,
     policy: ExecutionPolicy = DEFAULT_POLICY,
+    request_observer: Callable[[RequestObservation], None] | None = None,
 ) -> int:
     """Run the complete specification generation pipeline. Returns exit code."""
     started_at = _now_iso()
@@ -76,9 +91,15 @@ def run(
             return 2
         analyze_client = generate_client = review_client = real_client
 
-    analyze_client = _PolicyBoundLLMClient(analyze_client, execution_budget)
-    generate_client = _PolicyBoundLLMClient(generate_client, execution_budget)
-    review_client = _PolicyBoundLLMClient(review_client, execution_budget)
+    analyze_client = _PolicyBoundLLMClient(
+        analyze_client, execution_budget, worker="analyze", observer=request_observer
+    )
+    generate_client = _PolicyBoundLLMClient(
+        generate_client, execution_budget, worker="generate", observer=request_observer
+    )
+    review_client = _PolicyBoundLLMClient(
+        review_client, execution_budget, worker="review", observer=request_observer
+    )
 
     if not repo.exists() or not repo.is_dir():
         _write_error_artifact(output, run_id, started_at, "REPOSITORY_NOT_FOUND")
@@ -285,12 +306,39 @@ def _create_llm_client(provider: str, model: str, use_mock: bool) -> LLMClient:
 class _PolicyBoundLLMClient:
     """Apply one run budget to every legacy-worker provider call and retry."""
 
-    def __init__(self, delegate: LLMClient, budget: ExecutionBudget) -> None:
+    def __init__(
+        self,
+        delegate: LLMClient,
+        budget: ExecutionBudget,
+        *,
+        worker: str = "unknown",
+        observer: Callable[[RequestObservation], None] | None = None,
+    ) -> None:
         self._delegate = delegate
         self._budget = budget
+        self._worker = worker
+        self._observer = observer
+        self._call_index = 0
 
     def complete(self, request):
         self._budget.reserve_llm_call()
+        self._call_index += 1
+        if self._observer is not None:
+            try:
+                self._observer(
+                    RequestObservation(
+                        worker=self._worker,
+                        call_index=self._call_index,
+                        model=request.model,
+                        messages=tuple((m.role, m.content) for m in request.messages),
+                        temperature=request.temperature,
+                        max_tokens=request.max_tokens,
+                        response_format=request.response_format,
+                    )
+                )
+            except Exception:
+                # Observation failures must never become product retries or fallbacks.
+                logger.warning("Legacy request observation failed for %s", self._worker)
         return self._delegate.complete(request)
 
 

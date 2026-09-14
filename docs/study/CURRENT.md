@@ -3,12 +3,52 @@
 - Roadmap: [ROADMAP_V5_3_2.md](ROADMAP_V5_3_2.md)
 - Roadmap version: V5.3.2 Learning Effectiveness Patch
 - Campaign phase: Measure (Day 8-14)
-- Study status: DAY 9 COMPLETE — DATASET V1 AND EVALUATOR FIXTURES FROZEN
-- Day: 9
+- Study status: DAY 10 ADAPTER READY — BLOCKED ON LIVE PROVIDER IDENTITY
+- Day: 10
 - Current mode: REVIEW
 - Updated on: 2026-09-14
 
-## Day 9 active contract
+## Day 10 active contract
+
+用户于 2026-09-14 在本窗口明确启动 Day 10；唯一项目为
+`D:\Documents\ChatGPT\一个月冲刺\specflow-agent`，已首先进入并核对 cwd 与 Git 根。
+启动 HEAD 为 `cb665b4`，Dataset v1 冻结内容为 `bf77d19455cb989984dc4f909e6e7ca4b4f91aaf`，
+目标仓库/Gold revision 为 `08e5a66f8ea8216433c72744adab92aa07d99c45`；不重做 Day 9。
+
+执行与恢复入口：[Day 10 执行卡](day-10-execution-card.md)；本人记录：[Day 10 证据卡](evidence/day-10.md)。
+已先完成 gap trace 并展示规格，随后按用户明确授权完成 T-075 PATCH 和必要验证。
+用户最新要求是先完成 AI 可独立工作，教学判断延后；不再重复请求 PATCH 批准。
+学习者的运行前预测、关键 Diff Review、代表 Case 解释与 Teach-back 尚未完成；
+本日尚无本人回答，不因 AI 产物提升 ownership。恢复教学后每轮一个主要判断，回答后给【正确答案】。
+
+本日只允许 Legacy Dev；不运行 Multi-Agent baseline，不改 Prompt、检索策略、阈值或 Evaluator
+语义，不实现 RAG/Embedding/Vector/Hybrid/Rerank。Holdout 只读 manifest 元数据；禁止读取
+`datasets/v1/holdout.json`，不执行 Holdout。旧 12 条 portfolio suite 不得冒充 20 Dev。
+原未跟踪 `docs/study/SpecFlow-Agent-30天能力战役-更新执行版.docx` 必须保留，不覆盖、不删除、不暂存。
+成本遥测不完整为 not_comparable；实现无证据为 unknown；结构通过不等于 task success。
+
+只读追踪已完成：[Gap Trace](evidence/day-10-gap-trace.md)；
+冻结规格与测试边界：[T-075 v1](../tasks/T-075-dataset-v1-legacy-dev-adapter.md)。
+旧 12 条入口与新 Dev 不兼容；Legacy Worker 未读取传入 WorkerContext 的摘录来构建请求，
+该行为已由合成 marker 的实际请求观察复现：Collector 有摘录，但三个 Legacy Worker 请求不含该摘录。
+产品接线保持原样，不能只从 sources.json 推定 Context 事实覆盖。
+用户随后要求“现在先把AI可以解决的内容解决了，再给我谈后续的内容”，并通过任务同步明确
+批准 T-075 PATCH、Day 11 镜像脚手架和一致性测试。规格已冻结为 v1；实现与质量门已完成，
+暂停教学提问，不把执行授权记为 R1 回答。Legacy 产品 Prompt/检索/Context 接线保持原样。
+新增 dataset_v1.py、dev_baseline.py、run_dev_baseline.py、两份测试；runner.py 仅增加请求观察钩子。
+验证结果：802 passed、3 skipped、3 known warnings；Ruff lint/format 与 diff check 均通过。
+本次新增 25 项测试。真实数据仅 prepare-only：20 planned / 0 attempted / 20 not_started。
+隔离源码快照及两侧公共配置已生成于 `data/day10/`；Day 11 镜像为 plan-only，执行明确禁用。
+本进程 SPECFLOW_LLM_BASE_URL/API_KEY/MODEL 三项均未设置；不读取 .env，正式语义运行身份尚缺。
+Multi-Agent 选文件上限 10，Legacy 默认 5，已在镜像协议显式记录 not_comparable；不调整该限额。
+当前恢复入口：[T-075 完成报告](../reports/day-10-adapter-completion-report.md)、
+[验证摘要](evidence/day-10-adapter-validation.json)。提交由完成报告所属 Git commit 定位。
+下一步仅在真实 Provider 环境就绪后冻结运行身份并执行 Legacy 20 Dev，保存语义评分所需证据；
+尚无 Legacy Dev 语义报告，Day 10 整体未完成。不要拿 Mock 结构结果替代它，也不要自动修已观察到的接线缺口。
+
+## Day 9 archived completion record
+
+以下为 Day 9 的历史完成状态和当时停止线；用户已明确启动 Day 10，当前授权以上方为准。
 
 用户于 2026-09-13 在独立任务中明确启动 Day 9，授权创建 Dataset v1、Evaluator
 calibration fixtures、Holdout evidence-level manifest、执行卡与恢复记录，并直接开始教学。
