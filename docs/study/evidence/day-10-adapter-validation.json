@@ -2,11 +2,18 @@
   "date": "2026-09-14",
   "task": "T-075",
   "implementation_status": "implemented_and_verified",
-  "day10_status": "blocked_live_identity",
+  "day10_status": "complete_legacy_dev_recorded",
   "dataset_freeze_commit": "bf77d19455cb989984dc4f909e6e7ca4b4f91aaf",
   "repository_revision": "08e5a66f8ea8216433c72744adab92aa07d99c45",
   "source_profile": "authorized-source-v1",
-  "formal_dev": {"planned": 20, "attempted": 0, "not_started": 20},
+  "formal_dev": {
+    "planned": 20,
+    "attempted": 20,
+    "not_started": 0,
+    "product_completed": 20,
+    "exit_4_degraded": 20,
+    "task_success_ai_review": {"pass": 2, "fail": 18}
+  },
   "formal_multi_agent_baseline_executions": 0,
   "holdout_content_read": false,
   "holdout_executions": 0,
@@ -44,10 +51,12 @@
     "actual_max_selected_files": {"legacy": 5, "multi_agent": 10},
     "effective_limit_comparison": "not_comparable"
   },
-  "live_identity_blocker": {
-    "SPECFLOW_LLM_BASE_URL_present": false,
-    "SPECFLOW_LLM_API_KEY_present": false,
-    "SPECFLOW_LLM_MODEL_present": false
+  "live_identity": {
+    "status": "resolved_from_existing_local_DeepSeek_Harness_configuration",
+    "provider": "openai-compatible",
+    "model": "deepseek-flash",
+    "credentials_exposed": false,
+    "compatibility_smoke": "passed"
   },
   "learner_evidence": "none added; AI artifacts do not establish ownership"
 }

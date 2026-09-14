@@ -3,7 +3,7 @@
 - Roadmap: [ROADMAP_V5_3_2.md](ROADMAP_V5_3_2.md)
 - Roadmap version: V5.3.2 Learning Effectiveness Patch
 - Campaign phase: Measure (Day 8-14)
-- Study status: DAY 10 ADAPTER READY — BLOCKED ON LIVE PROVIDER IDENTITY
+- Study status: DAY 10 COMPLETE — DEEPSEEK LEGACY DEV RECORDED
 - Day: 10
 - Current mode: REVIEW
 - Updated on: 2026-09-14
@@ -39,12 +39,23 @@
 验证结果：802 passed、3 skipped、3 known warnings；Ruff lint/format 与 diff check 均通过。
 本次新增 25 项测试。真实数据仅 prepare-only：20 planned / 0 attempted / 20 not_started。
 隔离源码快照及两侧公共配置已生成于 `data/day10/`；Day 11 镜像为 plan-only，执行明确禁用。
-本进程 SPECFLOW_LLM_BASE_URL/API_KEY/MODEL 三项均未设置；不读取 .env，正式语义运行身份尚缺。
+初始进程没有 SPECFLOW_LLM_BASE_URL/API_KEY/MODEL。后续按用户要求从本机只读发现 DeepSeek
+Harness 配置：已有 DeepSeek 凭证，官方 OpenAI-compatible models 入口实际返回
+`deepseek-flash` 与 `deepseek-v4-pro`。选择与当前 Flash 档对应的 `deepseek-flash`，
+完成一次兼容性 smoke 后，冻结 Day 10/11 共用模型身份；未读取 .env 或输出凭证值。
 Multi-Agent 选文件上限 10，Legacy 默认 5，已在镜像协议显式记录 not_comparable；不调整该限额。
 当前恢复入口：[T-075 完成报告](../reports/day-10-adapter-completion-report.md)、
 [验证摘要](evidence/day-10-adapter-validation.json)。提交由完成报告所属 Git commit 定位。
-下一步仅在真实 Provider 环境就绪后冻结运行身份并执行 Legacy 20 Dev，保存语义评分所需证据；
-尚无 Legacy Dev 语义报告，Day 10 整体未完成。不要拿 Mock 结构结果替代它，也不要自动修已观察到的接线缺口。
+正式 Legacy Dev 已完成：20 planned / 20 attempted / 0 not_started，20 条均 product completed、
+exit 4/degraded；无顶层重跑。60 个实际请求均可观察，Repository Evidence 进入请求为 0，
+Evaluator-only/study 路径泄露为 0。AI 按冻结属性复核 task_success=2/20；14 个 answerable
+Case 的 23 条 Gold facts 在最终请求 Context 为 0/23。Token run coverage=16/20，完整成本 unknown，
+Day 11 成本比较 not_comparable。详见 [Legacy Dev Report](../reports/day-10-legacy-dev-report.md)
+与 [AI Semantic Review](evidence/day-10-legacy-semantic-review.json)。AI Review 不计 learner ownership。
+
+Day 10 到此结束；不自动执行 Day 11。Day 11 启动时复用同 Dataset/revision/模型/投影和报告口径，
+但必须先裁决 Legacy max_files=5 与 Multi-Agent=10 的限额差异，并补 Multi-Agent 实际请求观察。
+不因 Day 10 失败调 Prompt、检索、Context 接线、限额、阈值或 Evaluator；不进入 Holdout。
 
 ## Day 9 archived completion record
 

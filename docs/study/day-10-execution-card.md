@@ -1,7 +1,7 @@
 # Day 10 执行卡 — Legacy Dev 输入隔离与基线
 
 - 日期：2026-09-14；唯一项目：`D:\Documents\ChatGPT\一个月冲刺\specflow-agent`。
-- 模式：`REVIEW`；状态：`ADAPTER_READY / BLOCKED_LIVE_IDENTITY / TEACHING_DEFERRED`。
+- 模式：`REVIEW`；状态：`DAY 10 COMPLETE / LEGACY DEV RECORDED`。
 - 授权：用户明确启动 Day 10，允许执行卡、最小恢复记录、只读 gap trace、适配规格草案与教学。
 - 产品/评测 PATCH：T-075 展示后，用户已要求 AI 先完成可独立工作，并同步明确实现授权。
   允许 Day 11 镜像配置/一致性测试，不允许运行 Day 11 baseline；教学判断延后。
@@ -47,7 +47,7 @@
 - [x] 准备最小 task spec 和测试边界；提交第一轮高价值 Review。
 - [x] 展示规格后收到用户继续执行及明确 PATCH 授权；不将授权当作学习判断。
 - [x] 完成获批范围实现与输入隔离/报告口径测试；Day 11 plan-only 镜像与一致性测试已完成。
-- [ ] 冻结 Legacy Dev 运行身份与配置，完成基线和评分证据。
+- [x] 自主发现 DeepSeek OpenAI-compatible 身份，冻结 `deepseek-flash` 并完成 20 Legacy Dev。
 - [x] 完成 T-075 项目质量门与完成报告；对应代码、测试和文档纳入同一聚焦提交。
 
 当前未运行任何 Day 10 baseline、Provider 或 Holdout。只读结果见
@@ -57,5 +57,8 @@ Legacy WorkerContext 摘录未进入三类 Worker 请求的行为，已用合成
 本轮质量门：802 passed、3 skipped、3 known warnings，Ruff lint/format 与 diff check 通过。
 真实 Dev prepare-only 为 20/0/20，产物在 `data/day10/`；
 [完成报告](../reports/day-10-adapter-completion-report.md)记录结果和复现入口。
-当前真实 Provider 环境三项均未设置；停在运行身份 blocker，不用 Mock 替代语义 baseline。
-下一步配置身份后冻结配置，再执行 Legacy 20 Dev；不需要重新批准已经完成的 T-075。
+初始 SpecFlow Provider 环境缺失已通过本机 DeepSeek 配置发现解决。兼容性 smoke 通过；
+正式结果为 20/20 attempted、20 completed/degraded、task_success 2/20（AI review）、
+最终请求事实覆盖 0/23、Token coverage 16/20/not_comparable。报告见
+[Legacy Dev Report](../reports/day-10-legacy-dev-report.md)。
+Day 10 完成后停止；不自动执行 Day 11，不修 Context 接线或调整限额。

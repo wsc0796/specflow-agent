@@ -24,7 +24,9 @@ R1 已准备，待本人回答：是否批准只增加评测适配/输入隔离/
 
 原 R1 提问延后；用户最新指令是先完成 AI 可独立工作。T-075 已冻结、实施并通过完整质量门。
 已执行合成 fixture 与临时仓库测试；没有执行正式 Dev、Live Provider 或 Holdout。
-仍需冻结真实 Provider/model 与运行配置；本进程三项 SpecFlow Provider 环境变量均不存在。
+初始三项 SpecFlow Provider 环境变量不存在。用户随后说明本机已有 DeepSeek 并要求 AI 自主定位；
+已发现 DeepSeek Harness 和用户级凭证存在，OpenAI-compatible models API 返回
+deepseek-flash/deepseek-v4-pro。凭证值未输出；选择 deepseek-flash 并冻结运行身份。
 
 ## T-075 实现与验证结果
 
@@ -36,6 +38,25 @@ R1 已准备，待本人回答：是否批准只增加评测适配/输入隔离/
 - 真实 Dev 准备：20 planned、0 attempted、20 not_started。未读取真实 Holdout 内容，无正式 Multi-Agent 执行。
 - [完成报告](../../reports/day-10-adapter-completion-report.md)与[机器摘要](day-10-adapter-validation.json)
   记录已验证范围、Provider blocker 和复现命令。无本人新回答，不提升 ownership。
+
+## 正式 Legacy Dev 结果（AI 产物）
+
+- 兼容性 smoke：configured/response model 均为 deepseek-flash；64/31 Token，1.811s。
+- 正式运行：20 planned / 20 attempted / 0 not_started；20 returned、20 exit 4、20 completed/degraded。
+- 60 个实际请求、0 Provider retry；Repository Evidence 进入请求 0，Evaluator-only/study 路径泄露 0。
+- Collector 共 80 selected files、744 excerpts；因此最早错误观察面为 Context 接线，不能归为
+  “DeepSeek 不会读代码”或“Collector 全部失败”。
+- AI 对冻结属性复核：task_success 2 pass / 18 fail；D015/D016 pass。
+- 14 个 answerable Case、23 个 Gold facts，最终请求事实覆盖 0/23。
+- Token：56/60 调用有 usage，run completeness 16/20；已观测 subtotal 197779，full total unknown，
+  comparison_status=not_comparable。
+- Latency all attempted：mean 41.788s、p50 41.767s、p95 48.482s。
+- D017 secret_detected 来自源码符号 `_bearer_token`，判 Evaluator false positive，没有凭证值。
+- [正式报告](../../reports/day-10-legacy-dev-report.md)；
+  [逐 Case AI Review](day-10-legacy-semantic-review.json)。这些均不提升 learner ownership。
+
+Day 10 已收束。学习者尚未完成运行前预测、关键 Diff Review、代表 Case 解释或 Teach-back；
+下一教学动作留到后续窗口，当前不要求用户补充模型信息。Day 11 需显式启动。
 
 ## 启动阶段行政核验
 

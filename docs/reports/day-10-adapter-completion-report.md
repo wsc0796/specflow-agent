@@ -1,7 +1,8 @@
 # Day 10 — T-075 适配完成报告
 
 - 日期：2026-09-14；唯一项目：`D:\Documents\ChatGPT\一个月冲刺\specflow-agent`。
-- T-075：`IMPLEMENTED_AND_VERIFIED`；Day 10：`BLOCKED_LIVE_IDENTITY`。
+- T-075：`IMPLEMENTED_AND_VERIFIED`；Day 10 最终状态见
+  [Legacy Dev Report](day-10-legacy-dev-report.md)。本报告保存适配完成时的准备检查点。
 - Dataset freeze：`bf77d19455cb989984dc4f909e6e7ca4b4f91aaf`。
 - 被读源码/Gold revision：`08e5a66f8ea8216433c72744adab92aa07d99c45`。
 - 启动 HEAD：`cb665b4357d5b39498c5ac4a2bdd05d86affceb5`。
@@ -71,9 +72,9 @@ Day 10 不调整该限制，留待后续公平性判断。
 上述运行材料在 gitignored data/ 下；用入口可重新生成。当前 config 为未冻结运行身份的准备稿，
 其中 runtime 记录生成时的代码 revision/工作区状态；真正执行前须用已提交代码重新冻结身份。
 
-## 真实运行身份 blocker
+## 运行身份后续处置
 
-本进程检查只记录环境变量是否存在，结果如下；未读取 .env 或输出凭证内容。
+适配完成时三项 SpecFlow 专用变量均未设置；此表是当时的准备检查点，未读取 .env 或输出凭证内容。
 
 | 必需配置 | 状态 |
 | --- | --- |
@@ -81,20 +82,20 @@ Day 10 不调整该限制，留待后续公平性判断。
 | SPECFLOW_LLM_API_KEY | 未设置 |
 | SPECFLOW_LLM_MODEL | 未设置 |
 
-所以尚未运行正式 Legacy 20 Dev，尚无 Legacy 语义质量分数；Day 10 整体不能宣告完成。
-工具已就绪，后续需在同一运行环境中提供所选 Provider 身份。入口会核对指定 model 与实际
-config.model 相同，拒绝脏代码身份、忽略模型参数、错误快照或冻结 Dev 被改动。
+用户随后说明本机已有 DeepSeek，并要求 AI 自主定位。已从现有 DeepSeek Harness 配置发现凭证，
+由真实 models API 确认 `deepseek-flash`/`deepseek-v4-pro`，选择 Flash 完成兼容性 smoke、
+冻结身份并运行 20 Legacy Dev。最终结论和逐 Case Review 不回写本准备检查点，见正式报告。
 
-配置就绪后，在唯一项目目录使用：
+本次实际使用的复现入口为：
 
 ```powershell
 uv run --no-sync python scripts/run_dev_baseline.py --freeze-identity --provider openai-compatible --model '<实际配置的模型名>'
 uv run --no-sync python scripts/run_dev_baseline.py --execute
 ```
 
-执行命令读取已冻结配置，不接受临时模型覆盖，不自动顶层重跑。正式结果将写为
-legacy-dev-report.json/.md、attempts.json 和执行后的 evaluator-review-inputs.json。
-Day 11 的实际运行与接线必须在其任务中推进；Holdout 纪律保持原样。
+执行命令读取已冻结配置，不接受临时模型覆盖，不自动顶层重跑。本次原始结果已写入
+legacy-dev-report.json/.md、attempts.json 和 evaluator-review-inputs.json。
+Day 11 的实际运行与接线仍须在其任务中推进；Holdout 纪律保持原样。
 
 ## 学习记录
 
