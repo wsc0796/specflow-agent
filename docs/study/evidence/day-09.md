@@ -162,6 +162,7 @@ approved=True；七个必需 artifacts 存在、workflow_state=completed、schem
 
 Dataset v1 与 Evaluator Fixtures v1 已冻结；30 条 Case 未执行，Holdout 执行数为 0。
 Day 10 只能在独立任务中从冻结检查点开始，先解决 Dataset 到评测入口的最小适配和输入隔离。
+冻结内容提交：`bf77d19455cb989984dc4f909e6e7ca4b4f91aaf`。
 
 ## 恢复点
 

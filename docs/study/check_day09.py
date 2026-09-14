@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import ast
 import json
+import re
 import subprocess
 import tempfile
 from collections import Counter
@@ -88,6 +89,8 @@ def validate_dataset(include_holdout: bool) -> dict:
     assert manifest["repository_revision"] == REVISION
     assert manifest["status"] == "frozen_v1"
     assert manifest["frozen"] is True
+    assert re.fullmatch(r"[0-9a-f]{40}", manifest["freeze_commit"])
+    assert manifest["content_identity"]["freeze_commit"] == manifest["freeze_commit"]
     expected = {
         "holdout_evidence_level": "frozen_internal_holdout",
         "case_count": 10,
@@ -102,6 +105,8 @@ def validate_dataset(include_holdout: bool) -> dict:
         assert holdout_manifest[key] == value, key
     assert holdout_manifest["dataset_version"] == VERSION
     assert holdout_manifest["repository_revision"] == REVISION
+    assert holdout_manifest["freeze_commit"] == manifest["freeze_commit"]
+    assert holdout_manifest["identity"]["freeze_commit"] == manifest["freeze_commit"]
     tree = set(git("ls-tree", "-r", "--name-only", REVISION).splitlines())
     assert "docs/study/datasets/v1/dev.json" not in tree
     cases, source_cache, symbols = [], {}, {}

@@ -5,7 +5,7 @@
 - 源码与 Gold revision：`08e5a66f8ea8216433c72744adab92aa07d99c45`。
 - AI 准备提交：`174ecfc`。
 - Dataset/annotation version：`v1`；状态：`frozen_v1`。
-- 冻结检查点 commit：待本报告对应内容提交后回填。
+- 冻结检查点 commit：`bf77d19455cb989984dc4f909e6e7ca4b4f91aaf`。
 
 ## 交付结果
 

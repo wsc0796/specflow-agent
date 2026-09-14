@@ -6,7 +6,7 @@
   "repository_revision": "08e5a66f8ea8216433c72744adab92aa07d99c45",
   "status": "frozen_v1",
   "frozen": true,
-  "freeze_commit": null,
+  "freeze_commit": "bf77d19455cb989984dc4f909e6e7ca4b4f91aaf",
   "case_count": 30,
   "splits": {
     "dev": {
@@ -97,7 +97,7 @@
   "content_identity": {
     "dataset_version": "v1",
     "annotation_version": "v1",
-    "freeze_commit": null,
+    "freeze_commit": "bf77d19455cb989984dc4f909e6e7ca4b4f91aaf",
     "extra_content_digest": "not_generated"
   },
   "missing_implementation": {
@@ -131,7 +131,7 @@
   ],
   "execution_status": "not_run",
   "frozen_on": "2026-09-14",
-  "freeze_checkpoint_status": "content_frozen_pending_commit_pointer",
+  "freeze_checkpoint_status": "recorded",
   "freeze_review": {
     "status": "completed",
     "learner_reviewed_dev_case_ids": [

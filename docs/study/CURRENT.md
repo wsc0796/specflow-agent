@@ -37,8 +37,8 @@ Abstention 均完成首次判断、纠正与标准答案；Source/Citation 判�
 但 agent output 是无关天气内容。等待学习者同时判断 contract_run_success 与 task_success。
 学习者最终正确判断 `contract_run_success=pass`、`task_success=fail`，并完成 Day 9 最后一个
 关键边界 Review。Dataset/annotation version 已冻结为 v1；Holdout 执行数为 0，未参与调参。
-Day 9 收束检查通过；当前只提交冻结检查点并回填 commit 指针。用户已明确要求另开
-Day 10 窗口，须从该准确检查点启动，不在本任务执行 Day 10 baseline。
+Day 9 已在冻结内容提交 `bf77d19455cb989984dc4f909e6e7ca4b4f91aaf` 收束。
+用户已明确要求另开 Day 10 窗口，须从该准确检查点启动，不在本任务执行 Day 10 baseline。
 AI 完成候选数据/格式/机械核验；学习者只 Review 关键 Gold、Evaluator 盲区、隔离与取舍。
 每次回答后明确给【正确答案】与标准表述；AI-authored 不计本人 ownership。
 Day 8 整体仍为 `improving / partial`；Holdout 等级的有界决策保持 `verified`，不外推。

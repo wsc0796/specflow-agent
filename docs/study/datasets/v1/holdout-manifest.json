@@ -54,7 +54,7 @@
   "creation_status": "authored_and_frozen",
   "freeze_status": "frozen_v1",
   "frozen": true,
-  "freeze_commit": null,
+  "freeze_commit": "bf77d19455cb989984dc4f909e6e7ca4b4f91aaf",
   "configuration_freeze_day": 20,
   "execution_day": 21,
   "execution_count": 0,
@@ -65,7 +65,7 @@
     "annotation_version": "v1",
     "repository_revision": "08e5a66f8ea8216433c72744adab92aa07d99c45",
     "extra_content_digest": "not_generated",
-    "freeze_commit": null
+    "freeze_commit": "bf77d19455cb989984dc4f909e6e7ca4b4f91aaf"
   },
   "allowed_claim_after_execution": "在 10 条预注册、未参与调参的内部冻结用例上，按冻结配置完成一次性验证。",
   "claim_currently_established": false,
@@ -84,7 +84,7 @@
   },
   "review_policy": "学习者只审 manifest 与等级，不展示题面/Gold；作者创建与格式核验访问如实登记。",
   "frozen_on": "2026-09-14",
-  "freeze_checkpoint_status": "content_frozen_pending_commit_pointer",
+  "freeze_checkpoint_status": "recorded",
   "content_modified_after_freeze": false,
   "learner_review": {
     "scope": "manifest, evidence level, claims, contamination, and coverage gap",

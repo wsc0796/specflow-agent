@@ -91,7 +91,7 @@ Days 10–20 不用 Holdout 修改 Prompt、检索策略、阈值或 Evaluator�
 - [x] 创建 34 个 calibration fixtures，分开 expected 与 observed/unknown。
 - [x] 完成关键 Review、manifest、版本与 isolation_group 核验并冻结 Dataset v1。
 - [x] 完成结构合同与任务语义最终判断；学习证据与 AI 产物分开记录。
-- [x] Day 9 收束检查与完成报告通过；冻结提交指针在提交后回填。
+- [x] Day 9 收束检查与完成报告通过；冻结提交为 `bf77d19`。
 
 收束时使用项目现有依赖运行必要检查；不把回归测试当 Day 10/11 baseline。
 当前下一步：运行收束检查、写完成报告并提交冻结检查点；不进入 Day 10。
