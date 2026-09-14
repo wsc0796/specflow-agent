@@ -1,8 +1,8 @@
-# Dataset v1 — AI 草案待 Review
+# Dataset v1
 
-- dataset/annotation version：`v1-draft.1`。
+- dataset/annotation version：`v1`。
 - 仓库源码 revision：`08e5a66f8ea8216433c72744adab92aa07d99c45`。
-- 状态：`draft_pending_review`，`frozen=false`；不是已经完成的 Day 9 冻结数据。
+- 状态：`frozen_v1`；于 2026-09-14 完成关键边界 Review 后冻结。
 - 20 Dev + 10 frozen_internal_holdout；该等级描述目标纪律，目前没有执行结果。
 
 ## 使用入口
@@ -25,7 +25,10 @@
 5. legal_terminal_state 中 product_state_mapping 仍为 unknown：题目在要求源码解释或拒答，
    不是直接执行其中描述的故障。未来按实际 topology/profile 保存产品终态，不能把回答中的
    “某函数返回 failed”写成被测 Run 的实际 failed。
-6. 安全/旧索引的 3+1 配额当前使用已存在的安全边界；旧索引执行拒绝能力 unknown，未为了凑题实现索引。
+6. 安全/旧索引的 3+1 配额当前全部是 `scenario_type=safety_boundary`。manifest 明确记录
+   `safety_case_count=4/safety_coverage=covered`、`stale_index_case_count=0/not_covered`；
+   固定 revision 没有索引运行时，因此 stale-index runtime capability 为 `N/A`。
+   未为了凑题实现索引，也不声称已经覆盖旧索引拒绝。
 7. 同组重复事实保持一致并在同一 split；两个 split 的 Gold 来源文件也无重叠。
    这不证明语义问题完全独立，也不证明两个 split 难度相当；该取舍留给学习者审查。
 
@@ -48,8 +51,9 @@
 
 ## 冻结与未决项
 
-AI 已完成字段、源码映射、原文核验与组检查。仍待学习者 Review：关键 Gold/可回答性、
-Fixture 预期、数据隔离与 manifest。通过后才建立正式冻结版本并记录提交。
+AI 已完成字段、源码映射、原文核验与组检查。学习者已 Review 关键 Gold/可回答性、
+Fixture 边界、数据隔离与 manifest；未逐条人工审阅的 Case 保留 AI-authored provenance，
+不冒充学习者独立标注。
 来源、Gold 或期望属性变更要记录版本；Holdout 内容变化必须形成新 dataset version。
 用于开发/调参后旧版降为 contaminated_internal_check，换题不能恢复旧证据等级。
-不额外计算内容 digest；使用数据/标注版本、文件清单与 Git 提交记录身份。
+不额外计算内容 digest；使用数据/标注版本、文件清单与 Git 冻结检查点记录身份。

@@ -1,6 +1,8 @@
 # 20 条 Dev — Gold 审查包
 
-AI-authored / learner-review pending；固定源码 revision `08e5a66f8ea8216433c72744adab92aa07d99c45`。
+AI-authored；关键边界 learner reviewed，未逐条人工审阅；固定源码 revision `08e5a66f8ea8216433c72744adab92aa07d99c45`。
+
+本文保留审查前输入，不在题面下覆盖学习者答案；完成记录见 `../../evidence/day-09.md`。
 
 每轮只审一个主要判断；不用填写字段。全部题面来自 Dev，本文不包含 Holdout 内容。
 源文件链接附首行位置；完整 Gold 原文和必要条件保存在同目录 dev.json。

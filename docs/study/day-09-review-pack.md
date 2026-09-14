@@ -1,7 +1,7 @@
 # Day 9 — 只审会改变结论的判断
 
-- 日期：2026-09-13；状态：`AI_PREPARED / LEARNER_REVIEW_PENDING`。
-- 数据版本：`v1-draft.1`，尚未冻结；本人能力仍沿用 Day 8 improving/partial。
+- 日期：2026-09-13 至 2026-09-14；状态：`REVIEW_COMPLETE / DATASET V1 FROZEN`。
+- 数据版本：`v1`；本人能力按证据保持 improving/partial。
 - 用户明确要求 AI 先批量完成机械工作；不再让逐轮课堂等待阻塞候选数据与格式检查。
 
 ## 已准备
@@ -24,6 +24,15 @@
 4. 隔离/证据等级：同组放在同 split；不同来源职责造成的难度差异仍需注意。
    只审 Holdout manifest；不拿 Holdout 内容教学或调参，不声称独立盲测。
 
+分类同步（2026-09-14）：D018-D020 与 H010 均为安全边界。AI 已把 manifest 显式修订为
+`safety_case_count=4/covered`、`stale_index_case_count=0/not_covered`；当前没有索引运行时，
+stale-index runtime capability 为 `N/A`。
+学习者尚未亲自提交该分类判断，因此本项不计 learner ownership。
+
+侧对话恢复（2026-09-14）：离线指标、三个 Gold 锚点、answerability、Fact Recall、
+Token Completeness、Source/Citation、Safe Abstention、Holdout 边界和污染语义均已完成教学。
+当前只从结构合同与任务语义的双判定 Fixture 继续，不重做前述内容。
+
 每轮只处理一个主要判断。回答后无论对错，AI 都给【正确答案】、标准表述和差异，
 再记录本人证据。以上四项是恢复导航，不是要求一次提交四份作业。
 
@@ -41,4 +50,5 @@
 - Repository Task 的产品终态映射须绑定未来实际 topology/profile；不能复用题目描述的函数终态。
 - 当前没有旧索引拒绝实现证据；安全配额没有被包装成已实现 RAG。
 
-本轮可以完成 AI 准备检查点；Day 9 的最终冻结与本人 Teach-back 尚未完成。
+本包已完成关键边界 Review。逐题 AI 内容不计学习者 ownership；最终证据见
+[Day 9 证据卡](evidence/day-09.md)。

@@ -1,7 +1,8 @@
 # Fixture 输入审查包
 
 先读输入、预测，再查看 fixtures.json 的 AI 预期；不要求手填模板。
-此包不显示 expected 结果，完整人工 Review 尚未完成。每轮只取一项。
+此包保留审查前输入，不显示 expected 或学习者答案；关键边界完成记录见
+`../../evidence/day-09.md`。未逐条审阅的 AI Fixture 不标记 learner reviewed。
 
 优先三项：CAL-FR-F01（条件保留）、CAL-CS-F01（引用支持）、CAL-TC-U01（清单缺失）。
 

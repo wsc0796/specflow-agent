@@ -1,10 +1,11 @@
 {
-  "dataset_version": "v1-draft.1",
+  "dataset_version": "v1",
   "case_ids": [
     "SF-RT-D001",
     "SF-RT-D006",
     "SF-RT-D015"
   ],
   "role": "Dev review anchors only; references existing cases, no extra cases",
-  "human_review_status": "pending"
+  "human_review_status": "completed",
+  "reviewed_on": "2026-09-14"
 }

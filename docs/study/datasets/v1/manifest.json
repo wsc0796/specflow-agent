@@ -1,11 +1,11 @@
 {
   "manifest_version": "v1",
   "suite": "specflow_repository_tasks",
-  "dataset_version": "v1-draft.1",
-  "annotation_version": "v1-draft.1",
+  "dataset_version": "v1",
+  "annotation_version": "v1",
   "repository_revision": "08e5a66f8ea8216433c72744adab92aa07d99c45",
-  "status": "draft_pending_review",
-  "frozen": false,
+  "status": "frozen_v1",
+  "frozen": true,
   "freeze_commit": null,
   "case_count": 30,
   "splits": {
@@ -95,8 +95,8 @@
   ],
   "reference_method": "relative_path + symbol + line range + exact source excerpt at repository_revision",
   "content_identity": {
-    "dataset_version": "v1-draft.1",
-    "annotation_version": "v1-draft.1",
+    "dataset_version": "v1",
+    "annotation_version": "v1",
     "freeze_commit": null,
     "extra_content_digest": "not_generated"
   },
@@ -106,10 +106,20 @@
     "semantic_citation_scorer": "unknown",
     "token_coverage_scorer": "unknown",
     "task_terminal_profile_mapping": "unknown",
-    "index_version_rejection": "unknown"
+    "index_version_rejection": "N/A; no index runtime exists at the frozen repository revision"
+  },
+  "category_coverage": {
+    "safety_or_stale_index": {
+      "safety_case_count": 4,
+      "safety_coverage": "covered",
+      "stale_index_case_count": 0,
+      "stale_index_coverage": "not_covered",
+      "stale_index_runtime_capability": "N/A",
+      "reason": "D018-D020 与 H010 都是安全边界用例；当前没有旧索引题面或已证明的索引版本拒绝路径。"
+    }
   },
   "coverage_limits": [
-    "安全/旧索引类别当前使用已有安全边界场景；不声称已覆盖旧索引运行拒绝。",
+    "安全/旧索引配额当前只覆盖 4 条安全边界；旧索引 case_count=0/not_covered，当前无索引实现，runtime capability=N/A。",
     "类别配额一致不保证两个 split 的模块分布或难度相同；本版本按事实来源职责分组。",
     "只提供固定仓库内部 Golden Regression 数据；不是生产流量采样。"
   ],
@@ -119,5 +129,29 @@
     "Evaluator fixture 语义预期 Review",
     "记录争议并版本化解决，不覆盖已冻结版本"
   ],
-  "execution_status": "not_run"
+  "execution_status": "not_run",
+  "frozen_on": "2026-09-14",
+  "freeze_checkpoint_status": "content_frozen_pending_commit_pointer",
+  "freeze_review": {
+    "status": "completed",
+    "learner_reviewed_dev_case_ids": [
+      "SF-RT-D001",
+      "SF-RT-D006",
+      "SF-RT-D015",
+      "SF-RT-D018",
+      "SF-RT-D019",
+      "SF-RT-D020"
+    ],
+    "remaining_case_review": "AI source review; no claim of individual learner review",
+    "reviewed_evaluator_boundaries": [
+      "fact_evidence_coverage",
+      "citation_support",
+      "token_cost_completeness",
+      "safe_abstention",
+      "contract_run_success_vs_task_success"
+    ],
+    "holdout_review_scope": "manifest and evidence level only",
+    "learner_ownership_claim": "partial; AI authored dataset and fixtures"
+  },
+  "freeze_requirements_completed": true
 }

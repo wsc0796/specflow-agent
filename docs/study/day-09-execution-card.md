@@ -1,7 +1,7 @@
 # Day 9 执行卡 — Dataset v1 与 Evaluator 校准
 
 - 日期：2026-09-13；唯一工作项目：`D:\Documents\ChatGPT\一个月冲刺\specflow-agent`。
-- 模式：`TUTOR`；状态：`AI_PREPARED / LEARNER_REVIEW_PENDING`。
+- 模式：`REVIEW`；状态：`DAY 9 COMPLETE / DATASET V1 FROZEN`。
 - 授权：用户明确启动 Day 9，允许本日数据、fixture、manifest、Evidence Pack 与学习行政记录；直接开始教学。
 - 恢复入口：[CURRENT](CURRENT.md)；本人证据：[Day 9 证据卡](evidence/day-09.md)。
 
@@ -29,7 +29,7 @@
 
 30 条新数据单独位于 `docs/study/datasets/v1/`；不混入固定 12 条的 `benchmarks/cases/`。
 校准数据计划位于 `docs/study/calibration/v1/`，与正式任务及教材 suite 分开。
-上述目录现已创建；数据状态为 `v1-draft.1 / draft_pending_review`，尚未正式冻结。
+上述目录现已创建；数据状态为 `v1 / frozen_v1`。
 
 ## 3. 分工与逐轮教学
 
@@ -49,7 +49,7 @@ AI-authored 内容不算 learner ownership；没有本人回答时不得提前�
 
 ## 4. Holdout 冻结纪律
 
-以下字段已写入 manifest；10 条内容已创建并通过机械检查，冻结状态仍为待 Review，执行数为 0。
+以下字段已写入 manifest；10 条内容已创建、Review 并冻结，执行数仍为 0。
 
 ```yaml
 holdout_evidence_level: frozen_internal_holdout
@@ -86,14 +86,15 @@ Days 10–20 不用 Holdout 修改 Prompt、检索策略、阈值或 Evaluator�
 - [x] 创建执行卡与 Day 9 证据卡，更新 CURRENT。
 - [x] 完成当前 evaluation/benchmark 源码、测试、案例的启动阅读与 Evidence Pack。
 - [x] 运行并记录离线概念实验；提交 R1 给学习者。
-- [ ] 收到 R1 本人判断，给【正确答案】并记录差异。
+- [x] 同步离线指标/RRF 本人判断、给【正确答案】并记录差异。
 - [x] 创建与机械核验 Dataset v1 草案的 20 Dev + 10 Holdout。
 - [x] 创建 34 个 calibration fixtures，分开 expected 与 observed/unknown。
-- [ ] 完成关键 Review、manifest、版本与 isolation_group 核验后冻结数据。
-- [ ] Day 9 收束检查、完成报告与聚焦提交；未到收束不声称完成。
+- [x] 完成关键 Review、manifest、版本与 isolation_group 核验并冻结 Dataset v1。
+- [x] 完成结构合同与任务语义最终判断；学习证据与 AI 产物分开记录。
+- [x] Day 9 收束检查与完成报告通过；冻结提交指针在提交后回填。
 
 收束时使用项目现有依赖运行必要检查；不把回归测试当 Day 10/11 baseline。
-当前下一步：按 [精简审查入口](day-09-review-pack.md) 继续学习者判断，回答后给【正确答案】与标准表述。
+当前下一步：运行收束检查、写完成报告并提交冻结检查点；不进入 Day 10。
 源码与复查入口：[Day 9 Evidence Pack](evidence/day-09-source-pack.md)。
 
 ## 7. AI 批量准备检查点（2026-09-13）

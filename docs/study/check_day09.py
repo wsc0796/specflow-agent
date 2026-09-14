@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parents[2]
 DATA = ROOT / "docs/study/datasets/v1"
 CALIBRATION = ROOT / "docs/study/calibration/v1/fixtures.json"
 REVISION = "08e5a66f8ea8216433c72744adab92aa07d99c45"
-VERSION = "v1-draft.1"
+VERSION = "v1"
 DISTRIBUTION = {
     "dev": dict(
         zip(
@@ -86,7 +86,8 @@ def validate_dataset(include_holdout: bool) -> dict:
     holdout_manifest = read_json(DATA / "holdout-manifest.json")
     assert manifest["dataset_version"] == VERSION
     assert manifest["repository_revision"] == REVISION
-    assert manifest["frozen"] is False
+    assert manifest["status"] == "frozen_v1"
+    assert manifest["frozen"] is True
     expected = {
         "holdout_evidence_level": "frozen_internal_holdout",
         "case_count": 10,
@@ -95,7 +96,7 @@ def validate_dataset(include_holdout: bool) -> dict:
         "independent_creator": False,
         "independent_access_control": False,
         "execution_count": 0,
-        "frozen": False,
+        "frozen": True,
     }
     for key, value in expected.items():
         assert holdout_manifest[key] == value, key
@@ -124,9 +125,13 @@ def validate_dataset(include_holdout: bool) -> dict:
             assert case["split"] == split
             assert case["dataset_version"] == case["annotation_version"] == VERSION
             assert case["repository_revision"] == REVISION
+            assert case["status"] == "frozen_v1"
             assert case["execution_status"] == "not_run"
             assert case["model_input_keys"] == ["requirement"]
-            assert case["annotation_provenance"]["human_review_status"] == "pending"
+            assert case["annotation_provenance"]["human_review_status"] in {
+                "learner_reviewed",
+                "ai_reviewed_not_individually_learner_reviewed",
+            }
             assert case["annotation_provenance"]["learner_ownership_evidence"] is False
             assert case["requirement"].strip() and case["forbidden_claims"]
             assert case["legal_terminal_state"]["product_state_mapping"] == "unknown"
@@ -185,7 +190,7 @@ def validate_dataset(include_holdout: bool) -> dict:
     assert not (paths_by_split["dev"] & paths_by_split["holdout"])
     return {
         "status": "passed",
-        "dataset_status": "draft_pending_review",
+        "dataset_status": "frozen_v1",
         "cases_checked": len(cases),
         "holdout_content_read": include_holdout,
         "holdout_read_purpose": (
@@ -200,7 +205,7 @@ def validate_dataset(include_holdout: bool) -> dict:
         "cross_split_group_overlap": 0 if include_holdout else "not_checked",
         "cross_split_gold_id_overlap": 0 if include_holdout else "not_checked",
         "cross_split_gold_source_file_overlap": 0 if include_holdout else "not_checked",
-        "semantic_near_duplicate_review": "AI reviewed; learner review pending",
+        "semantic_near_duplicate_review": "AI reviewed; learner reviewed critical boundaries",
         "tested_model_input_projection": "not implemented; only data-side allowlist checked",
         "repository_revision": REVISION,
         "dataset_version": VERSION,
@@ -211,6 +216,8 @@ def validate_dataset(include_holdout: bool) -> dict:
 
 def validate_fixtures() -> list[dict]:
     payload = read_json(CALIBRATION)
+    assert payload["fixture_version"] == VERSION
+    assert payload["status"] == "frozen_v1_expected_results"
     fixtures = payload["fixtures"]
     assert len({f["fixture_id"] for f in fixtures}) == len(fixtures)
     assert {f["evaluator_id"] for f in fixtures} == EVALUATORS
@@ -220,7 +227,10 @@ def validate_fixtures() -> list[dict]:
     for fixture in fixtures:
         assert fixture["formal_case_ids"] == []
         assert fixture["suite"] == "specflow_evaluator_calibration"
-        assert fixture["human_review_status"] == "pending"
+        assert fixture["fixture_version"] == fixture["annotation_version"] == VERSION
+        assert fixture["human_review_status"] in {"pending", "learner_reviewed"}
+        if fixture["human_review_status"] == "learner_reviewed":
+            assert fixture["human_review_notes"].strip()
         expected = fixture["expected"]
         assert expected["verdict"] in {"pass", "fail", "unknown", "N/A", None}
         if expected["verdict"] is None:

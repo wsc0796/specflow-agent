@@ -1,6 +1,6 @@
 # Evaluator calibration v1
 
-34 个独立合成 Fixtures，覆盖冻结合同的七项 Evaluator；没有取用教材或正式 30 条任务的题面/Gold。
+34 个独立合成 Fixtures，版本 `v1`，覆盖冻结合同的七项 Evaluator；没有取用教材或正式 30 条任务的题面/Gold。
 数据与完整预期在 [fixtures.json](fixtures.json)，便于先预测的输入展示在 [审查包](fixture-review.md)。
 
 | Evaluator | 数量 | 当前可执行内容 |
@@ -15,7 +15,9 @@
 
 八次实际核心调用结果见 [calibration results](../../evidence/day-09-calibration-results.json)。
 其余 26 个 observation 明确为 `not_run`。fixture 文件保存预期，观察记录独立存放，不覆盖成伪执行结果。
-Fixture 文件完整与核心函数匹配，不等于人工语义校准已经完成；human_review_status 保持 pending。
+Fixture 文件完整与核心函数匹配。学习者已审查 Fact Recall、Citation Support、Token
+Completeness、Safe Abstention 以及 contract_run_success 与 task_success 的关键边界；
+其余 AI 起草 Fixture 不声称逐条 learner reviewed。
 
 `fixture_role=should_pass/should_fail` 表示校准正反例。Fact Recall 的两类 fixture 输出具体比例
 而非产品任务 verdict；`expected.verdict=null`、`product_task_verdict=unknown` 明确保留阈值缺口。

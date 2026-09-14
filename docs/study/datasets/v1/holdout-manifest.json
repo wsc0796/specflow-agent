@@ -1,8 +1,8 @@
 {
   "manifest_version": "v1",
   "suite": "specflow_repository_tasks",
-  "dataset_version": "v1-draft.1",
-  "annotation_version": "v1-draft.1",
+  "dataset_version": "v1",
+  "annotation_version": "v1",
   "repository_revision": "08e5a66f8ea8216433c72744adab92aa07d99c45",
   "split": "holdout",
   "file": "holdout.json",
@@ -31,6 +31,16 @@
     "no_answer": 1,
     "safety_or_stale_index": 1
   },
+  "category_coverage": {
+    "safety_or_stale_index": {
+      "safety_case_count": 1,
+      "safety_coverage": "covered",
+      "stale_index_case_count": 0,
+      "stale_index_coverage": "not_covered",
+      "stale_index_runtime_capability": "N/A",
+      "reason": "H010 是 HTTP 鉴权安全边界；不把它登记为旧索引覆盖。"
+    }
+  },
   "isolation_groups": [
     "IG-H-RUN-REQUEST",
     "IG-H-PROJECT",
@@ -41,9 +51,9 @@
     "IG-H-LIVE-DB-CONTENTS",
     "IG-H-API-AUTH"
   ],
-  "creation_status": "authored",
-  "freeze_status": "draft_pending_manifest_review",
-  "frozen": false,
+  "creation_status": "authored_and_frozen",
+  "freeze_status": "frozen_v1",
+  "frozen": true,
   "freeze_commit": null,
   "configuration_freeze_day": 20,
   "execution_day": 21,
@@ -51,10 +61,11 @@
   "results_available": false,
   "access_log": "access-log.jsonl",
   "identity": {
-    "dataset_version": "v1-draft.1",
-    "annotation_version": "v1-draft.1",
+    "dataset_version": "v1",
+    "annotation_version": "v1",
     "repository_revision": "08e5a66f8ea8216433c72744adab92aa07d99c45",
-    "extra_content_digest": "not_generated"
+    "extra_content_digest": "not_generated",
+    "freeze_commit": null
   },
   "allowed_claim_after_execution": "在 10 条预注册、未参与调参的内部冻结用例上，按冻结配置完成一次性验证。",
   "claim_currently_established": false,
@@ -71,5 +82,13 @@
     "replacement_requires_new_dataset_version": true,
     "old_evidence_level_restored_by_replacement": false
   },
-  "review_policy": "学习者只审 manifest 与等级，不展示题面/Gold；作者创建与格式核验访问如实登记。"
+  "review_policy": "学习者只审 manifest 与等级，不展示题面/Gold；作者创建与格式核验访问如实登记。",
+  "frozen_on": "2026-09-14",
+  "freeze_checkpoint_status": "content_frozen_pending_commit_pointer",
+  "content_modified_after_freeze": false,
+  "learner_review": {
+    "scope": "manifest, evidence level, claims, contamination, and coverage gap",
+    "status": "completed",
+    "content_reviewed_for_tuning": false
+  }
 }
