@@ -2,14 +2,15 @@
 
 from __future__ import annotations
 
-import time
 from collections.abc import Callable
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import FIRST_COMPLETED, wait
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 
 from specflow.coordinator.exceptions import ScheduleExecutionError
+from specflow.coordinator.execution_lanes import LaneManager
+from specflow.policy.models import ExecutionLanePolicy, LaneLimits, SpecFlowError
 
 # Type alias: an executor is a callable that receives context and returns results.
 AgentExecutor = Callable[[dict[str, Any]], dict[str, Any]]
@@ -53,7 +54,9 @@ class MultiAgentScheduler:
     Within each stage, agent executors run **concurrently** via a thread pool.
     """
 
-    def __init__(self, max_parallel_workers: int = 10) -> None:
+    def __init__(
+        self, max_parallel_workers: int = 10, *, lane_manager: LaneManager | None = None
+    ) -> None:
         """Initialise the scheduler.
 
         Parameters
@@ -63,6 +66,7 @@ class MultiAgentScheduler:
             within a single stage.
         """
         self._max_workers = max_parallel_workers
+        self._lanes = lane_manager
 
     # ── Public API ──────────────────────────────────────────────────
 
@@ -88,7 +92,7 @@ class MultiAgentScheduler:
             Base context dict passed (with accumulated prior outputs) to
             every agent executor.
         deadline:
-            Optional absolute monotonic deadline (``time.monotonic()`` scale).
+            Optional absolute deadline on the lane manager's monotonic clock.
             When set, each stage waits at most the remaining budget for its
             agents. Queued work is cancelled; already-started synchronous work
             is allowed to exit before control returns, because Python threads
@@ -105,6 +109,18 @@ class MultiAgentScheduler:
             If no executor is registered for an agent, or if any agent
             callable raises an exception.
         """
+        if self._max_workers <= 0:
+            raise ValueError("max_parallel_workers must be positive")
+        lanes = self._lanes or LaneManager(
+            ExecutionLanePolicy(local_tool=LaneLimits(self._max_workers, self._max_workers))
+        )
+        try:
+            return self._execute_stages(stages, agent_executors, context, deadline, lanes)
+        finally:
+            if self._lanes is None:
+                lanes.shutdown()
+
+    def _execute_stages(self, stages, agent_executors, context, deadline, lanes):
         results: list[StageExecutionResult] = []
         supplied_prior_outputs = context.get("prior_outputs", {})
         if not isinstance(supplied_prior_outputs, dict):
@@ -121,53 +137,68 @@ class MultiAgentScheduler:
                 if agent_id not in agent_executors:
                     raise ScheduleExecutionError(f"No executor registered for agent {agent_id!r}")
 
-            # Execute agents in this stage concurrently. The executor is
-            # owned manually so a timed-out stage can cancel queued work, then
-            # wait for started work to exit before the caller releases shared
-            # run capacity.
-            executor = ThreadPoolExecutor(max_workers=self._max_workers)
+            # Track only this stage's accepted handles. On failure cancel its
+            # queued work and drain started work without shutting down lanes
+            # that may also serve another run.
+            future_map = {}
             try:
                 remaining = None
                 if deadline is not None:
-                    remaining = max(0.0, deadline - time.monotonic())
+                    remaining = max(0.0, deadline - lanes.clock())
                 if remaining is not None and remaining <= 0:
                     raise ScheduleExecutionError(
                         "TIME_BUDGET_EXCEEDED: stage exceeded the wall-clock budget"
                     )
 
-                future_map = {}
-                for agent_id in stage_agent_ids:
+                remaining_agents = iter(stage_agent_ids)
+
+                def submit_next():
+                    agent_id = next(remaining_agents, None)
+                    if agent_id is None:
+                        return None
                     agent_ctx: dict[str, Any] = {
                         **context,
                         "prior_outputs": dict(prior_outputs),
                     }
                     submitted_at = datetime.now(UTC).isoformat()
-                    future = executor.submit(agent_executors[agent_id], agent_ctx)
+                    future = lanes.submit(
+                        "local_tool", agent_executors[agent_id], agent_ctx, deadline=deadline
+                    )
                     future_map[future] = agent_id
                     agent_timings[agent_id] = AgentExecutionTiming(submitted_at=submitted_at)
+                    return future
 
-                try:
-                    for future in as_completed(future_map, timeout=remaining):
+                pending = set()
+                for _ in range(min(self._max_workers, len(stage_agent_ids))):
+                    pending.add(submit_next())
+                while pending:
+                    remaining = None if deadline is None else max(0.0, deadline - lanes.clock())
+                    done, pending = wait(pending, timeout=remaining, return_when=FIRST_COMPLETED)
+                    if not done:
+                        raise SpecFlowError("TIME_BUDGET_EXCEEDED", "Stage deadline exhausted.")
+                    for future in done:
                         agent_id = future_map[future]
-                        try:
-                            agent_results[agent_id] = future.result()
-                            agent_timings[agent_id].completed_at = datetime.now(UTC).isoformat()
-                        except Exception as exc:
-                            raise ScheduleExecutionError(
-                                f"Agent {agent_id!r} execution failed: {exc}"
-                            ) from exc
-                except TimeoutError as exc:
-                    for future in future_map:
-                        future.cancel()
-                    raise ScheduleExecutionError(
-                        "TIME_BUDGET_EXCEEDED: stage did not finish within the wall-clock budget"
-                    ) from exc
+                        agent_results[agent_id] = lanes.wait_for(future, deadline=deadline)
+                        agent_timings[agent_id].completed_at = datetime.now(UTC).isoformat()
+                    for _ in done:
+                        future = submit_next()
+                        if future is not None:
+                            pending.add(future)
+            except SpecFlowError as error:
+                raise ScheduleExecutionError(
+                    f"{error.code}: stage admission or execution failed"
+                ) from error
+            except ScheduleExecutionError:
+                raise
+            except Exception as error:
+                raise ScheduleExecutionError("Agent execution failed") from error
             finally:
-                executor.shutdown(wait=True, cancel_futures=True)
+                lanes.cancel_and_wait(future_map)
 
             completed_at = datetime.now(UTC).isoformat()
 
             # Accumulate outputs so downstream stages can access them
+            agent_results = {agent_id: agent_results[agent_id] for agent_id in stage_agent_ids}
             prior_outputs.update(agent_results)
 
             results.append(

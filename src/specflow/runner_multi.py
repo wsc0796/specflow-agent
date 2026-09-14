@@ -11,6 +11,7 @@ import time
 from collections.abc import Callable, Mapping
 from dataclasses import asdict, replace
 from datetime import UTC, datetime
+from functools import partial
 from hashlib import sha256
 from pathlib import Path
 from typing import Any
@@ -26,6 +27,7 @@ from specflow.agents.synthesis import SynthesisAgent
 from specflow.agents.test_strategy import TestStrategyAgent
 from specflow.coordinator.coordinator import Coordinator
 from specflow.coordinator.exceptions import ScheduleExecutionError
+from specflow.coordinator.execution_lanes import DEFAULT_LANES, LaneManager
 from specflow.coordinator.scheduler import MultiAgentScheduler, StageExecutionResult
 from specflow.coordinator.state_machine import MultiAgentWorkflowState
 from specflow.evaluation.metrics import AgentMetrics, RunMetrics
@@ -77,6 +79,7 @@ def run_multi_agent(
     _flight: Flight | None = None,
     _coordinator: SingleFlightCoordinator = DEFAULT_COORDINATOR,
     _on_join: Callable[[dict[str, str]], None] | None = None,
+    _lane_manager: LaneManager | None = None,
 ) -> int:
     """Coalesce in-flight execution while preserving int-compatible CLI exits."""
     PolicyValidator().validate(policy)
@@ -97,6 +100,7 @@ def run_multi_agent(
             _executor_overrides=_executor_overrides,
             _provider_config=flight.prepared.provider_config,
             _single_flight=flight.metadata,
+            _lane_manager=_lane_manager,
         )
         return result.with_audit(flight.metadata)
 
@@ -113,7 +117,10 @@ def run_multi_agent(
             provider=provider,
             model=model,
             policy=policy,
-            extra={"executors": {k: id(v) for k, v in (_executor_overrides or {}).items()}},
+            extra={
+                "executors": {k: id(v) for k, v in (_executor_overrides or {}).items()},
+                **({"lane_manager": id(_lane_manager)} if _lane_manager is not None else {}),
+            },
         )
     except SpecFlowError as error:
         return RunResult(2, error_code=error.code)
@@ -140,6 +147,7 @@ def _run_multi_agent_owned(
     _executor_overrides: Mapping[str, AgentExecutor] | None = None,
     _provider_config: OpenAICompatibleConfig | None = None,
     _single_flight: dict[str, str] | None = None,
+    _lane_manager: LaneManager | None = None,
 ) -> RunResult:
     """Execute the fixed plan and persist auditable multi-agent artifacts.
 
@@ -152,6 +160,9 @@ def _run_multi_agent_owned(
 
     PolicyValidator().validate(policy)
     guard = RuntimeGuard(policy)
+    lanes = _lane_manager or DEFAULT_LANES
+    if lanes.policy != policy.lanes:
+        return RunResult(3, error_code="LANE_CONFIGURATION_MISMATCH")
 
     if not repo.is_dir() or not requirement.strip():
         return RunResult(2)
@@ -179,11 +190,15 @@ def _run_multi_agent_owned(
                 max_tool_calls=20,
             ),
         )
-        evidence = collector.collect(
-            run_id=run_id,
-            requirement=requirement,
-            project_summary=_repo_summary(repo),
-            technology_stack=(),
+        evidence = lanes.call(
+            "local_tool",
+            lambda: collector.collect(
+                run_id=run_id,
+                requirement=requirement,
+                project_summary=_repo_summary(repo),
+                technology_stack=(),
+            ),
+            deadline=guard.deadline,
         )
         evidence_text = final_dlp_scan(evidence.serialized_context())
         tool_call_records = [
@@ -192,6 +207,19 @@ def _run_multi_agent_owned(
         discovered_files = evidence.discovered_file_count
         selected_file_count = len(evidence.selected_files)
         referenced_file_count = len({excerpt.relative_path for excerpt in evidence.excerpts})
+    except SpecFlowError as error:
+        directory = _persist_pre_execution_failure(
+            output=output,
+            run_id=run_id,
+            started_at=started_at,
+            guard=guard,
+            error=error.code,
+            discovered_files=discovered_files,
+            selected_file_count=selected_file_count,
+            referenced_file_count=referenced_file_count,
+            tool_call_count=len(tool_call_records),
+        )
+        return RunResult(3, error_code=error.code, artifact_directory=directory)
     except Exception:
         # Evidence is a required, untrusted input boundary.  Continuing would
         # let agents produce an ungrounded plan with no audit evidence.
@@ -225,7 +253,11 @@ def _run_multi_agent_owned(
     else:
         try:
             llm_client = _create_real_llm_client(
-                provider, model, policy=policy, config=_provider_config
+                provider,
+                model,
+                policy=policy,
+                config=_provider_config,
+                attempt_executor=partial(lanes.call, "provider", deadline=guard.deadline),
             )
         except Exception:
             import sys
@@ -272,7 +304,9 @@ def _run_multi_agent_owned(
         "requirement": requirement,
         "repository_evidence": evidence_text,
     }
-    scheduler = MultiAgentScheduler(max_parallel_workers=policy.max_parallel_agents)
+    scheduler = MultiAgentScheduler(
+        max_parallel_workers=policy.max_parallel_agents, lane_manager=lanes
+    )
     prior_outputs: dict[str, dict[str, Any]] = {}
     stages: list[StageExecutionResult] = []
     runtime_handoffs: list[AgentHandoff] = []
@@ -772,13 +806,17 @@ def _validate_stage_results(
             raise ValueError("AGENT_EXECUTION_FAILED")
         if not result.get("success", True):
             output = result.get("output")
-            if (
-                isinstance(output, dict)
-                and output.get("error_code") == ErrorCode.PROVIDER_CIRCUIT_REJECTED.value
-            ):
+            if isinstance(output, dict) and output.get("error_code") in {
+                ErrorCode.PROVIDER_CIRCUIT_REJECTED.value,
+                ErrorCode.LANE_SATURATED.value,
+                ErrorCode.BUDGET_WALL_TIME.value,
+                ErrorCode.RUN_CANCELLED.value,
+            }:
                 raise SpecFlowError(
-                    ErrorCode.PROVIDER_CIRCUIT_REJECTED.value,
-                    "Provider circuit rejected the attempt.",
+                    "TIME_BUDGET_EXCEEDED"
+                    if output["error_code"] == ErrorCode.BUDGET_WALL_TIME.value
+                    else output["error_code"],
+                    "Execution admission or provider circuit rejected work.",
                     retryable=False,
                 )
             raise ValueError("AGENT_EXECUTION_FAILED")
@@ -1327,6 +1365,7 @@ def _create_real_llm_client(
     *,
     policy: ExecutionPolicy,
     config: OpenAICompatibleConfig | None = None,
+    attempt_executor: Callable | None = None,
 ) -> LLMClient:
     """Create a real OpenAI-compatible LLM client from env vars.
 
@@ -1335,4 +1374,6 @@ def _create_real_llm_client(
     """
     config = config or OpenAICompatibleConfig.from_env()
     capped_timeout = min(config.timeout_seconds, policy.max_wall_time_seconds)
-    return OpenAICompatibleLLMClient(replace(config, timeout_seconds=capped_timeout))
+    return OpenAICompatibleLLMClient(
+        replace(config, timeout_seconds=capped_timeout), attempt_executor=attempt_executor
+    )

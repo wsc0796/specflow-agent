@@ -17,6 +17,7 @@ class ErrorCategory(StrEnum):
     TIMEOUT = "timeout"
     CANCELLED = "cancelled"
     INTERNAL_ERROR = "internal_error"
+    ADMISSION_REJECTED = "admission_rejected"
 
 
 class ErrorCode(StrEnum):
@@ -28,6 +29,7 @@ class ErrorCode(StrEnum):
     PROVIDER_AUTH_FAILURE = "PROVIDER_AUTH_FAILURE"
     PROVIDER_MODEL_NOT_FOUND = "PROVIDER_MODEL_NOT_FOUND"
     PROVIDER_CIRCUIT_REJECTED = "PROVIDER_CIRCUIT_REJECTED"
+    LANE_SATURATED = "LANE_SATURATED"
 
     # JSON errors
     JSON_PARSE_FAILED = "JSON_PARSE_FAILED"
@@ -88,6 +90,7 @@ _ERROR_CODE_CATEGORY: dict[ErrorCode, ErrorCategory] = {
     ErrorCode.PROVIDER_AUTH_FAILURE: ErrorCategory.PERMANENT_PROVIDER,
     ErrorCode.PROVIDER_MODEL_NOT_FOUND: ErrorCategory.PERMANENT_PROVIDER,
     ErrorCode.PROVIDER_CIRCUIT_REJECTED: ErrorCategory.PERMANENT_PROVIDER,
+    ErrorCode.LANE_SATURATED: ErrorCategory.ADMISSION_REJECTED,
     ErrorCode.JSON_PARSE_FAILED: ErrorCategory.INVALID_JSON,
     ErrorCode.JSON_NOT_OBJECT: ErrorCategory.INVALID_JSON,
     ErrorCode.SCHEMA_MISSING_FIELD: ErrorCategory.SCHEMA_MISMATCH,

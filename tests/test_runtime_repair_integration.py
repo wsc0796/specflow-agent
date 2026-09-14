@@ -224,10 +224,12 @@ def service_context(tmp_path):
 
 
 def test_actual_worker_cancellation_waits_for_peer_and_keeps_permit(service_context, monkeypatch):
+    from specflow.coordinator.execution_lanes import LaneManager
+
     repo, db, security, coordinator, service, create = service_context
     entered, release, unwinding, joined = Event(), Event(), Event(), Event()
     real_design, real_risk = runner.DesignAgent.execute, runner.RiskReviewAgent.execute
-    real_shutdown, real_wait = ThreadPoolExecutor.shutdown, Flight.wait
+    real_drain, real_wait = LaneManager.cancel_and_wait, Flight.wait
 
     def design(self, context):
         assert entered.wait(5)
@@ -238,10 +240,10 @@ def test_actual_worker_cancellation_waits_for_peer_and_keeps_permit(service_cont
         assert release.wait(5)
         return real_risk(self, context)
 
-    def shutdown(self, *args, **kwargs):
+    def drain(self, *args, **kwargs):
         if entered.is_set() and not release.is_set():
             unwinding.set()
-        return real_shutdown(self, *args, **kwargs)
+        return real_drain(self, *args, **kwargs)
 
     def wait(self, timeout):
         joined.set()
@@ -249,7 +251,7 @@ def test_actual_worker_cancellation_waits_for_peer_and_keeps_permit(service_cont
 
     monkeypatch.setattr(runner.DesignAgent, "execute", design)
     monkeypatch.setattr(runner.RiskReviewAgent, "execute", risk)
-    monkeypatch.setattr(ThreadPoolExecutor, "shutdown", shutdown)
+    monkeypatch.setattr(LaneManager, "cancel_and_wait", drain)
     monkeypatch.setattr(Flight, "wait", wait)
     with ThreadPoolExecutor(2) as pool:
         owner = pool.submit(create)
