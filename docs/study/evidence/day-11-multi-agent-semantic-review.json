@@ -1,0 +1,35 @@
+{
+  "review_id": "SF-MULTI-AGENT-DEV-v1-AI-REVIEW",
+  "date": "2026-09-14",
+  "learner_verified": false,
+  "dataset_version": "v1",
+  "annotation_version": "v1",
+  "dataset_freeze_commit": "bf77d19455cb989984dc4f909e6e7ca4b4f91aaf",
+  "repository_revision": "08e5a66f8ea8216433c72744adab92aa07d99c45",
+  "provider": "openai-compatible",
+  "model": "deepseek-flash",
+  "execution": {
+    "status": "adapter_verified_formal_run_not_started",
+    "planned": 20,
+    "attempted": 0,
+    "not_started": 20,
+    "top_level_retries": 0
+  },
+  "fairness_decision": {
+    "status": "pending_learner_decision",
+    "legacy_max_selected_files": 5,
+    "multi_agent_max_selected_files": 10
+  },
+  "contract_run_success": {"verdict": "unknown", "reason": "formal run not started"},
+  "artifact_validation": {"verdict": "unknown", "reason": "formal run not started"},
+  "task_success": {"verdict": "unknown", "reason": "formal run not started"},
+  "fact_evidence_coverage": {"verdict": "unknown", "reason": "formal run not started"},
+  "safe_abstention": {"verdict": "unknown", "reason": "formal run not started"},
+  "citation_support": {"verdict": "unknown", "reason": "formal run not started"},
+  "token_cost_completeness": {
+    "verdict": "unknown",
+    "comparison_status": "not_comparable",
+    "reason": "formal run not started; current metrics omit Coordinator enrichment usage"
+  },
+  "allowed_conclusion": "Day 11 adapter preparation is in progress; no Multi-Agent Dev quality result exists yet."
+}

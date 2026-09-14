@@ -1,0 +1,36 @@
+{
+  "task_id": "T-076",
+  "date": "2026-09-14",
+  "status": "implemented_and_verified_formal_run_pending",
+  "dataset_freeze_commit": "bf77d19455cb989984dc4f909e6e7ca4b4f91aaf",
+  "repository_revision": "08e5a66f8ea8216433c72744adab92aa07d99c45",
+  "paired_legacy_result_commit": "271d409cb0164ffa998a47b164abed3682c60801",
+  "tdd": {
+    "red": "ImportError: _RequestObservingLLMClient did not exist",
+    "focused_green": "35 passed",
+    "related_regression": "72 passed"
+  },
+  "quality_gate": {
+    "pytest": "807 passed, 3 skipped, 3 known warnings",
+    "ruff_check": "passed",
+    "ruff_format": "216 files already formatted",
+    "diff_check": "passed",
+    "frozen_dev_and_fixtures": "unchanged",
+    "word_boundary": "one unrelated untracked Word preserved and excluded"
+  },
+  "prepared_run": {
+    "provider": "openai-compatible",
+    "model": "deepseek-flash",
+    "planned": 20,
+    "attempted": 0,
+    "not_started": 20,
+    "multi_agent_max_selected_files": 10,
+    "fairness_status": "pending_learner_decision",
+    "run_identity_frozen": true,
+    "runtime_code_status": "clean",
+    "execute_gate": "exit 2; no attempts.json"
+  },
+  "holdout_opened": false,
+  "formal_provider_called": false,
+  "learner_verified": false
+}

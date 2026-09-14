@@ -12,6 +12,7 @@ from specflow.plan.hash_utils import canonical_json_bytes
 from specflow.policy.models import ExecutionPolicy
 from specflow.runner_multi import (
     _build_registry,
+    _RequestObservingLLMClient,
     _sanitize_artifact_value,
     _validated_inputs,
     run_multi_agent,
@@ -24,6 +25,156 @@ def _write_matching_evidence(repo: Path, requirement: str) -> None:
 
 
 class TestMultiAgentRunner:
+    def test_request_observer_is_non_interfering_and_preserves_provider_error(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        from specflow.llm import LLMMessage, LLMRequest, LLMResponse, LLMUsage
+        from specflow.llm.exceptions import LLMResponseError
+
+        request = LLMRequest(
+            model="test-model",
+            messages=[LLMMessage(role="user", content="hello")],
+            response_format="json",
+        )
+        response = LLMResponse(
+            content='{"ok": true}',
+            model="test-model",
+            usage=LLMUsage(input_tokens=3, output_tokens=2),
+            latency_ms=1,
+            finish_reason="stop",
+        )
+        forwarded = []
+
+        class Provider:
+            def complete(self, value):
+                forwarded.append(value)
+                return response
+
+        def broken_observer(_):
+            raise RuntimeError("observer failed")
+
+        client = _RequestObservingLLMClient(
+            Provider(), receiver="repository-analyst-agent-v1", observer=broken_observer
+        )
+        assert client.complete(request) is response
+        assert forwarded == [request]
+        assert "observation" in caplog.text
+
+        original = LLMResponseError("synthetic provider failure")
+
+        class FailingProvider:
+            def complete(self, value):
+                forwarded.append(value)
+                raise original
+
+        seen = []
+        client = _RequestObservingLLMClient(
+            FailingProvider(), receiver="review-agent-v1", observer=seen.append
+        )
+        with pytest.raises(LLMResponseError) as failure:
+            client.complete(request)
+        assert failure.value is original
+        assert forwarded[-1] is request
+        assert len(seen) == 1
+        assert seen[0].receiver == "review-agent-v1"
+        assert seen[0].messages == (("user", "hello"),)
+
+    def test_live_branch_observes_enrichment_and_agent_contexts(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from specflow.llm import LLMResponse, LLMUsage
+
+        class FakeProvider:
+            def __init__(self):
+                self.requests = []
+
+            def complete(self, request):
+                self.requests.append(request)
+                system = request.messages[0].content if request.messages[0].role == "system" else ""
+                if not system:
+                    content = json.dumps(
+                        {
+                            "task_description": "Use the declared receiver input only.",
+                            "analysis_focus": [],
+                            "evaluation_hints": [],
+                            "repository_scope_hint": "",
+                        }
+                    )
+                elif "repository_analyst" in system:
+                    content = json.dumps(
+                        {
+                            "summary": "Repository evidence reviewed.",
+                            "affected_components": [],
+                            "key_files": [],
+                            "technology_notes": "",
+                            "evidence_count": 1,
+                        }
+                    )
+                elif "test_strategy" in system:
+                    content = json.dumps({"summary": "Test strategy."})
+                elif "risk_review" in system:
+                    content = json.dumps({"summary": "Risk review."})
+                elif "synthesis" in system:
+                    content = json.dumps({"summary": "Synthesis."})
+                elif "review" in system:
+                    content = json.dumps({"decision": "PASS", "summary": "Review passed."})
+                else:
+                    content = json.dumps({"summary": "Design."})
+                return LLMResponse(
+                    content=content,
+                    model="test-model",
+                    usage=LLMUsage(input_tokens=3, output_tokens=2),
+                    latency_ms=1,
+                    finish_reason="stop",
+                )
+
+        provider = FakeProvider()
+        monkeypatch.setattr(
+            "specflow.runner_multi._create_real_llm_client", lambda *args, **kwargs: provider
+        )
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        (repo / "evidence.py").write_text(
+            "# health feature EVIDENCE_ONLY_MARKER\n", encoding="utf-8"
+        )
+        observations = []
+
+        assert (
+            run_multi_agent(
+                repo=repo,
+                requirement="Explain the health feature",
+                output=tmp_path / "output",
+                provider="openai-compatible",
+                model="test-model",
+                request_observer=observations.append,
+            )
+            == 0
+        )
+
+        assert len(observations) == len(provider.requests) == 12
+        enrichments = [item for item in observations if item.receiver == "coordinator_enricher"]
+        assert [item.call_index for item in enrichments] == list(range(1, 7))
+        agent_observations = [
+            item for item in observations if item.receiver != "coordinator_enricher"
+        ]
+        assert {item.receiver for item in agent_observations} == {
+            "repository-analyst-agent-v1",
+            "design-agent-v1",
+            "test-strategy-agent-v1",
+            "risk-review-agent-v1",
+            "synthesis-agent-v1",
+            "review-agent-v1",
+        }
+        repository_request = next(
+            item for item in agent_observations if item.receiver == "repository-analyst-agent-v1"
+        )
+        assert "EVIDENCE_ONLY_MARKER" in str(repository_request.messages)
+        assert all(
+            "EVIDENCE_ONLY_MARKER" not in str(item.messages)
+            for item in agent_observations
+            if item.receiver != "repository-analyst-agent-v1"
+        )
+
     def test_artifact_sanitization_uses_full_dlp_ruleset(self) -> None:
         raw_values = {
             "openai": "sk-" + "abc123def456ghi789jkl012mno345pqr678stu",

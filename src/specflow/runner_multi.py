@@ -46,6 +46,7 @@ from specflow.policy import (
     SpecFlowError,
 )
 from specflow.policy.repository_limits import repository_tool_limits_from_policy
+from specflow.runner import RequestObservation
 from specflow.tools import ToolExecutor, ToolRegistry
 from specflow.tools.repository_tools import RepositoryToolSet
 from specflow.tools.sanitization import final_dlp_scan
@@ -65,6 +66,7 @@ def run_multi_agent(
     provider: str = "mock",
     model: str = "mock-model",
     policy: ExecutionPolicy = DEFAULT_POLICY,
+    request_observer: Callable[[RequestObservation], None] | None = None,
     _executor_overrides: Mapping[str, AgentExecutor] | None = None,
 ) -> int:
     """Execute the fixed plan and persist auditable multi-agent artifacts.
@@ -161,9 +163,18 @@ def run_multi_agent(
 
     schema_registry = build_schema_registry()
 
+    coordinator_client = (
+        _RequestObservingLLMClient(
+            llm_client,
+            receiver="coordinator_enricher",
+            observer=request_observer,
+        )
+        if request_observer is not None
+        else llm_client
+    )
     coordinator = Coordinator(
         agent_registry=registry,
-        llm_client=llm_client,
+        llm_client=coordinator_client,
         model=model,
         provider=provider,
         schema_registry=schema_registry,
@@ -177,9 +188,18 @@ def run_multi_agent(
         if mock or provider == "mock":
             executors[identity.agent_id] = agent.execute
         else:
+            agent_client = (
+                _RequestObservingLLMClient(
+                    llm_client,
+                    receiver=identity.agent_id,
+                    observer=request_observer,
+                )
+                if request_observer is not None
+                else llm_client
+            )
             runner = AgentRunner(
                 identity=identity,
-                llm_client=llm_client,
+                llm_client=agent_client,
                 schema_registry=schema_registry,
                 system_prompt=(
                     f"You are the **{identity.role.value}** agent. {identity.description}"
@@ -561,6 +581,43 @@ def run_multi_agent(
     except SpecFlowError:
         return 3
     return 0
+
+
+class _RequestObservingLLMClient:
+    """Observe immutable request copies without changing Provider behavior."""
+
+    def __init__(
+        self,
+        delegate: LLMClient,
+        *,
+        receiver: str,
+        observer: Callable[[RequestObservation], None] | None,
+    ) -> None:
+        self._delegate = delegate
+        self._receiver = receiver
+        self._observer = observer
+        self._call_index = 0
+
+    def complete(self, request):
+        self._call_index += 1
+        if self._observer is not None:
+            try:
+                self._observer(
+                    RequestObservation(
+                        worker=self._receiver,
+                        call_index=self._call_index,
+                        model=request.model,
+                        messages=tuple(
+                            (message.role, message.content) for message in request.messages
+                        ),
+                        temperature=request.temperature,
+                        max_tokens=request.max_tokens,
+                        response_format=request.response_format,
+                    )
+                )
+            except Exception:
+                logger.warning("Multi-Agent request observation failed for %s", self._receiver)
+        return self._delegate.complete(request)
 
 
 def _build_registry() -> AgentRegistry:

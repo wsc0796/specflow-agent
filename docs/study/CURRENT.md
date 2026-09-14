@@ -3,10 +3,45 @@
 - Roadmap: [ROADMAP_V5_3_2.md](ROADMAP_V5_3_2.md)
 - Roadmap version: V5.3.2 Learning Effectiveness Patch
 - Campaign phase: Measure (Day 8-14)
-- Study status: DAY 10 COMPLETE — DEEPSEEK LEGACY DEV RECORDED
-- Day: 10
+- Study status: DAY 11 IN PROGRESS — ADAPTER VERIFIED, FAIRNESS REVIEW PENDING
+- Day: 11
 - Current mode: REVIEW
 - Updated on: 2026-09-14
+
+## Day 11 active contract
+
+用户已明确启动 Day 11，并进一步授权先完成所有不依赖公平性选择的 AI 工程工作：执行卡、恢复记录、
+gap trace、T-076、Multi-Agent adapter/请求观察/attempt 报告、输入隔离、测试、报告骨架和机器记录。
+正式 20 Dev 仍只能在学习者裁决 Legacy max_selected_files=5 与 Multi-Agent=10 后运行一次。
+
+唯一工程目标是复用同一 20 Dev、`08e5a66f8ea8216433c72744adab92aa07d99c45`
+源码快照、`deepseek-flash`、requirement-only 投影和 Day 10 报告语义，测 Multi-Agent 当前版本。
+不因 Day 10 的 2/20 修 Legacy Context 接线，不改 Dataset/Gold/Prompt/检索策略/Context 限制/
+阈值/Evaluator/模型，不实现 RAG/Vector/Hybrid/Rerank，不安装依赖。
+
+恢复入口：[Day 11 执行卡](day-11-execution-card.md)；规格：
+[T-076](../tasks/T-076-dataset-v1-multi-agent-dev-adapter.md)；只读事实：
+[Day 11 Gap Trace](evidence/day-11-gap-trace.md)；报告骨架：
+[Multi-Agent Dev Report](../reports/day-11-multi-agent-dev-report.md)。当前正式状态为
+20 planned / 0 attempted / 20 not_started。
+
+T-076 适配已完成：Multi-Agent 请求观察覆盖 6 次 Coordinator enrichment 与真实 AgentRunner
+receiver，请求副本不可变且 observer 失败不改变 Provider 异常/调用次数；harness 支持 Multi-Agent
+逐 attempt journal、artifact observation、usage 缺口和 fairness gate。RED 为缺少观察类的收集失败；
+GREEN 为 35 focused passed，相关回归 72 passed，全量为 807 passed、3 skipped、3 known warnings；
+Ruff lint/format、diff check、冻结 Dev/fixture 与 Word 边界通过。prepare-only 正式执行门实测 exit 2，
+attempts 文件不存在。完成报告见 [Day 11 Adapter Report](../reports/day-11-adapter-completion-report.md)。
+adapter 已聚焦提交；gitignored Day 11 config 已冻结 openai-compatible/deepseek-flash 和干净的
+runtime code identity。没有读取 `.env` 或输出凭证值；fairness 仍 pending，正式 Provider 尚未调用。
+
+Legacy 请求观察的正确归因保持：Collector 有 744 excerpts，但 60 个 Worker 请求均没有
+Repository Evidence；最早错误是 Context 接线，不是 Collector 全败或 DeepSeek 不会读代码。
+Day 10 质量门为 802 passed、3 skipped、3 known warnings。启动工作区只有无关未跟踪 Word，
+必须保留、不删除、不覆盖、不暂存。
+
+教学按 D001 → D015 → D018 → D017 进行，每次只展示一个 Case 的 requirement、sources、
+llm-requests、generation、expected_properties/forbidden_claims；学习者用三句话回答后，AI 才给
+【正确答案】、差异和 evidence path。AI 产物不提升 ownership。
 
 ## Day 10 active contract
 

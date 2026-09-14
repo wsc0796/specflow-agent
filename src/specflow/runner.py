@@ -40,7 +40,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class RequestObservation:
-    """Immutable copy at the budgeted Legacy client boundary; no credentials."""
+    """Immutable copy at an LLM client boundary; no credentials."""
 
     worker: str
     call_index: int
@@ -49,6 +49,11 @@ class RequestObservation:
     temperature: float
     max_tokens: int
     response_format: str | None
+
+    @property
+    def receiver(self) -> str:
+        """Return the receiving Worker or Agent identity."""
+        return self.worker
 
 
 def run(

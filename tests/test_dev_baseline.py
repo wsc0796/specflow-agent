@@ -192,9 +192,10 @@ def test_child_receives_no_annotations_and_records_actual_messages(tmp_path):
     assert inspection["observation_status"] == "complete"
 
 
-def test_worker_rejects_extra_fields_and_multi_agent_before_product(tmp_path):
+def test_worker_rejects_extra_fields_and_wrong_multi_agent_cap(tmp_path, monkeypatch):
     module, _, dataset_root, target, output = prepared_fixture(tmp_path)
     from specflow.evaluation.dataset_v1 import load_dev_dataset
+    from specflow.runner import RequestObservation
 
     case = load_dev_dataset(dataset_root).cases[0]
     payload = module.build_adapter_input(
@@ -205,13 +206,161 @@ def test_worker_rejects_extra_fields_and_multi_agent_before_product(tmp_path):
         model="mock-model",
         mode="multi-agent",
     )
-    with pytest.raises(ValueError, match="Day 11"):
-        module.execute_worker(payload)
-    payload["mode"] = "legacy"
+    assert payload["max_files"] == 10
+    calls = []
+
+    def fake_run_multi_agent(**kwargs):
+        calls.append(kwargs)
+        kwargs["request_observer"](
+            RequestObservation(
+                worker="repository-analyst-agent-v1",
+                call_index=1,
+                model="mock-model",
+                messages=(("user", "synthetic"),),
+                temperature=0.0,
+                max_tokens=3000,
+                response_format="json",
+            )
+        )
+        return 0
+
+    monkeypatch.setattr(module, "run_multi_agent", fake_run_multi_agent)
+    assert module.execute_worker(payload) == 0
+    assert len(calls) == 1
+    assert (
+        json.loads((output / "rejected" / "llm-requests.json").read_text(encoding="utf-8"))[0][
+            "receiver"
+        ]
+        == "repository-analyst-agent-v1"
+    )
+
+    wrong_cap = module.build_adapter_input(
+        case,
+        repo=target,
+        output=output / "wrong-cap",
+        provider="mock",
+        model="mock-model",
+        mode="multi-agent",
+    )
+    wrong_cap["max_files"] = 5
+    with pytest.raises(ValueError, match="frozen product input"):
+        module.execute_worker(wrong_cap)
+
+    payload = module.build_adapter_input(
+        case,
+        repo=target,
+        output=output / "extra-field",
+        provider="mock",
+        model="mock-model",
+        mode="legacy",
+    )
     payload["gold_evidence"] = ["EVALUATOR_ONLY_MARKER"]
     with pytest.raises(ValueError, match="fields"):
         module.execute_worker(payload)
-    assert not (output / "rejected").exists()
+    assert not (output / "extra-field").exists()
+
+
+def test_prepare_multi_agent_reuses_identity_and_blocks_pending_fairness(tmp_path):
+    module, workspace, dataset, target, legacy_output = prepared_fixture(tmp_path)
+    module.freeze_run_identity(legacy_output, provider="mock", model="mock-model")
+    output = workspace / "data" / "day11" / "multi-agent-dev"
+
+    config = module.prepare_multi_agent_baseline(
+        workspace,
+        dataset,
+        target,
+        output,
+        legacy_config=legacy_output / "run-config.json",
+    )
+
+    assert config["mode"] == "multi-agent"
+    assert config["provider"] == "mock"
+    assert config["model"] == "mock-model"
+    assert config["run_identity_frozen"] is False
+    assert config["effective_multi_agent_limits"]["max_selected_files"] == 10
+    assert config["fairness_decision"]["status"] == "pending_learner_decision"
+    assert json.loads((output / "prepared.json").read_text(encoding="utf-8")) == {
+        "status": "prepared_only",
+        "planned_count": 20,
+        "attempted_count": 0,
+        "not_started_count": 20,
+        "holdout_opened": False,
+        "blockers": [
+            "Run identity is not frozen for the Day 11 code revision.",
+            "Fairness decision is pending learner review.",
+        ],
+    }
+    module.freeze_run_identity(output, provider="mock", model="mock-model")
+    with pytest.raises(ValueError, match="Fairness"):
+        module.run_prepared(output)
+
+
+def test_fairness_choice_records_as_is_or_requires_separate_patch(tmp_path, monkeypatch):
+    module, workspace, dataset, target, legacy_output = prepared_fixture(tmp_path)
+    module.freeze_run_identity(legacy_output, provider="mock", model="mock-model")
+
+    equalize_output = workspace / "data" / "day11" / "equalize"
+    module.prepare_multi_agent_baseline(
+        workspace,
+        dataset,
+        target,
+        equalize_output,
+        legacy_config=legacy_output / "run-config.json",
+    )
+    module.freeze_run_identity(equalize_output, provider="mock", model="mock-model")
+    equalize = module.record_fairness_decision(equalize_output, "controlled-cap-at-5")
+    assert equalize["fairness_decision"]["status"] == "requires_separate_patch"
+    with pytest.raises(ValueError, match="separate Patch"):
+        module.run_prepared(equalize_output)
+
+    as_is_output = workspace / "data" / "day11" / "as-is"
+    module.prepare_multi_agent_baseline(
+        workspace,
+        dataset,
+        target,
+        as_is_output,
+        legacy_config=legacy_output / "run-config.json",
+    )
+    module.freeze_run_identity(as_is_output, provider="mock", model="mock-model")
+    as_is = module.record_fairness_decision(as_is_output, "current-topology-as-is")
+    assert as_is["fairness_decision"]["status"] == "approved"
+    assert "fact_evidence_coverage" in as_is["fairness_decision"]["not_comparable_dimensions"]
+
+    monkeypatch.setattr(module, "launch_worker", lambda _: 0)
+    report = module.run_prepared(as_is_output)
+    assert report["summary"]["attempted_count"] == 20
+    assert report["summary"]["not_started_count"] == 0
+    assert (as_is_output / "multi-agent-dev-report.json").is_file()
+    assert not (as_is_output / "legacy-dev-report.json").exists()
+
+
+def test_multi_agent_summary_does_not_treat_agent_usage_as_full_cost():
+    module = baseline_module()
+    report = module.summarize_attempts(
+        ["A"],
+        [
+            {
+                "case_id": "A",
+                "wall_time_ms": 10,
+                "product_terminal_state": "completed",
+                "usage_observation": {
+                    "request_count": 12,
+                    "metered_agent_request_count": 6,
+                    "unmetered_enrichment_request_count": 6,
+                    "observed_input_tokens_subtotal": 30,
+                    "observed_output_tokens_subtotal": 20,
+                    "observed_total_tokens_subtotal": 50,
+                    "all_provider_usage_complete": False,
+                },
+            }
+        ],
+        mode="multi-agent",
+    )
+    assert report["token_cost"]["observed_total_tokens_subtotal"] == 50
+    assert report["token_cost"]["complete_run_count"] == 0
+    assert report["token_cost"]["telemetry_coverage"] == 0.0
+    assert report["token_cost"]["full_total"] == "unknown"
+    assert report["token_cost"]["comparison_status"] == "not_comparable"
 
 
 def test_attempt_journal_keeps_failure_degraded_and_interruption(tmp_path, monkeypatch):
