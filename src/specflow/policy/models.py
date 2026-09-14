@@ -95,6 +95,23 @@ class ArtifactPolicy:
 
 
 @dataclass(frozen=True)
+class LaneLimits:
+    max_active: int = 3
+    queue_capacity: int = 8
+
+    def __post_init__(self) -> None:
+        for value in (self.max_active, self.queue_capacity):
+            if type(value) is not int or value <= 0:
+                raise ValueError("Lane limits must be positive integers")
+
+
+@dataclass(frozen=True)
+class ExecutionLanePolicy:
+    local_tool: LaneLimits = field(default_factory=LaneLimits)
+    provider: LaneLimits = field(default_factory=LaneLimits)
+
+
+@dataclass(frozen=True)
 class ExecutionPolicy:
     """Top-level execution policy composing all sub-policies."""
 
@@ -110,6 +127,7 @@ class ExecutionPolicy:
     tokens: TokenPolicy = field(default_factory=TokenPolicy)
     retry: RetryPolicy = field(default_factory=RetryPolicy)
     artifacts: ArtifactPolicy = field(default_factory=ArtifactPolicy)
+    lanes: ExecutionLanePolicy = field(default_factory=ExecutionLanePolicy)
 
     def __post_init__(self) -> None:
         if self.max_wall_time_seconds <= 0:
@@ -128,6 +146,13 @@ class ExecutionPolicy:
             "max_revisions": self.max_revisions,
             "fail_on_schema_error": self.fail_on_schema_error,
             "allow_degraded_completion": self.allow_degraded_completion,
+            "lanes": {
+                name: {
+                    "max_active": getattr(self.lanes, name).max_active,
+                    "queue_capacity": getattr(self.lanes, name).queue_capacity,
+                }
+                for name in ("local_tool", "provider")
+            },
             "repository": {
                 "max_scanned_files": self.repository.max_scanned_files,
                 "max_selected_files": self.repository.max_selected_files,

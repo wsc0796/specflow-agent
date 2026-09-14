@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from time import perf_counter
 from typing import Any
 
 import httpx
 
-from specflow.llm.exceptions import LLMResponseError, LLMTimeoutError
+from specflow.llm.exceptions import LLMError, LLMResponseError, LLMTimeoutError
 from specflow.llm.models import LLMRequest, LLMResponse, LLMUsage
 from specflow.llm.providers.config import OpenAICompatibleConfig
 from specflow.llm.resilience import (
@@ -27,6 +28,7 @@ class OpenAICompatibleLLMClient:
         *,
         transport: httpx.BaseTransport | None = None,
         resilience_guard: ProviderResilienceGuard | None = None,
+        attempt_executor: Callable[[Callable[[], LLMResponse]], LLMResponse] | None = None,
     ) -> None:
         if not isinstance(config, OpenAICompatibleConfig):
             raise TypeError("config must be an OpenAICompatibleConfig")
@@ -36,6 +38,7 @@ class OpenAICompatibleLLMClient:
             resilience_guard if resilience_guard is not None else DEFAULT_RESILIENCE_GUARD
         )
         self._resource = resource_identity(config)
+        self._attempt_executor = attempt_executor
 
     def __repr__(self) -> str:
         return (
@@ -47,10 +50,54 @@ class OpenAICompatibleLLMClient:
 
     def complete(self, request: LLMRequest) -> LLMResponse:
         """Map one provider-neutral request to one safe HTTP request and response."""
+        from specflow.policy.models import SpecFlowError
+
         if not isinstance(request, LLMRequest):
             raise LLMResponseError("OpenAI-compatible Provider requires an LLMRequest")
-        with self._resilience.attempt(self._resource):
-            return self._complete_once(request)
+        if self._attempt_executor is None:
+            with self._resilience.attempt(self._resource):
+                return self._complete_once(request)
+
+        actual_error: BaseException | None = None
+        actual_result: LLMResponse | None = None
+        finished = False
+        admission_code = None
+
+        def actual_attempt():
+            nonlocal actual_error, actual_result, finished
+            try:
+                actual_result = self._complete_once(request)
+                return actual_result
+            except BaseException as error:
+                actual_error = error
+                raise
+            finally:
+                finished = True
+
+        try:
+            with self._resilience.attempt(self._resource):
+                try:
+                    result = self._attempt_executor(actual_attempt)
+                except SpecFlowError as error:
+                    admission_code = {
+                        "LANE_SATURATED": ErrorCode.LANE_SATURATED,
+                        "TIME_BUDGET_EXCEEDED": ErrorCode.BUDGET_WALL_TIME,
+                        "RUN_CANCELLED": ErrorCode.RUN_CANCELLED,
+                    }.get(error.code, ErrorCode.INTERNAL_UNEXPECTED)
+                    # The executor drains started work before returning. Feed
+                    # its actual outcome to the unchanged breaker, then report
+                    # the caller's deadline outside that health boundary.
+                    if actual_error is not None:
+                        raise actual_error
+                    if not finished:
+                        raise LLMResponseError("Execution admission failed.", code=admission_code)
+                    result = actual_result
+        except LLMError:
+            if admission_code is None:
+                raise
+        if admission_code is not None:
+            raise LLMResponseError("Execution admission failed.", code=admission_code)
+        return result
 
     def _complete_once(self, request: LLMRequest) -> LLMResponse:
         started = perf_counter()

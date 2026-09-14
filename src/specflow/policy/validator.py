@@ -30,6 +30,11 @@ class PolicyValidator:
             ),
             ("artifacts.max_artifact_bytes", self._hard_limit.artifacts.max_artifact_bytes),
         ]
+        limits.extend(
+            (f"lanes.{lane}.{field}", getattr(getattr(self._hard_limit.lanes, lane), field))
+            for lane in ("local_tool", "provider")
+            for field in ("max_active", "queue_capacity")
+        )
         for field_path, max_allowed in limits:
             value = _resolve_attr(policy, field_path)
             if value > max_allowed:
