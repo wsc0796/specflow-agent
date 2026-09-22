@@ -3,12 +3,30 @@
 - Roadmap: [ROADMAP_V5_3_2.md](ROADMAP_V5_3_2.md)
 - Roadmap version: V5.3.2 Learning Effectiveness Patch
 - Campaign phase: Measure (Day 8-14)
-- Study status: DAY 11 COMPLETED / DAY 12 READY
-- Day: 11
+- Study status: DAY 12 COMPLETED / DAY 13 READY
+- Day: 12
 - Current mode: REVIEW
 - Updated on: 2026-09-22
 
-## Day 11 completion checkpoint
+## Day 12 completion checkpoint
+
+2026-09-22 已完成冻结 Day10/Day11 的20组 Dev 配对分析，未重跑baseline、未修改产品、
+Prompt、Dataset或Evaluator，未读取Holdout题面/Gold/output或运行Holdout。
+报告：[Day12 A/B Trade-off](../reports/day-12-ab-tradeoff-report.md)；
+逐例：[Case Pair Table](evidence/day-12-case-pairs.md)、[JSON](evidence/day-12-case-pairs.json)；
+后续：[DAY13_INPUT](evidence/DAY13_INPUT.md)。Day13 READY但未启动，不自动推进。
+
+Legacy task_success=2/20，Multi-Agent=0/20；不同失败结构不支持topology因果排名。
+Legacy16例保存744条摘录但请求没有Evidence；Multi-Agent对应16个Analyst请求包含同序744行摘录，
+完整Gold delivery仍为0/23。4例在LLM前EVIDENCE_NOT_FOUND；其余16例的主失败边界保持S6–S7 unknown。
+Token两侧incomplete，完整成本not_comparable。Vector必要性判断为insufficient，未写Retrieval ADR。
+Day12统一p50为median；Multi-Agent median=92848.9465ms，旧报告92801.186ms是第10顺序统计量。
+
+历史Day11 progress audit已定位于artifacts/progress-audit/day11-20260922-142519/，其中0 attempted及
+fairness pending是运行前快照，不覆盖后来的唯一正式20 Dev。Day12按现有仓库要求验证：
+812 passed、3 skipped、3 warnings；Ruff lint/format通过。全部结果仍为AI分析，不提升learner ownership。
+
+## Day 11 archived completion checkpoint
 
 唯一一次正式 Multi-Agent 20 Dev 已于 2026-09-22 完成：20 planned / 20 attempted / 0 not_started，
 20 个产品终态全部 failed；其中 `EVIDENCE_NOT_FOUND` 4 个，`MULTI_AGENT_RUN_FAILED` 16 个。
