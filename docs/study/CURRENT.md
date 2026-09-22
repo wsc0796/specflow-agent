@@ -3,12 +3,33 @@
 - Roadmap: [ROADMAP_V5_3_2.md](ROADMAP_V5_3_2.md)
 - Roadmap version: V5.3.2 Learning Effectiveness Patch
 - Campaign phase: Measure (Day 8-14)
-- Study status: DAY 11 IN PROGRESS — ADAPTER VERIFIED, FAIRNESS REVIEW PENDING
+- Study status: DAY 11 COMPLETED / DAY 12 READY
 - Day: 11
 - Current mode: REVIEW
-- Updated on: 2026-09-14
+- Updated on: 2026-09-22
 
-## Day 11 active contract
+## Day 11 completion checkpoint
+
+唯一一次正式 Multi-Agent 20 Dev 已于 2026-09-22 完成：20 planned / 20 attempted / 0 not_started，
+20 个产品终态全部 failed；其中 `EVIDENCE_NOT_FOUND` 4 个，`MULTI_AGENT_RUN_FAILED` 16 个。
+无顶层重跑、duplicate、execution_error、interrupted 或 top-level timeout。正式身份为
+`bc75a6de3cef8bcbf3b0cbbddda00918003cfb0e`、Dataset freeze `bf77d19`、目标 revision
+`08e5a66`、DeepSeek `deepseek-flash`、controlled-cap-at-5；产品默认 cap=10，benchmark cap=5。
+
+16 个 case 各记录 6 次 Coordinator enrichment + 1 次 Repository Analyst request；4 个无 Evidence
+case 确认 0 次 LLM request。没有 Agent stage 完成或最终答案，AI task_success=0/20；23 个 eligible
+Gold facts 在实际 Repository Analyst request 中完整支持为 0/23。Token 仅 4/20 个确认零调用，
+其余 usage unknown，完整成本 unknown/not_comparable。D001 的 receiver 预测与实际一致，但 Gold
+没有进入 request，最早缺口因失败路径没有 `sources.json` 而 unknown。
+
+正式报告：[Day 11 Multi-Agent Dev Report](../reports/day-11-multi-agent-dev-report.md)；机器复核：
+[Day 11 Semantic Review](evidence/day-11-multi-agent-semantic-review.json)；学习者原始预测：
+[Day 11 Pre-run Prediction](evidence/day-11-pre-run-prediction.md)。Day 12 已具备消费本次原始结果的
+条件，但尚未启动；不得重跑 Day 11、筛除失败样本或提前实施 Vector/Hybrid/Rerank。
+
+## Day 11 archived pre-run contract
+
+以下保留运行前合同和教学停点作为历史记录；其状态已由上方 completion checkpoint 取代。
 
 用户已明确启动 Day 11，并进一步授权先完成所有不依赖公平性选择的 AI 工程工作：执行卡、恢复记录、
 gap trace、T-076、Multi-Agent adapter/请求观察/attempt 报告、输入隔离、测试、报告骨架和机器记录。
@@ -42,6 +63,12 @@ Day 10 质量门为 802 passed、3 skipped、3 known warnings。启动工作区�
 教学按 D001 → D015 → D018 → D017 进行，每次只展示一个 Case 的 requirement、sources、
 llm-requests、generation、expected_properties/forbidden_claims；学习者用三句话回答后，AI 才给
 【正确答案】、差异和 evidence path。AI 产物不提升 ownership。
+
+Day 10 学习遗留队列已并入 [Day 11 learner evidence](evidence/day-11.md)。当前停在已展示的 D001，
+等待学习者三句话；必须分别判断本 Case 最早错误层和 Legacy 全局共同缺口。随后依次 D015、D018、
+D017，再 Review T-075 的三个关键 Diff并完成四边界 Teach-back。Day 10 运行前预测明确登记为
+`missed/not_collected`，不允许事后补写，也不算失败或 ownership；替换为正式 Multi-Agent 运行前的
+D001 receiver 前瞻预测。A–D 完成后才进入公平性判断与唯一一次正式 20 Dev。
 
 ## Day 10 active contract
 

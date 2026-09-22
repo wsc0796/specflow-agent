@@ -1,11 +1,24 @@
 # Day 11 执行卡 — Multi-Agent 当前版本 Dev Baseline
 
-- 日期：2026-09-14；唯一项目：`D:\Documents\ChatGPT\一个月冲刺\specflow-agent`。
-- 阶段：Measure；模式：`REVIEW`；状态：`ADAPTER VERIFIED / FORMAL RUN BLOCKED ON FAIRNESS`。
+- 日期：2026-09-22；唯一项目：`D:\Documents\ChatGPT\一个月冲刺\specflow-agent`。
+- 阶段：Measure；模式：`REVIEW`；状态：`DAY11 COMPLETED / DAY12 READY`。
 - 唯一工程目标：用同一 20 Dev、固定源码快照、`deepseek-flash`、requirement-only 投影和报告语义，
   运行一次 Multi-Agent 当前版本 baseline，形成 Multi-Agent Dev Report。
-- 正式运行门：公平性选择未完成前保持 0 attempted。
-- 恢复入口：[CURRENT](CURRENT.md)；规格：[T-076](../tasks/T-076-dataset-v1-multi-agent-dev-adapter.md)。
+- 正式运行门：已于 2026-09-22 使用 `controlled-cap-at-5` 执行一次并关闭；禁止自动重跑。
+- 恢复入口：[CURRENT](CURRENT.md)；规格：[T-076](../tasks/T-076-dataset-v1-multi-agent-dev-adapter.md)；
+  学习者记录：[Day 11 evidence](evidence/day-11.md)。
+
+## 正式运行完成检查点
+
+- SpecFlow revision：`bc75a6de3cef8bcbf3b0cbbddda00918003cfb0e`。
+- 20 planned / 20 attempted / 0 not_started；20 returned；产品 completed=0、failed=20。
+- `EVIDENCE_NOT_FOUND`=4；`MULTI_AGENT_RUN_FAILED`=16；顶层 retry/duplicate=0。
+- 112 条 request-boundary records：96 enrichment + 16 Repository Analyst；4 个 case 确认零调用。
+- AI task_success=0/20；eligible Gold fact request coverage=0/23。
+- Token complete runs=4/20；其余 usage unknown；full total unknown/not_comparable。
+- 报告：[Day 11 Multi-Agent Dev Report](../reports/day-11-multi-agent-dev-report.md)。
+- 学习者 D001 receiver 预测与实际一致；Gold 未进入 request，最早缺口仍 unknown。
+- Day 12 仅标 READY，尚未启动。
 
 ## 固定身份
 
@@ -31,8 +44,17 @@
 
 1. 按 D001 → D015 → D018 → D017，每次只 Review 一个 Case；三句话回答实际可见 Context、
    全部必要属性、最早错误层。回答后给【正确答案】、差异和 evidence path。
-2. 选择 `current-topology-as-is` 或 `controlled-cap-at-5`。前者保持 5/10 并标混杂与
+2. Review T-075 三个关键 Diff：显式 Dev/固定快照、pre-call attempt journal/requirement-only、
+   RequestObservation 默认关闭/不可变/observer 非干扰。每次只问一个判断。
+3. 闭卷 Teach-back 四个边界：Retrieval/Context、运行结构/task success、安全子检查/完整属性、
+   Evaluator false positive/产品失败。
+4. Day 10 运行前预测登记为 `missed/not_collected`；不得事后补写。正式 Day 11 前改收集 D001 Gold
+   将进入哪个具体 receiver 的前瞻预测，并在运行后核对。
+5. 选择 `current-topology-as-is` 或 `controlled-cap-at-5`。前者保持 5/10 并标混杂与
    not_comparable；后者需要另行 PATCH，不能直接运行。
+
+当前停点为 D001，已展示完整题面与原始运行材料，等待学习者三句话。D001 必须区分 Case 自身
+最早错误层与 Legacy 全局共同缺口。A–D 完成前不进入公平性判断或正式运行。
 
 ## 禁止范围
 
@@ -45,7 +67,8 @@
 
 ## 恢复检查点
 
-当前 HEAD 为 Day 10 result commit `271d409c`；工作区启动时只有指定 Word 未跟踪。
+Day 11 adapter commit 为 `c802953b180d23722431fbb0493cf99c0d2bcab0`；本轮恢复时工作区只有
+指定 Word 未跟踪。
 Day 10 正式结果为 20/20 attempted、20 completed/degraded、AI task success 2/20、最终请求
 Gold coverage 0/23、Token coverage 16/20/not_comparable。Collector 共 744 excerpts，实际 60 个
 Legacy Worker 请求均无 Repository Evidence；最早问题在 Context 接线，不能归因成 Collector 全败

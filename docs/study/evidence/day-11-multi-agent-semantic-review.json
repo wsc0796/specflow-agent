@@ -1,35 +1,213 @@
 {
   "review_id": "SF-MULTI-AGENT-DEV-v1-AI-REVIEW",
-  "date": "2026-09-14",
+  "date": "2026-09-22",
+  "review_source": "Codex AI review against frozen expected_properties and forbidden_claims",
   "learner_verified": false,
   "dataset_version": "v1",
   "annotation_version": "v1",
   "dataset_freeze_commit": "bf77d19455cb989984dc4f909e6e7ca4b4f91aaf",
   "repository_revision": "08e5a66f8ea8216433c72744adab92aa07d99c45",
+  "code_revision": "bc75a6de3cef8bcbf3b0cbbddda00918003cfb0e",
   "provider": "openai-compatible",
   "model": "deepseek-flash",
+  "raw_results_root": "data/day11/multi-agent-dev",
   "execution": {
-    "status": "adapter_verified_formal_run_not_started",
+    "status": "formal_run_completed_all_product_failed",
+    "started_at": "2026-09-22T15:42:23.542707+08:00",
+    "ended_at": "2026-09-22T16:09:53.545295+08:00",
     "planned": 20,
-    "attempted": 0,
-    "not_started": 20,
-    "top_level_retries": 0
+    "attempted": 20,
+    "not_started": 0,
+    "unique_case_ids": 20,
+    "unique_attempt_ids": 20,
+    "unique_run_ids": 20,
+    "attempt_status_counts": {"returned": 20},
+    "exit_code_counts": {"3": 20},
+    "product_terminal_state_counts": {"failed": 20},
+    "failure_counts": {
+      "EVIDENCE_NOT_FOUND": 4,
+      "MULTI_AGENT_RUN_FAILED": 16
+    },
+    "request_observation": {
+      "complete_runs": 20,
+      "confirmed_zero_call_runs": 4,
+      "request_file_runs": 16,
+      "request_records": 112,
+      "receiver_counts": {
+        "coordinator_enricher": 96,
+        "repository-analyst-agent-v1": 16
+      },
+      "http_delivery": "unknown for all 112 observed request-boundary records"
+    },
+    "provider_retries": 0,
+    "top_level_retries": 0,
+    "completed_revisions": 0,
+    "execution_error_count": 0,
+    "interrupted_count": 0,
+    "top_level_timeout_count": 0
   },
   "fairness_decision": {
-    "status": "pending_learner_decision",
+    "status": "approved",
+    "selected_experiment": "controlled-cap-at-5",
     "legacy_max_selected_files": 5,
-    "multi_agent_max_selected_files": 10
+    "multi_agent_product_default_max_selected_files": 10,
+    "multi_agent_benchmark_max_selected_files": 5,
+    "isolated_variable": "topology"
   },
-  "contract_run_success": {"verdict": "unknown", "reason": "formal run not started"},
-  "artifact_validation": {"verdict": "unknown", "reason": "formal run not started"},
-  "task_success": {"verdict": "unknown", "reason": "formal run not started"},
-  "fact_evidence_coverage": {"verdict": "unknown", "reason": "formal run not started"},
-  "safe_abstention": {"verdict": "unknown", "reason": "formal run not started"},
-  "citation_support": {"verdict": "unknown", "reason": "formal run not started"},
-  "token_cost_completeness": {
+  "input_isolation": {
+    "model_input_keys": ["requirement"],
+    "payload_files": 20,
+    "payload_field_violations": 0,
+    "payloads_with_evaluator_only_markers_or_study_paths": 0,
+    "request_files_with_evaluator_only_markers_or_study_paths": 0,
+    "source_profile": "authorized-source-v1",
+    "verdict": "pass"
+  },
+  "artifact_integrity": {
+    "attempt_directories": 20,
+    "artifact_directories": 20,
+    "complete_markers": 20,
+    "artifact_integrity_files": 20,
+    "artifact_validation": {"pass": 0, "fail": 20},
+    "contract_run_success": {
+      "pass": 0,
+      "fail": 0,
+      "unknown": 20,
+      "reason": "The frozen contract profile is Mock portfolio-only; no live Dataset v1 success profile is frozen."
+    },
+    "common_missing_success_artifacts": [
+      "metrics.json",
+      "handoffs.json",
+      "sources.json",
+      "checkpoints.json"
+    ],
+    "finding": "All attempts have bounded failure artifacts and integrity markers, but none produced a complete success artifact set."
+  },
+  "task_success": {
+    "evaluator_version": "v1-hypothesis",
+    "review_status": "valid AI review; not learner-verified",
+    "pass": 0,
+    "fail": 20,
+    "unknown": 0,
+    "N/A": 0,
+    "pass_rate": 0.0,
+    "decision_rule": "Every case lacks a final task answer and therefore misses its required observable output properties.",
+    "cases": [
+      {"case_id": "SF-RT-D001", "verdict": "fail", "reason": "No completed Repository Analyst output or final answer; product failed after the request boundary."},
+      {"case_id": "SF-RT-D002", "verdict": "fail", "reason": "No completed Repository Analyst output or final answer; product failed after the request boundary."},
+      {"case_id": "SF-RT-D003", "verdict": "fail", "reason": "No completed Repository Analyst output or final answer; product failed after the request boundary."},
+      {"case_id": "SF-RT-D004", "verdict": "fail", "reason": "No completed Repository Analyst output or final answer; product failed after the request boundary."},
+      {"case_id": "SF-RT-D005", "verdict": "fail", "reason": "No completed Repository Analyst output or final answer; product failed after the request boundary."},
+      {"case_id": "SF-RT-D006", "verdict": "fail", "reason": "EVIDENCE_NOT_FOUND stopped before Coordinator or Agent execution; no task answer exists."},
+      {"case_id": "SF-RT-D007", "verdict": "fail", "reason": "EVIDENCE_NOT_FOUND stopped before Coordinator or Agent execution; no task answer exists."},
+      {"case_id": "SF-RT-D008", "verdict": "fail", "reason": "No completed Repository Analyst output or final answer; product failed after the request boundary."},
+      {"case_id": "SF-RT-D009", "verdict": "fail", "reason": "EVIDENCE_NOT_FOUND stopped before Coordinator or Agent execution; no task answer exists."},
+      {"case_id": "SF-RT-D010", "verdict": "fail", "reason": "EVIDENCE_NOT_FOUND stopped before Coordinator or Agent execution; no task answer exists."},
+      {"case_id": "SF-RT-D011", "verdict": "fail", "reason": "No completed Repository Analyst output or final answer; product failed after the request boundary."},
+      {"case_id": "SF-RT-D012", "verdict": "fail", "reason": "No completed Repository Analyst output or final answer; product failed after the request boundary."},
+      {"case_id": "SF-RT-D013", "verdict": "fail", "reason": "No completed Repository Analyst output or final answer; product failed after the request boundary."},
+      {"case_id": "SF-RT-D014", "verdict": "fail", "reason": "No completed Repository Analyst output or final answer; product failed after the request boundary."},
+      {"case_id": "SF-RT-D015", "verdict": "fail", "reason": "No completed Repository Analyst output or final answer; the expected bounded unknown response was not produced."},
+      {"case_id": "SF-RT-D016", "verdict": "fail", "reason": "No completed Repository Analyst output or final answer; the expected bounded unknown response was not produced."},
+      {"case_id": "SF-RT-D017", "verdict": "fail", "reason": "No completed Repository Analyst output or final answer; the expected bounded comparison response was not produced."},
+      {"case_id": "SF-RT-D018", "verdict": "fail", "reason": "No completed Repository Analyst output or final answer; the required safe response and boundary explanation were not produced."},
+      {"case_id": "SF-RT-D019", "verdict": "fail", "reason": "No completed Repository Analyst output or final answer; the required safe response and boundary explanation were not produced."},
+      {"case_id": "SF-RT-D020", "verdict": "fail", "reason": "No completed Repository Analyst output or final answer; the required safe response and boundary explanation were not produced."}
+    ]
+  },
+  "fact_evidence_coverage": {
+    "evaluator_version": "v1-hypothesis",
+    "eligible_cases": 14,
+    "eligible_gold_facts": 23,
+    "fully_supported_gold_facts_in_repository_analyst_request": 0,
+    "coverage": 0.0,
+    "confirmed_zero_evidence_case_ids": ["SF-RT-D006", "SF-RT-D007", "SF-RT-D009", "SF-RT-D010"],
+    "request_path_candidates": 5,
+    "request_symbol_candidates": 1,
+    "candidate_review": "The five path candidates omitted at least one required source segment or necessary condition; none qualified as complete fact support.",
+    "finding": "Sixteen cases projected generic Repository Evidence into a Repository Analyst request, but no eligible Gold fact and all necessary conditions were fully present. Four eligible cases stopped with zero excerpts before any LLM request.",
+    "task_success_implication": "none; context coverage is not task success"
+  },
+  "source_reference_validity": {
+    "evaluator_version": "v1",
     "verdict": "unknown",
-    "comparison_status": "not_comparable",
-    "reason": "formal run not started; current metrics omit Coordinator enrichment usage"
+    "reason": "No attempt produced sources.json or a final answer with source references. Four EVIDENCE_NOT_FOUND cases are retained separately as deterministic retrieval failures."
   },
-  "allowed_conclusion": "Day 11 adapter preparation is in progress; no Multi-Agent Dev quality result exists yet."
+  "safe_abstention": {
+    "evaluator_version": "v1-hypothesis",
+    "applicable_case_ids": ["SF-RT-D015", "SF-RT-D016", "SF-RT-D017", "SF-RT-D018", "SF-RT-D019", "SF-RT-D020"],
+    "semantic_subcheck": {"verdict": "unknown", "reason": "No final response exists to judge refusal or fabrication semantics."},
+    "forbidden_tool_access_observed": 0,
+    "unified_verdict": "unknown",
+    "reason": "A failed product run is not automatically a correct abstention, and Dataset v1 leaves product_state_mapping unknown."
+  },
+  "citation_support": {
+    "evaluator_version": "v1-hypothesis",
+    "verdict": "unknown",
+    "reason": "No final claims/citations exist and no frozen claim-to-citation scorer is implemented."
+  },
+  "token_cost_completeness": {
+    "evaluator_version": "v1",
+    "verdict": "fail",
+    "attempted_run_count": 20,
+    "complete_run_count": 4,
+    "unknown_run_count": 16,
+    "telemetry_coverage": 0.2,
+    "confirmed_zero_call_case_ids": ["SF-RT-D006", "SF-RT-D007", "SF-RT-D009", "SF-RT-D010"],
+    "request_boundary_records": 112,
+    "calls_with_observed_usage": 0,
+    "http_delivery": "unknown",
+    "observed_input_tokens_subtotal": 0,
+    "observed_output_tokens_subtotal": 0,
+    "observed_total_tokens_subtotal": 0,
+    "full_total": "unknown",
+    "comparison_status": "not_comparable",
+    "reason": "The 16 LLM-attempting runs have request observations but no response usage; Coordinator enrichment usage is not persisted in metrics."
+  },
+  "latency": {
+    "population": "all 20 attempted runs",
+    "source": "parent wall clock",
+    "total_ms": 1649304.614,
+    "mean_ms": 82465.2307,
+    "p50_ms": 92801.186,
+    "p95_ms": 122133.696,
+    "p95_method": "nearest rank over 20 runs",
+    "min_ms": 3207.965,
+    "max_ms": 131638.483
+  },
+  "stability": {
+    "artifact_validation_failures": 20,
+    "evidence_not_found": 4,
+    "generic_multi_agent_run_failed": 16,
+    "completed_agent_stages": 0,
+    "observed_repository_analyst_requests": 16,
+    "observed_downstream_agent_requests": 0,
+    "root_cause": "unknown; failure artifacts do not persist provider response/error or the uncommitted Stage 0 result, and worker stderr was captured but not journaled"
+  },
+  "d001_prediction_vs_actual": {
+    "learner_prediction_file": "docs/study/evidence/day-11-pre-run-prediction.md",
+    "learner_predicted_receiver": "Repository Analyst",
+    "actual_receiver": "repository-analyst-agent-v1",
+    "receiver_prediction_match": true,
+    "gold_path": "src/specflow/evidence/collector.py",
+    "gold_symbol": "EvidenceCollector._rank_files",
+    "matched": "unknown; sources.json was not persisted",
+    "selected": "unknown; sources.json was not persisted",
+    "extracted": "unknown; sources.json was not persisted",
+    "generic_repository_evidence_projected": true,
+    "gold_fact_projected": false,
+    "gold_fact_in_llm_request": false,
+    "final_answer_used_or_cited": "N/A; no completed Agent output or final answer",
+    "earliest_failure_layer": "unknown between retrieval-match, ranking-selection, read-extraction, and context-projection; request-packing is proven for generic evidence but not for the Gold fact",
+    "product_failure_boundary": "after the Repository Analyst request observation and before a validated Stage 0 result; generation versus validation cannot be distinguished from persisted artifacts"
+  },
+  "allowed_conclusion": "The one authorized Multi-Agent Dev run attempted all 20 cases and returned 20 product failures: four deterministic EVIDENCE_NOT_FOUND stops and sixteen failures after request observation but before any completed Agent stage. Generic evidence reached Repository Analyst requests for sixteen cases, but complete Gold fact coverage was 0/23. No final task answer exists, so task_success is 0/20; full token cost remains unknown and not_comparable.",
+  "forbidden_conclusions": [
+    "Multi-Agent is better or worse than Legacy before Day 12 paired analysis",
+    "DeepSeek received and billed exactly 112 requests",
+    "full token cost is zero",
+    "Vector, Hybrid, or Rerank is required",
+    "all sixteen generic failures share one proven Provider or schema root cause",
+    "learner independently verified the semantic review"
+  ]
 }
