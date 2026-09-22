@@ -192,7 +192,7 @@ def test_child_receives_no_annotations_and_records_actual_messages(tmp_path):
     assert inspection["observation_status"] == "complete"
 
 
-def test_worker_rejects_extra_fields_and_wrong_multi_agent_cap(tmp_path, monkeypatch):
+def test_worker_uses_controlled_multi_agent_cap_and_rejects_wrong_inputs(tmp_path, monkeypatch):
     module, _, dataset_root, target, output = prepared_fixture(tmp_path)
     from specflow.evaluation.dataset_v1 import load_dev_dataset
     from specflow.runner import RequestObservation
@@ -206,7 +206,7 @@ def test_worker_rejects_extra_fields_and_wrong_multi_agent_cap(tmp_path, monkeyp
         model="mock-model",
         mode="multi-agent",
     )
-    assert payload["max_files"] == 10
+    assert payload["max_files"] == 5
     calls = []
 
     def fake_run_multi_agent(**kwargs):
@@ -227,6 +227,7 @@ def test_worker_rejects_extra_fields_and_wrong_multi_agent_cap(tmp_path, monkeyp
     monkeypatch.setattr(module, "run_multi_agent", fake_run_multi_agent)
     assert module.execute_worker(payload) == 0
     assert len(calls) == 1
+    assert calls[0]["policy"].repository.max_selected_files == 5
     assert (
         json.loads((output / "rejected" / "llm-requests.json").read_text(encoding="utf-8"))[0][
             "receiver"
@@ -242,7 +243,7 @@ def test_worker_rejects_extra_fields_and_wrong_multi_agent_cap(tmp_path, monkeyp
         model="mock-model",
         mode="multi-agent",
     )
-    wrong_cap["max_files"] = 5
+    wrong_cap["max_files"] = 10
     with pytest.raises(ValueError, match="frozen product input"):
         module.execute_worker(wrong_cap)
 
@@ -277,7 +278,10 @@ def test_prepare_multi_agent_reuses_identity_and_blocks_pending_fairness(tmp_pat
     assert config["provider"] == "mock"
     assert config["model"] == "mock-model"
     assert config["run_identity_frozen"] is False
-    assert config["effective_multi_agent_limits"]["max_selected_files"] == 10
+    assert config["product_default_multi_agent_limits"]["max_selected_files"] == 10
+    assert config["effective_multi_agent_limits"]["max_selected_files"] == 5
+    assert config["fairness_decision"]["multi_agent_product_default_max_selected_files"] == 10
+    assert config["fairness_decision"]["multi_agent_benchmark_max_selected_files"] == 5
     assert config["fairness_decision"]["status"] == "pending_learner_decision"
     assert json.loads((output / "prepared.json").read_text(encoding="utf-8")) == {
         "status": "prepared_only",
@@ -295,7 +299,7 @@ def test_prepare_multi_agent_reuses_identity_and_blocks_pending_fairness(tmp_pat
         module.run_prepared(output)
 
 
-def test_fairness_choice_records_as_is_or_requires_separate_patch(tmp_path, monkeypatch):
+def test_controlled_cap_is_approved_and_as_is_is_not_an_official_day11_run(tmp_path, monkeypatch):
     module, workspace, dataset, target, legacy_output = prepared_fixture(tmp_path)
     module.freeze_run_identity(legacy_output, provider="mock", model="mock-model")
 
@@ -309,9 +313,18 @@ def test_fairness_choice_records_as_is_or_requires_separate_patch(tmp_path, monk
     )
     module.freeze_run_identity(equalize_output, provider="mock", model="mock-model")
     equalize = module.record_fairness_decision(equalize_output, "controlled-cap-at-5")
-    assert equalize["fairness_decision"]["status"] == "requires_separate_patch"
-    with pytest.raises(ValueError, match="separate Patch"):
-        module.run_prepared(equalize_output)
+    assert equalize["fairness_decision"]["status"] == "approved"
+    assert equalize["product_default_multi_agent_limits"]["max_selected_files"] == 10
+    assert equalize["effective_multi_agent_limits"]["max_selected_files"] == 5
+
+    monkeypatch.setattr(module, "launch_worker", lambda _: 0)
+    report = module.run_prepared(equalize_output)
+    assert report["summary"]["attempted_count"] == 20
+    assert report["summary"]["not_started_count"] == 0
+    assert report["config"]["product_default_multi_agent_limits"]["max_selected_files"] == 10
+    assert report["config"]["effective_multi_agent_limits"]["max_selected_files"] == 5
+    assert (equalize_output / "multi-agent-dev-report.json").is_file()
+    assert not (equalize_output / "legacy-dev-report.json").exists()
 
     as_is_output = workspace / "data" / "day11" / "as-is"
     module.prepare_multi_agent_baseline(
@@ -323,15 +336,79 @@ def test_fairness_choice_records_as_is_or_requires_separate_patch(tmp_path, monk
     )
     module.freeze_run_identity(as_is_output, provider="mock", model="mock-model")
     as_is = module.record_fairness_decision(as_is_output, "current-topology-as-is")
-    assert as_is["fairness_decision"]["status"] == "approved"
+    assert as_is["fairness_decision"]["status"] == "not_selected_for_official_day11"
     assert "fact_evidence_coverage" in as_is["fairness_decision"]["not_comparable_dimensions"]
+    with pytest.raises(ValueError, match="official Day 11"):
+        module.run_prepared(as_is_output)
+    assert not (as_is_output / "attempts.json").exists()
 
-    monkeypatch.setattr(module, "launch_worker", lambda _: 0)
-    report = module.run_prepared(as_is_output)
-    assert report["summary"]["attempted_count"] == 20
-    assert report["summary"]["not_started_count"] == 0
-    assert (as_is_output / "multi-agent-dev-report.json").is_file()
-    assert not (as_is_output / "legacy-dev-report.json").exists()
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("missing_effective_cap", None),
+        ("effective_cap", 6),
+        ("product_default_cap", 11),
+    ],
+)
+def test_controlled_cap_config_drift_fails_before_worker_launch(
+    tmp_path, monkeypatch, field, value
+):
+    module, workspace, dataset, target, legacy_output = prepared_fixture(tmp_path)
+    module.freeze_run_identity(legacy_output, provider="mock", model="mock-model")
+    output = workspace / "data" / "day11" / "controlled-cap-drift"
+    module.prepare_multi_agent_baseline(
+        workspace,
+        dataset,
+        target,
+        output,
+        legacy_config=legacy_output / "run-config.json",
+    )
+    module.freeze_run_identity(output, provider="mock", model="mock-model")
+    module.record_fairness_decision(output, "controlled-cap-at-5")
+
+    config_path = output / "run-config.json"
+    config = json.loads(config_path.read_text(encoding="utf-8"))
+    if field == "missing_effective_cap":
+        config["effective_multi_agent_limits"].pop("max_selected_files")
+    elif field == "effective_cap":
+        config["effective_multi_agent_limits"]["max_selected_files"] = value
+    else:
+        config["product_default_multi_agent_limits"]["max_selected_files"] = value
+    config_path.write_text(json.dumps(config), encoding="utf-8")
+
+    monkeypatch.setattr(
+        module,
+        "launch_worker",
+        lambda _: pytest.fail("Invalid cap configuration must fail before worker launch"),
+    )
+    with pytest.raises(ValueError, match="controlled benchmark configuration"):
+        module.run_prepared(output)
+    assert not (output / "attempts.json").exists()
+
+
+def test_existing_attempts_block_controlled_cap_before_worker_launch(tmp_path, monkeypatch):
+    module, workspace, dataset, target, legacy_output = prepared_fixture(tmp_path)
+    module.freeze_run_identity(legacy_output, provider="mock", model="mock-model")
+    output = workspace / "data" / "day11" / "controlled-cap-attempts"
+    module.prepare_multi_agent_baseline(
+        workspace,
+        dataset,
+        target,
+        output,
+        legacy_config=legacy_output / "run-config.json",
+    )
+    module.freeze_run_identity(output, provider="mock", model="mock-model")
+    module.record_fairness_decision(output, "controlled-cap-at-5")
+    (output / "attempts.json").write_text("[]\n", encoding="utf-8")
+
+    monkeypatch.setattr(
+        module,
+        "launch_worker",
+        lambda _: pytest.fail("Existing attempts must fail before worker launch"),
+    )
+    with pytest.raises(ValueError, match="Existing attempts"):
+        module.run_prepared(output)
 
 
 def test_multi_agent_summary_does_not_treat_agent_usage_as_full_cost():

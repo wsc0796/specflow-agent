@@ -25,6 +25,33 @@ def _write_matching_evidence(repo: Path, requirement: str) -> None:
 
 
 class TestMultiAgentRunner:
+    def test_default_product_evidence_cap_remains_ten(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        observed_caps = []
+
+        class CapturingCollector:
+            def __init__(self, *args, config, **kwargs):
+                observed_caps.append(config.max_selected_files)
+
+            def collect(self, **kwargs):
+                raise RuntimeError("stop after observing the product default")
+
+        monkeypatch.setattr("specflow.runner_multi.EvidenceCollector", CapturingCollector)
+        repo = tmp_path / "repo"
+        repo.mkdir()
+
+        assert (
+            run_multi_agent(
+                repo=repo,
+                requirement="Observe the default evidence cap",
+                output=tmp_path / "output",
+                mock=True,
+            )
+            == 3
+        )
+        assert observed_caps == [10]
+
     def test_request_observer_is_non_interfering_and_preserves_provider_error(
         self, caplog: pytest.LogCaptureFixture
     ) -> None:

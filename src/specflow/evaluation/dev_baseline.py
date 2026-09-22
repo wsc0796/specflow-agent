@@ -10,7 +10,7 @@ import sys
 import time
 import uuid
 from collections import Counter
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from datetime import UTC, datetime
 from hashlib import sha256
 from pathlib import Path
@@ -44,6 +44,9 @@ SEMANTIC_EVALUATORS = (
     "citation_support",
     "safe_abstention",
 )
+LEGACY_BENCHMARK_MAX_SELECTED_FILES = 5
+MULTI_AGENT_PRODUCT_DEFAULT_MAX_SELECTED_FILES = 10
+DAY11_BENCHMARK_MAX_SELECTED_FILES = 5
 
 
 def _now() -> str:
@@ -250,8 +253,14 @@ def prepare_multi_agent_baseline(
         **shared,
         "source_paths": list(SOURCE_PATHS),
         "policy": asdict(DEFAULT_POLICY),
+        "product_default_multi_agent_limits": {
+            "max_selected_files": min(
+                MULTI_AGENT_PRODUCT_DEFAULT_MAX_SELECTED_FILES,
+                DEFAULT_POLICY.repository.max_selected_files,
+            ),
+        },
         "effective_multi_agent_limits": {
-            "max_selected_files": min(10, DEFAULT_POLICY.repository.max_selected_files),
+            "max_selected_files": DAY11_BENCHMARK_MAX_SELECTED_FILES,
             "max_total_evidence_chars": DEFAULT_POLICY.repository.max_total_evidence_chars,
             "max_tool_calls": 20,
             "max_parallel_agents": DEFAULT_POLICY.max_parallel_agents,
@@ -272,15 +281,22 @@ def prepare_multi_agent_baseline(
             "receiver_protocol": "per_receiver_actual_llm_request; no union across receivers",
             "multi_agent_primary_receiver": "repository-analyst-agent-v1",
             "known_limit_difference": {
-                "max_selected_files": {"legacy": 5, "multi_agent": 10},
+                "max_selected_files": {
+                    "legacy": LEGACY_BENCHMARK_MAX_SELECTED_FILES,
+                    "multi_agent_product_default": (MULTI_AGENT_PRODUCT_DEFAULT_MAX_SELECTED_FILES),
+                    "multi_agent_benchmark": DAY11_BENCHMARK_MAX_SELECTED_FILES,
+                },
                 "status": "pending_learner_decision",
             },
         },
         "fairness_decision": {
             "status": "pending_learner_decision",
             "selected_experiment": None,
-            "legacy_max_selected_files": 5,
-            "multi_agent_max_selected_files": 10,
+            "legacy_max_selected_files": LEGACY_BENCHMARK_MAX_SELECTED_FILES,
+            "multi_agent_product_default_max_selected_files": (
+                MULTI_AGENT_PRODUCT_DEFAULT_MAX_SELECTED_FILES
+            ),
+            "multi_agent_benchmark_max_selected_files": DAY11_BENCHMARK_MAX_SELECTED_FILES,
         },
         "evaluators": {"SF-EVAL": "v1", "SF-EVALUATORS": "v1"},
         "artifact_profile": {
@@ -360,18 +376,29 @@ def freeze_run_identity(output: Path, *, provider: str, model: str) -> dict:
 
 
 def record_fairness_decision(output: Path, decision: str) -> dict:
-    """Record the learner's experiment choice without changing product limits."""
+    """Record the learner's experiment choice without changing product defaults."""
     if (output / "attempts.json").exists():
         raise ValueError("Cannot change fairness decision after an attempt")
     config = _object(output / "run-config.json")
     if config.get("mode") != "multi-agent":
         raise ValueError("Fairness decisions apply only to the Multi-Agent Dev run")
+    config["product_default_multi_agent_limits"] = {
+        "max_selected_files": MULTI_AGENT_PRODUCT_DEFAULT_MAX_SELECTED_FILES,
+    }
     if decision == "current-topology-as-is":
+        config["effective_multi_agent_limits"]["max_selected_files"] = (
+            MULTI_AGENT_PRODUCT_DEFAULT_MAX_SELECTED_FILES
+        )
         config["fairness_decision"] = {
-            "status": "approved",
+            "status": "not_selected_for_official_day11",
             "selected_experiment": decision,
-            "legacy_max_selected_files": 5,
-            "multi_agent_max_selected_files": 10,
+            "legacy_max_selected_files": LEGACY_BENCHMARK_MAX_SELECTED_FILES,
+            "multi_agent_product_default_max_selected_files": (
+                MULTI_AGENT_PRODUCT_DEFAULT_MAX_SELECTED_FILES
+            ),
+            "multi_agent_benchmark_max_selected_files": (
+                MULTI_AGENT_PRODUCT_DEFAULT_MAX_SELECTED_FILES
+            ),
             "confounder": "effective max_selected_files differs across the two paths",
             "not_comparable_dimensions": [
                 "source_reference_and_evidence_counts",
@@ -384,14 +411,18 @@ def record_fairness_decision(output: Path, decision: str) -> dict:
             ],
         }
     elif decision == "controlled-cap-at-5":
+        config["effective_multi_agent_limits"]["max_selected_files"] = (
+            DAY11_BENCHMARK_MAX_SELECTED_FILES
+        )
         config["fairness_decision"] = {
-            "status": "requires_separate_patch",
+            "status": "approved",
             "selected_experiment": decision,
-            "legacy_max_selected_files": 5,
-            "multi_agent_max_selected_files": 10,
-            "required_change": (
-                "Freeze and approve a separate task before changing Multi-Agent to 5."
+            "legacy_max_selected_files": LEGACY_BENCHMARK_MAX_SELECTED_FILES,
+            "multi_agent_product_default_max_selected_files": (
+                MULTI_AGENT_PRODUCT_DEFAULT_MAX_SELECTED_FILES
             ),
+            "multi_agent_benchmark_max_selected_files": DAY11_BENCHMARK_MAX_SELECTED_FILES,
+            "isolated_variable": "topology",
         }
     else:
         raise ValueError("Unknown fairness decision")
@@ -414,7 +445,11 @@ def build_adapter_input(
         "output": str(output.resolve()),
         "provider": provider,
         "model": model,
-        "max_files": 5 if mode == "legacy" else 10,
+        "max_files": (
+            LEGACY_BENCHMARK_MAX_SELECTED_FILES
+            if mode == "legacy"
+            else DAY11_BENCHMARK_MAX_SELECTED_FILES
+        ),
         **case.product_input(),
     }
 
@@ -424,7 +459,10 @@ def execute_worker(payload: dict) -> int:
     if set(payload) != PAYLOAD_FIELDS:
         raise ValueError("Unexpected product input fields")
     mode = payload["mode"]
-    expected_max_files = {"legacy": 5, "multi-agent": 10}.get(mode)
+    expected_max_files = {
+        "legacy": LEGACY_BENCHMARK_MAX_SELECTED_FILES,
+        "multi-agent": DAY11_BENCHMARK_MAX_SELECTED_FILES,
+    }.get(mode)
     if (
         expected_max_files is None
         or payload["max_files"] != expected_max_files
@@ -464,6 +502,13 @@ def execute_worker(payload: dict) -> int:
                 max_files=5,
                 request_observer=observe,
             )
+        benchmark_policy = replace(
+            DEFAULT_POLICY,
+            repository=replace(
+                DEFAULT_POLICY.repository,
+                max_selected_files=DAY11_BENCHMARK_MAX_SELECTED_FILES,
+            ),
+        )
         return run_multi_agent(
             repo=target,
             requirement=payload["requirement"],
@@ -471,6 +516,7 @@ def execute_worker(payload: dict) -> int:
             mock=payload["provider"] == "mock",
             provider=payload["provider"],
             model=payload["model"],
+            policy=benchmark_policy,
             request_observer=observe,
         )
     finally:
@@ -764,6 +810,28 @@ def summarize_attempts(
     }
 
 
+def _validate_controlled_multi_agent_config(config: dict) -> None:
+    fairness = config.get("fairness_decision", {})
+    if fairness.get("selected_experiment") == "current-topology-as-is":
+        raise ValueError("Only controlled-cap-at-5 is approved for the official Day 11 run")
+    if fairness.get("status") != "approved":
+        raise ValueError("Fairness decision has not been approved")
+    expected = (
+        fairness.get("selected_experiment") == "controlled-cap-at-5"
+        and fairness.get("legacy_max_selected_files") == LEGACY_BENCHMARK_MAX_SELECTED_FILES
+        and fairness.get("multi_agent_product_default_max_selected_files")
+        == MULTI_AGENT_PRODUCT_DEFAULT_MAX_SELECTED_FILES
+        and fairness.get("multi_agent_benchmark_max_selected_files")
+        == DAY11_BENCHMARK_MAX_SELECTED_FILES
+        and config.get("product_default_multi_agent_limits", {}).get("max_selected_files")
+        == MULTI_AGENT_PRODUCT_DEFAULT_MAX_SELECTED_FILES
+        and config.get("effective_multi_agent_limits", {}).get("max_selected_files")
+        == DAY11_BENCHMARK_MAX_SELECTED_FILES
+    )
+    if not expected:
+        raise ValueError("Invalid controlled benchmark configuration")
+
+
 def run_prepared(output: Path) -> dict:
     """Execute one fixed Dev pass; journal every attempt before spawning a child."""
     config = _object(output / "run-config.json")
@@ -771,11 +839,7 @@ def run_prepared(output: Path) -> dict:
     if mode not in {"legacy", "multi-agent"}:
         raise ValueError("Unknown prepared execution mode")
     if mode == "multi-agent":
-        fairness_status = config.get("fairness_decision", {}).get("status")
-        if fairness_status == "requires_separate_patch":
-            raise ValueError("The controlled-cap experiment requires a separate Patch")
-        if fairness_status != "approved":
-            raise ValueError("Fairness decision has not been approved")
+        _validate_controlled_multi_agent_config(config)
     if not config.get("run_identity_frozen"):
         raise ValueError("Run identity has not been frozen")
     if (output / "attempts.json").exists():
