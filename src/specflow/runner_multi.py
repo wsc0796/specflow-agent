@@ -9,7 +9,7 @@ import re
 import tempfile
 import time
 from collections.abc import Callable, Mapping
-from dataclasses import asdict, replace
+from dataclasses import asdict, dataclass, replace
 from datetime import UTC, datetime
 from hashlib import sha256
 from pathlib import Path
@@ -55,6 +55,76 @@ from specflow.trace.models import AgentTraceSpan
 AgentExecutor = Callable[[dict[str, Any]], dict[str, Any]]
 
 logger = logging.getLogger(__name__)
+
+_EXECUTOR_ERROR_CODES = frozenset(code.value for code in ErrorCode) | {
+    "SCHEMA_REGISTRY_UNAVAILABLE",
+    "SCHEMA_NOT_FOUND",
+    "AGENT_EXECUTION_FAILED",
+}
+
+
+@dataclass(frozen=True)
+class _StageFailureAudit:
+    """Metadata from a rejected stage, never an accepted output or handoff."""
+
+    agent_id: str
+    role: str
+    version: str
+    stage_index: int
+    error_code: str
+    classification_source: str
+    stage_started_at: str | None
+    stage_completed_at: str | None
+    agent_submitted_at: str | None
+    agent_completed_at: str | None
+
+    def context(self) -> dict[str, str]:
+        return {
+            "kind": "stage_result_validation",
+            "agent_id": self.agent_id,
+            "stage_index": str(self.stage_index),
+            "error_code": self.error_code,
+            "classification_source": self.classification_source,
+        }
+
+    def output_summary(self) -> dict[str, object]:
+        return {
+            "agent_id": self.agent_id,
+            "role": self.role,
+            "stage_index": self.stage_index,
+            "success": False,
+            "schema_validated": False,
+            "degraded": True,
+            "audit_only": True,
+            "error_code": self.error_code,
+            "classification_source": self.classification_source,
+        }
+
+
+class _StageResultValidationError(ValueError):
+    def __init__(
+        self,
+        stage: StageExecutionResult,
+        agent_id: str,
+        registry: AgentRegistry,
+        error_code: str,
+        classification_source: str,
+    ) -> None:
+        super().__init__(error_code)
+        identity = registry.get(agent_id).identity
+        timing = stage.agent_timings.get(agent_id)
+        self.audit = _StageFailureAudit(
+            agent_id=identity.agent_id,
+            role=identity.role.value,
+            version=identity.version,
+            stage_index=stage.stage_index,
+            error_code=error_code,
+            classification_source=classification_source,
+            stage_started_at=stage.started_at or None,
+            stage_completed_at=stage.completed_at or None,
+            agent_submitted_at=(timing.submitted_at or None) if timing else None,
+            agent_completed_at=(timing.completed_at or None) if timing else None,
+        )
 
 
 def run_multi_agent(
@@ -379,6 +449,32 @@ def run_multi_agent(
             MultiAgentWorkflowState.COMPLETED,
             "review passed" if decision == "PASS" else "revision limit reached",
         )
+    except _StageResultValidationError as error:
+        # Only controlled metadata is logged; validation exceptions can embed
+        # rejected model content and must not be printed with their traceback.
+        logger.error(
+            "run %s stage validation failed: agent=%s stage=%s code=%s source=%s",
+            run_id,
+            error.audit.agent_id,
+            error.audit.stage_index,
+            error.audit.error_code,
+            error.audit.classification_source,
+        )
+        _persist_failed_run(
+            output=output,
+            run_id=run_id,
+            coordinator=coordinator,
+            registry=registry,
+            model=model,
+            stages=stages,
+            plan=plan,
+            discovered_files=discovered_files,
+            guard=guard,
+            error="MULTI_AGENT_RUN_FAILED",
+            failure_context=error.audit.context(),
+            stage_failure=error.audit,
+        )
+        return 3
     except HandoffIntegrityError as error:
         error_code = ErrorCode.HANDOFF_INTEGRITY_FAILED.value
         logger.error(
@@ -728,17 +824,32 @@ def _validate_stage_results(
 ) -> None:
     """Fail closed before outputs can become inter-agent handoffs."""
     for agent_id, result in stage.agent_results.items():
-        if result.get("agent_id") != agent_id or not result.get("success", True):
-            raise ValueError("AGENT_EXECUTION_FAILED")
+        if result.get("agent_id") != agent_id:
+            raise _StageResultValidationError(
+                stage, agent_id, registry, "AGENT_EXECUTION_FAILED", "stage_validator"
+            )
+        if not result.get("success", True):
+            output = result.get("output")
+            reported_code = output.get("error_code") if isinstance(output, dict) else None
+            code = (
+                reported_code
+                if isinstance(reported_code, str) and reported_code in _EXECUTOR_ERROR_CODES
+                else "AGENT_EXECUTION_FAILED"
+            )
+            raise _StageResultValidationError(stage, agent_id, registry, code, "executor_reported")
         output = _sanitize_artifact_value(result.get("output"))
         if not isinstance(output, dict):
-            raise ValueError("AGENT_OUTPUT_NOT_OBJECT")
+            raise _StageResultValidationError(
+                stage, agent_id, registry, "AGENT_OUTPUT_NOT_OBJECT", "stage_validator"
+            )
         identity = registry.get(agent_id).identity
         try:
             output_model = schema_registry.get(identity.output_schema_id)
             result["output"] = output_model.model_validate(output).model_dump()
-        except Exception as exc:
-            raise ValueError("SCHEMA_VALIDATION_FAILED") from exc
+        except Exception:
+            raise _StageResultValidationError(
+                stage, agent_id, registry, "SCHEMA_VALIDATION_FAILED", "stage_validator"
+            ) from None
         result["schema_validated"] = True
 
 
@@ -858,6 +969,7 @@ def _build_trace_tree(
     *,
     error_code: str | None = None,
     failure_context: Mapping[str, str] | None = None,
+    stage_failure: _StageFailureAudit | None = None,
 ) -> list[dict[str, object]]:
     root_id = f"run-{uuid4().hex}"
     coordinator_id = f"coordinator-{uuid4().hex}"
@@ -923,6 +1035,33 @@ def _build_trace_tree(
                 revision_round=1 if stage.stage_index >= 4 else 0,
             )
             traces.append(span.as_dict())
+    if stage_failure is not None:
+        # This is a runner observation of rejection, not a Provider trace.
+        # Usage/latency are unknown here; AgentTraceSpan's zero defaults would
+        # incorrectly imply measured values, so omit those fields.
+        traces.append(
+            {
+                "span_id": f"agent-{uuid4().hex}",
+                "parent_span_id": coordinator_id,
+                "kind": "agent",
+                "run_id": run_id,
+                "agent_id": stage_failure.agent_id,
+                "agent_role": stage_failure.role,
+                "agent_version": stage_failure.version,
+                "stage": stage_failure.stage_index,
+                "status": "failed",
+                "stage_started_at": stage_failure.stage_started_at,
+                "stage_completed_at": stage_failure.stage_completed_at,
+                "agent_submitted_at": stage_failure.agent_submitted_at,
+                "agent_completed_at": stage_failure.agent_completed_at,
+                "metadata": {
+                    "error_code": stage_failure.error_code,
+                    "classification_source": stage_failure.classification_source,
+                    "observation_boundary": "stage_result_validation",
+                    "audit_only": "true",
+                },
+            }
+        )
     return traces
 
 
@@ -1051,6 +1190,7 @@ def _persist_failed_run(
     guard: RuntimeGuard,
     error: str,
     failure_context: Mapping[str, str] | None = None,
+    stage_failure: _StageFailureAudit | None = None,
 ) -> None:
     """Persist FAILED manifest, state history, and partial traces for audit."""
     try:
@@ -1080,6 +1220,7 @@ def _persist_failed_run(
             "failed",
             error_code=error if failure_context is not None else None,
             failure_context=failure_context,
+            stage_failure=stage_failure,
         )
         failed_manifest = {
             "run_id": run_id,
@@ -1100,6 +1241,10 @@ def _persist_failed_run(
             for s in stages
             for aid, result in s.agent_results.items()
         }
+        if stage_failure is not None:
+            agent_outputs[_output_ref(stage_failure.stage_index, stage_failure.agent_id)] = (
+                stage_failure.output_summary()
+            )
         _safe_write(run_dir, "agent-outputs.json", agent_outputs, guard, sort_keys=True)
         _finalize_run_directory(run_dir, guard)
     except Exception:
