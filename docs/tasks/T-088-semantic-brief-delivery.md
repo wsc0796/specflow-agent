@@ -24,6 +24,7 @@ brief 是有界任务数据，不改变权限/依赖或输出 Schema；通过最
 ## Design
 
 REQ-001、REQ-002：构造 AgentRunner 时显式注入接收者的 task_brief 数据字典，适配器以 JSON 块交付。保留不提供 brief 的独立适配器默认行为。
+审查补充：DLP 必须先逐字符串值处理，再序列化；task_description 含敏感赋值时后续语义字段仍完整。
 允许：src/specflow/runner_multi.py、src/specflow/agents/adapter.py、tests/test_semantic_brief_delivery.py、本规格及报告。
 禁止：真实 Provider、正式 Dev/Holdout、历史 baseline/raw/学习材料、依赖、权限扩张、全局预算提升、推送。
 验证使用净化 Provider 环境且阻断主/子进程 HTTP 的已有包装；临时合成数据独立目录。

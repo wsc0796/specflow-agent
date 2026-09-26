@@ -1,5 +1,8 @@
 # T-087 修复报告
 
+独立审查补修：先逐字符串值 DLP 再 JSON 序列化，避免 authorization/access_token 正则吞掉后置字段。
+review-dlp-red：2 failed/7 passed；review-dlp-green：28 passed，真实 HTTP=0。新增实际请求 JSON 解析与后置字段完整性断言。
+
 日期：2026-09-26。修订目标现在收到独立 revision_context：修订指令、已接受且已脱敏的 Review 输出、目标上一版输出。其它接收者保持原投影；整请求仍受原输入预算约束。
 
 | 验收 | 结果 | 证据 |

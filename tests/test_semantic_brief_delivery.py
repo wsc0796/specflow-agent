@@ -9,10 +9,11 @@ from test_revision_request_delivery import RevisionProvider, run_revision
 
 
 class BriefProvider(RevisionProvider):
-    def __init__(self, *, degraded=False, size=0):
+    def __init__(self, *, degraded=False, size=0, sensitive_first=False):
         super().__init__()
         self.degraded = degraded
         self.size = size
+        self.sensitive_first = sensitive_first
 
     def complete(self, request):
         response = super().complete(request)
@@ -25,6 +26,8 @@ class BriefProvider(RevisionProvider):
             "evaluation_hints": [f"EVAL::{agent_id}"],
             "repository_scope_hint": f"SCOPE::{agent_id} authorization=synthetic-only",
         }
+        if self.sensitive_first:
+            brief["task_description"] = "authorization=synthetic-front-value"
         return replace(response, content="not json" if self.degraded else json.dumps(brief))
 
 
@@ -60,3 +63,22 @@ def test_oversized_brief_is_rejected_before_first_agent_call(tmp_path, monkeypat
     manifest = json.loads((run / "manifest.json").read_text(encoding="utf-8"))
     assert manifest["error"] == "TOKEN_BUDGET_EXCEEDED"
     assert manifest["stages_completed"] == 0
+
+
+def test_brief_dlp_preserves_json_and_fields_after_sensitive_value(tmp_path, monkeypatch):
+    provider = BriefProvider(sensitive_first=True)
+    code, _ = run_revision(tmp_path, monkeypatch, provider)
+    assert code == 0
+    for request in provider.requests:
+        if request.messages[0].role != "system":
+            continue
+        block = request.messages[-1].content.split("## Task Brief\n", 1)[1].splitlines()[1]
+        parsed = json.loads(block)
+        assert set(parsed) == {
+            "task_description",
+            "analysis_focus",
+            "evaluation_hints",
+            "repository_scope_hint",
+        }
+        assert parsed["analysis_focus"] and parsed["evaluation_hints"]
+        assert "synthetic-front-value" not in block

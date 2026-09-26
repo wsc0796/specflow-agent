@@ -24,6 +24,7 @@ FakeProvider 真实请求覆盖三个可修订角色；首轮无修订块，二�
 ## Design
 
 REQ-001、REQ-002：runner 在 Handoff 验证后投影 revision_context（instruction/review_output/previous_output），adapter 序列化为独立 JSON 数据块后执行既有 token 准入。该补充执行上下文不改变正常业务 Schema。
+审查补充：DLP 必须作用于各字符串值，再序列化；敏感前置值不能吞掉后续合法字段，修订块必须仍可解析。
 允许：src/specflow/runner_multi.py、src/specflow/agents/adapter.py、tests/test_revision_request_delivery.py、本规格及报告。
 禁止：真实 Provider、正式 Dev/Holdout、历史 baseline/raw/学习材料、依赖、权限扩张、全局预算提升、推送。
 验证使用净化 Provider 环境且阻断主/子进程 HTTP 的已有包装；临时合成数据独立目录。

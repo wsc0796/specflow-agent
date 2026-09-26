@@ -1,5 +1,8 @@
 # T-088 修复报告
 
+独立审查补修：先逐字符串值 DLP 再 JSON 序列化，避免 authorization/access_token 正则吞掉后置字段。
+review-dlp-red：2 failed/7 passed；review-dlp-green：28 passed，真实 HTTP=0。新增实际请求 JSON 解析与后置字段完整性断言。
+
 日期：2026-09-26。runner 按 agent_id 投影自身 brief 的四个语义字段，AgentRunner 以独立 JSON 块交付。brief 经过 DLP 并计入完整输入预算；修订复用同一 brief，原结构权限和业务 Schema 不变。
 
 | 验收 | 结果 | 证据 |

@@ -11,11 +11,14 @@ from specflow.policy import ExecutionPolicy, TokenPolicy
 
 
 class RevisionProvider(FakeProvider):
-    def __init__(self, role="design", finding="REVIEW_CORRECTION_MARKER"):
+    def __init__(
+        self, role="design", finding="REVIEW_CORRECTION_MARKER", summary="Review needs changes"
+    ):
         super().__init__()
         self.role = role
         self.finding = finding
         self.reviews = 0
+        self.summary = summary
 
     def complete(self, request):
         response = super().complete(request)
@@ -28,7 +31,7 @@ class RevisionProvider(FakeProvider):
             self.reviews += 1
             if self.reviews == 1:
                 payload = {
-                    "summary": "Review needs changes",
+                    "summary": self.summary,
                     "decision": "REJECT",
                     "findings": [self.finding],
                     "target_agent_id": self.role.replace("_", "-") + "-agent-v1",
@@ -87,3 +90,15 @@ def test_revision_context_is_checked_before_spending_another_call(tmp_path, monk
     manifest = json.loads((run / "manifest.json").read_text(encoding="utf-8"))
     assert manifest["error"] == "TOKEN_BUDGET_EXCEEDED"
     assert manifest["stages_completed"] == 4
+
+
+def test_revision_dlp_preserves_findings_and_previous_output(tmp_path, monkeypatch):
+    provider = RevisionProvider(summary="authorization=synthetic-front-value")
+    code, _ = run_revision(tmp_path, monkeypatch, provider)
+    assert code == 0
+    request = [r for r in provider.requests if "**design**" in r.messages[0].content][-1]
+    block = request.messages[-1].content.split("## Revision Context\n", 1)[1].splitlines()[1]
+    parsed = json.loads(block)
+    assert parsed["review_output"]["findings"] == ["REVIEW_CORRECTION_MARKER"]
+    assert parsed["previous_output"]["summary"] == "PREVIOUS_TARGET_OUTPUT_MARKER"
+    assert "synthetic-front-value" not in block
