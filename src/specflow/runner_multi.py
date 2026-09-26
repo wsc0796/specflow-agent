@@ -691,6 +691,7 @@ def run_multi_agent(
             "max_revisions": policy.max_revisions,
         },
         "execution_policy_hash": policy_hash,
+        "usage_contract": "all_provider_requests_v1",
         "budget_usage": {
             **llm_budget.snapshot(),
             "input_tokens": guard.total_input_tokens,
@@ -1341,6 +1342,7 @@ def _persist_failed_run(
         if failure_context is not None:
             failed_manifest["failure_context"] = dict(failure_context)
         if llm_budget is not None:
+            failed_manifest["usage_contract"] = "all_provider_requests_v1"
             failed_manifest["budget_usage"] = llm_budget.snapshot()
         if scheduler_abort is not None:
             failed_manifest["scheduler_abort"] = scheduler_abort.as_dict()

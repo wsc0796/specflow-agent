@@ -623,6 +623,72 @@ def _multi_agent_artifact_observation(artifact: Path) -> tuple[dict, dict | None
     return observation, manifest, metrics
 
 
+def _all_request_usage(manifest, metrics, records, observation_status, artifact_valid) -> dict:
+    """Interpret the explicit all-call contract without inferring old-run semantics."""
+    budget = manifest.get("budget_usage")
+    budget = budget if isinstance(budget, dict) else {}
+    calls = metrics.get("llm_call_count")
+    input_tokens = metrics.get("input_tokens")
+    output_tokens = metrics.get("output_tokens")
+    total_tokens = metrics.get("total_tokens")
+    valid_usage = (
+        all(
+            type(value) is int and value >= 0
+            for value in (input_tokens, output_tokens, total_tokens)
+        )
+        and total_tokens == input_tokens + output_tokens
+    )
+    valid_calls = type(calls) is int and calls >= 0
+    valid_budget = all(
+        type(budget.get(name)) is int and budget[name] >= 0
+        for name in (
+            "llm_calls",
+            "usage_observed_calls",
+            "usage_unknown_calls",
+            "observed_input_tokens",
+            "observed_output_tokens",
+        )
+    )
+    complete = (
+        artifact_valid
+        and valid_usage
+        and valid_calls
+        and valid_budget
+        and budget.get("scope") == "all_llm_requests"
+        and budget.get("usage_complete") is True
+        and budget["llm_calls"] == budget["usage_observed_calls"] == calls
+        and budget["usage_unknown_calls"] == 0
+        and budget["observed_input_tokens"] == input_tokens
+        and budget["observed_output_tokens"] == output_tokens
+    )
+    receivers = {"coordinator_enricher"} | {
+        agent.agent_id for agent in _build_registry().list_agents()
+    }
+    breakdown_known = (
+        valid_calls
+        and observation_status == "complete"
+        and len(records) == calls
+        and all(isinstance(r.get("receiver"), str) and r["receiver"] in receivers for r in records)
+    )
+    enrichment = sum(r.get("receiver") == "coordinator_enricher" for r in records)
+    return {
+        "scope": "all_provider_requests_v1",
+        "request_count": calls if valid_calls else len(records),
+        "metered_provider_request_count": calls if complete else "unknown",
+        "metered_agent_request_count": calls - enrichment
+        if complete and breakdown_known
+        else "unknown",
+        "metered_enrichment_request_count": enrichment
+        if complete and breakdown_known
+        else "unknown",
+        "unmetered_enrichment_request_count": 0 if complete else "unknown",
+        "observed_input_tokens_subtotal": input_tokens if valid_usage else "unknown",
+        "observed_output_tokens_subtotal": output_tokens if valid_usage else "unknown",
+        "observed_total_tokens_subtotal": total_tokens if valid_usage else "unknown",
+        "all_provider_usage_complete": complete,
+    }
+
+
 def inspect_attempt(output: Path, target: Path, *, mode: str = "legacy") -> dict:
     result = {
         "product_terminal_state": "unknown",
@@ -728,6 +794,18 @@ def inspect_attempt(output: Path, target: Path, *, mode: str = "legacy") -> dict
                         else "unknown",
                         "all_provider_usage_complete": valid_usage and coordinator_requests == 0,
                     }
+                    contract = manifest.get("usage_contract")
+                    if contract == "all_provider_requests_v1":
+                        result["usage_observation"] = _all_request_usage(
+                            manifest,
+                            metrics,
+                            request_records,
+                            result["observation_status"],
+                            observation["verdict"] == "pass",
+                        )
+                    elif contract is not None:
+                        result["usage_observation"]["scope"] = "unknown_usage_contract"
+                        result["usage_observation"]["all_provider_usage_complete"] = False
             else:
                 manifest = _object(artifact / "manifest.json")
                 result["product_terminal_state"] = manifest.get("status", "unknown")
@@ -794,7 +872,11 @@ def summarize_attempts(
             "comparison_status": "comparable"
             if count and complete_count == count
             else ("not_comparable" if count else "N/A"),
-            "reason": "Current metrics omit Coordinator enrichment usage.",
+            "reason": (
+                "All attempted runs have complete request usage."
+                if count and complete_count == count
+                else "Some runs have legacy, unknown, or incomplete request usage."
+            ),
         }
     elif mode == "legacy":
         token_cost = {
