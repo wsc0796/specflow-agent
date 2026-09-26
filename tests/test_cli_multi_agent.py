@@ -31,6 +31,8 @@ class TestMultiAgentRunner:
         observed_caps = []
 
         class CapturingCollector:
+            tool_call_records = ()
+
             def __init__(self, *args, config, **kwargs):
                 observed_caps.append(config.max_selected_files)
 

@@ -7,7 +7,7 @@ from pathlib import Path
 from time import perf_counter
 from typing import Any
 
-from specflow.evidence.exceptions import EvidenceLimitError
+from specflow.evidence.exceptions import EvidenceCollectionError, EvidenceLimitError
 from specflow.evidence.keywords import extract_keywords
 from specflow.evidence.models import (
     EvidenceBundle,
@@ -61,6 +61,12 @@ class EvidenceCollector:
         files_output = self._execute_tool(
             "list_files", {"include": ["*.py", "*.md", "*.yaml", "*.yml", "*.toml", "*.cfg"]}
         )
+        if files_output is None:
+            raise EvidenceCollectionError(
+                "Required repository listing failed",
+                tool_name="list_files",
+                error_type=self._records[-1].error_type,
+            )
         discovered_file_count = int(files_output.get("count", 0))
         all_matches: list[dict[str, Any]] = []
         searched_files: set[str] = set()

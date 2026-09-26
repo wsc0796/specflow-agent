@@ -29,7 +29,7 @@ from specflow.coordinator.exceptions import ScheduleExecutionError, SchedulerAbo
 from specflow.coordinator.scheduler import MultiAgentScheduler, StageExecutionResult
 from specflow.coordinator.state_machine import MultiAgentWorkflowState
 from specflow.evaluation.metrics import AgentMetrics, RunMetrics
-from specflow.evidence import EvidenceCollector
+from specflow.evidence import EvidenceCollectionError, EvidenceCollector
 from specflow.evidence.models import EvidenceCollectionConfig
 from specflow.handoff.exceptions import HandoffIntegrityError
 from specflow.handoff.models import AgentHandoff
@@ -219,10 +219,25 @@ def run_multi_agent(
             failure_context={"phase": "evidence_collection"},
         )
         return 3
-    except Exception:
+    except Exception as error:
         # Evidence is a required, untrusted input boundary.  Continuing would
         # let agents produce an ungrounded plan with no audit evidence.
-        logger.exception("run %s failed while collecting repository evidence", run_id)
+        failure_context = {"phase": "evidence_collection"}
+        if isinstance(error, EvidenceCollectionError):
+            failure_context.update(error.audit_context)
+        logger.error("run %s evidence collection failed: code=EVIDENCE_COLLECTION_FAILED", run_id)
+        _persist_pre_execution_failure(
+            output=output,
+            run_id=run_id,
+            started_at=started_at,
+            guard=guard,
+            error="EVIDENCE_COLLECTION_FAILED",
+            discovered_files=None,
+            selected_file_count=None,
+            referenced_file_count=None,
+            tool_call_count=len(collector.tool_call_records) if collector is not None else 0,
+            failure_context=failure_context,
+        )
         return 3
 
     if not evidence.excerpts:
