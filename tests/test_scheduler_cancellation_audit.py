@@ -3,7 +3,7 @@
 import json
 import time
 from concurrent.futures import CancelledError
-from threading import Barrier, Event, Timer
+from threading import Barrier, Event, Thread, Timer
 
 import pytest
 
@@ -182,21 +182,30 @@ def test_expired_deadline_has_no_future_audit_agents():
 def test_runner_uses_logical_stage_and_keeps_abort_out_of_outputs(tmp_path, monkeypatch):
     import specflow.coordinator.scheduler as scheduler_module
 
+    stage_one_submitted = Event()
     stage_one_started = Event()
+    cancellation_observed = Event()
     release = Event()
     sentinels = []
     original_as_completed = scheduler_module.as_completed
-    timers = []
+    original_abort_agent = scheduler_module._abort_agent
+    abort_observations = []
 
     def controlled_as_completed(futures, timeout):
-        if stage_one_started.is_set():
-            timer = Timer(0.02, release.set)
-            timer.start()
-            timers.append(timer)
+        if stage_one_submitted.is_set():
+            assert stage_one_started.wait(1)
             return original_as_completed(futures, timeout=0)
         return original_as_completed(futures, timeout=timeout)
 
+    def observe_abort(agent_id, future):
+        observation = original_abort_agent(agent_id, future)
+        abort_observations.append(observation)
+        if len(abort_observations) == 3:
+            cancellation_observed.set()
+        return observation
+
     monkeypatch.setattr(scheduler_module, "as_completed", controlled_as_completed)
+    monkeypatch.setattr(scheduler_module, "_abort_agent", observe_abort)
 
     class StageOneTimeoutScheduler:
         def __init__(self, *args, **kwargs):
@@ -205,6 +214,7 @@ def test_runner_uses_logical_stage_and_keeps_abort_out_of_outputs(tmp_path, monk
         def execute(self, stages, executors, context, *, deadline=None):
             if stages[0][0] == "repository-analyst-agent-v1":
                 return self._delegate.execute(stages, executors, context, deadline=deadline)
+            stage_one_submitted.set()
             return self._delegate.execute(stages, executors, context, deadline=time.monotonic() + 5)
 
     monkeypatch.setattr(runner_multi, "MultiAgentScheduler", StageOneTimeoutScheduler)
@@ -231,25 +241,37 @@ def test_runner_uses_logical_stage_and_keeps_abort_out_of_outputs(tmp_path, monk
         downstream.append(True)
         raise AssertionError("Synthesis/Review must not run")
 
-    assert (
-        runner_multi.run_multi_agent(
-            repo=repo,
-            requirement="Explain cancellation audit",
-            output=output,
-            mock=True,
-            policy=ExecutionPolicy(max_llm_calls=12),
-            _executor_overrides={
-                "synthesis-agent-v1": forbidden,
-                "review-agent-v1": forbidden,
-                "design-agent-v1": slow_design,
-                "test-strategy-agent-v1": queued_sentinel,
-                "risk-review-agent-v1": queued_sentinel,
-            },
+    def release_after_abort():
+        assert cancellation_observed.wait(1)
+        release.set()
+
+    releaser = Thread(target=release_after_abort)
+    releaser.start()
+    try:
+        assert (
+            runner_multi.run_multi_agent(
+                repo=repo,
+                requirement="Explain cancellation audit",
+                output=output,
+                mock=True,
+                policy=ExecutionPolicy(max_llm_calls=12),
+                _executor_overrides={
+                    "synthesis-agent-v1": forbidden,
+                    "review-agent-v1": forbidden,
+                    "design-agent-v1": slow_design,
+                    "test-strategy-agent-v1": queued_sentinel,
+                    "risk-review-agent-v1": queued_sentinel,
+                },
+            )
+            == 3
         )
-        == 3
-    )
-    for timer in timers:
-        timer.join(1)
+    finally:
+        release.set()
+        releaser.join(1)
+    assert stage_one_submitted.is_set()
+    assert stage_one_started.is_set()
+    assert cancellation_observed.is_set()
+    assert len(abort_observations) == 3
     assert downstream == []
     assert sentinels == []
     run_dir = next(output.glob("run-multi-*"))
