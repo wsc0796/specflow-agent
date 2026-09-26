@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+from dataclasses import replace
 from pathlib import Path
 
 from specflow import __version__
@@ -44,8 +45,14 @@ def main(argv: list[str] | None = None) -> None:
         run_stdio(registry)
         raise SystemExit(0)
     if args.mode == "multi-agent":
+        from specflow.policy import DEFAULT_POLICY
         from specflow.runner_multi import run_multi_agent
 
+        policy = (
+            replace(DEFAULT_POLICY, max_llm_calls=args.max_llm_calls)
+            if args.max_llm_calls is not None
+            else DEFAULT_POLICY
+        )
         exit_code = run_multi_agent(
             repo=Path(args.repo),
             requirement=args.requirement,
@@ -53,6 +60,7 @@ def main(argv: list[str] | None = None) -> None:
             mock=args.mock,
             provider=args.provider,
             model=args.model or "",
+            policy=policy,
         )
     else:
         from specflow.runner import run
@@ -67,6 +75,16 @@ def main(argv: list[str] | None = None) -> None:
             max_files=args.max_files,
         )
     raise SystemExit(exit_code)
+
+
+def _positive_int(value: str) -> int:
+    try:
+        number = int(value)
+    except ValueError as error:
+        raise argparse.ArgumentTypeError("must be a positive integer") from error
+    if number <= 0:
+        raise argparse.ArgumentTypeError("must be a positive integer")
+    return number
 
 
 def _parse_args(argv: list[str]) -> argparse.Namespace:
@@ -116,6 +134,12 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
     )
     run_parser.add_argument("--model", default="", help="Model name override (optional)")
     run_parser.add_argument(
+        "--max-llm-calls",
+        type=_positive_int,
+        default=None,
+        help="Total LLM request limit for multi-agent mode (default: 10)",
+    )
+    run_parser.add_argument(
         "--max-files", type=int, default=5, help="Maximum files to read (default: 5)"
     )
     run_parser.add_argument(
@@ -134,4 +158,10 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
     if not parsed.command:
         parser.print_help()
         raise SystemExit(2)
+    if (
+        parsed.command == "run"
+        and parsed.mode != "multi-agent"
+        and parsed.max_llm_calls is not None
+    ):
+        run_parser.error("--max-llm-calls requires --mode multi-agent")
     return parsed

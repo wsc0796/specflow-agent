@@ -38,8 +38,13 @@ uv run specflow run --repo . --requirement "Add a search endpoint" --output ./ou
 # Multi-agent pipeline (Live Provider)
 $env:SPECFLOW_LLM_BASE_URL = "https://api.deepseek.com"
 $env:SPECFLOW_LLM_API_KEY = "<key>"
-uv run specflow run --mode multi-agent --provider openai-compatible --model deepseek-v4-flash --repo . --requirement "Add a search endpoint" --output ./out
+uv run specflow run --mode multi-agent --provider openai-compatible --model deepseek-v4-flash --max-llm-calls 12 --repo . --requirement "Add a search endpoint" --output ./out
 ```
+
+`--max-llm-calls` 仅适用于 Multi-Agent，必须为正整数。省略时仍使用默认上限 10；正常实时
+链路包含 6 次 Coordinator enrichment 和 6 次 Agent 请求，需要 12 次额度。若需要允许一次
+revision（目标 Agent、Synthesis、Review 各再执行一次），可显式设置 15。调用额度只控制请求
+次数，Token、时间及其它校验仍可能先停止运行；Legacy 显式使用该参数会报参数错误。
 
 ## Portfolio benchmark (mock-only)
 
