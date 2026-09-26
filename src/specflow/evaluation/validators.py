@@ -62,6 +62,7 @@ def validate_artifacts(
         or not calls
         or any(
             not isinstance(c, dict)
+            or not isinstance(c.get("tool_name"), str)
             or c.get("tool_name") not in _TOOLS
             or c.get("status") != "success"
             or not isinstance(c.get("call_id"), str)
@@ -99,7 +100,12 @@ def _safe_file(root: Path, name: str) -> bool:
 
 def _read_json(root: Path, findings: list[EvaluationFinding], name: str):
     try:
-        return json.loads(_read_text(root, name))
+        value = json.loads(_read_text(root, name))
+        if value is None:
+            findings.append(
+                EvaluationFinding("invalid_json", f"JSON null is not an artifact: {name}.")
+            )
+        return value
     except (OSError, UnicodeDecodeError, json.JSONDecodeError):
         findings.append(EvaluationFinding("invalid_json", f"Invalid JSON: {name}."))
         return None
@@ -124,11 +130,15 @@ def _validate_manifest(value: object, findings: list[EvaluationFinding], live: b
                 "live_provider_mock", "Live validation rejects mock provider artifacts."
             )
         )
-    if live and not str(value.get("model", "")).strip():
+    if live and (
+        not isinstance(value.get("provider_type"), str) or not value["provider_type"].strip()
+    ):
+        findings.append(EvaluationFinding("live_provider_invalid", "Live provider must be a name."))
+    if live and (not isinstance(value.get("model"), str) or not value["model"].strip()):
         findings.append(
             EvaluationFinding("live_model_missing", "Live validation requires a model.")
         )
-    if value.get("status") not in {"completed", "failed"}:
+    if not isinstance(value.get("status"), str) or value["status"] not in {"completed", "failed"}:
         findings.append(
             EvaluationFinding("workflow_status_invalid", "Manifest workflow status is invalid.")
         )
@@ -184,11 +194,19 @@ def _payload_hash(value: dict[str, object], *, excluded_field: str) -> str:
 
 
 def _validate_traces(value: object, findings: list[EvaluationFinding]) -> None:
-    roles = (
-        {x.get("metadata", {}).get("worker_role") for x in value if isinstance(x, dict)}
-        if isinstance(value, list)
-        else set()
-    )
+    roles = set()
+    if isinstance(value, list):
+        for item in value:
+            if (
+                not isinstance(item, dict)
+                or not isinstance(item.get("metadata"), dict)
+                or not isinstance(item["metadata"].get("worker_role"), str)
+            ):
+                findings.append(
+                    EvaluationFinding("worker_trace_invalid", "Invalid trace metadata.")
+                )
+                return
+            roles.add(item["metadata"]["worker_role"])
     if roles != {"analyze", "generate", "review"}:
         findings.append(
             EvaluationFinding(
@@ -201,11 +219,22 @@ def _validate_sources(value: object, root: Path, findings: list[EvaluationFindin
     if not isinstance(value, dict):
         findings.append(EvaluationFinding("sources_invalid", "sources.json must be an object."))
         return
-    candidates = (
-        list(value.get("selected_files", []))
-        + list(value.get("matched_files", []))
-        + [x.get("relative_path", "") for x in value.get("excerpts", []) if isinstance(x, dict)]
-    )
+    selected = value.get("selected_files", [])
+    matched = value.get("matched_files", [])
+    excerpts = value.get("excerpts", [])
+    if (
+        not all(isinstance(items, list) for items in (selected, matched, excerpts))
+        or any(not isinstance(path, str) or not path.strip() for path in selected + matched)
+        or any(
+            not isinstance(item, dict)
+            or not isinstance(item.get("relative_path"), str)
+            or not item["relative_path"].strip()
+            for item in excerpts
+        )
+    ):
+        findings.append(EvaluationFinding("sources_invalid", "Invalid source collection shape."))
+        return
+    candidates = selected + matched + [item["relative_path"] for item in excerpts]
     if not candidates:
         findings.append(
             EvaluationFinding("source_evidence_missing", "Expected repository source evidence.")
@@ -217,7 +246,12 @@ def _validate_sources(value: object, root: Path, findings: list[EvaluationFindin
                 EvaluationFinding("source_path_external", f"Invalid source path: {item}.")
             )
             continue
-        resolved = (root / path).resolve()
+        try:
+            resolved = (root / path).resolve()
+            exists = resolved.is_file()
+        except (OSError, ValueError):
+            findings.append(EvaluationFinding("source_path_invalid", "Invalid source path."))
+            continue
         try:
             resolved.relative_to(root.resolve())
         except ValueError:
@@ -225,7 +259,7 @@ def _validate_sources(value: object, root: Path, findings: list[EvaluationFindin
                 EvaluationFinding("source_path_external", f"External source path: {item}.")
             )
             continue
-        if not resolved.is_file():
+        if not exists:
             findings.append(
                 EvaluationFinding("source_path_missing", f"Missing source path: {item}.")
             )
