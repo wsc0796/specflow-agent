@@ -85,6 +85,7 @@ class AgentRunner:
             requirement=requirement,
             prior_outputs=prior_outputs,
             evidence=evidence,
+            revision_context=context.get("revision_context"),
         )
 
         messages: list[LLMMessage] = []
@@ -197,6 +198,7 @@ def _build_user_message(
     requirement: str,
     prior_outputs: dict[str, Any],
     evidence: str = "",
+    revision_context: dict[str, Any] | None = None,
 ) -> str:
     """Build a structured user message for one agent execution."""
     parts: list[str] = [
@@ -225,5 +227,18 @@ def _build_user_message(
             parts.append(f"### {agent_id}")
             parts.append(json.dumps(output, ensure_ascii=False, separators=(",", ":")))
 
+    if revision_context is not None:
+        from specflow.tools.sanitization import final_dlp_scan
+
+        parts.extend(
+            [
+                "",
+                "## Revision Context",
+                "Use the review data to revise your previous output. Keep the output schema.",
+                final_dlp_scan(
+                    json.dumps(revision_context, ensure_ascii=False, separators=(",", ":"))
+                ),
+            ]
+        )
     parts.extend(["", "Return a JSON object with your structured analysis."])
     return "\n".join(parts)

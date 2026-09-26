@@ -440,7 +440,15 @@ def run_multi_agent(
                     (target_id,),
                     4,
                     executors,
-                    {**base_context, "revision_task": revision_task.__dict__},
+                    {
+                        **base_context,
+                        "revision_task": revision_task.__dict__,
+                        "revision_context": {
+                            "instruction": revision_task.instruction,
+                            "review_output": prior_outputs[plan.stages[3][0]]["output"],
+                            "previous_output": prior_outputs[target_id]["output"],
+                        },
+                    },
                     prior_outputs,
                     registry,
                     schema_registry,
