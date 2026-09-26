@@ -578,22 +578,36 @@ def _multi_agent_artifact_observation(artifact: Path) -> tuple[dict, dict | None
         "artifact-integrity.json",
         "_COMPLETE",
     )
-    findings = [f"missing:{name}" for name in required if not (artifact / name).is_file()]
+    findings = []
+    for name in required:
+        try:
+            _plain_path(artifact / name)
+            if not (artifact / name).is_file():
+                findings.append(f"missing:{name}")
+        except ValueError:
+            findings.append(f"unsafe_artifact:{name}")
     manifest = metrics = None
     try:
         manifest = _object(artifact / "manifest.json")
         metrics = _object(artifact / "metrics.json")
         integrity = _object(artifact / "artifact-integrity.json")
         hashes = integrity.get("artifact_hashes")
-        if not isinstance(hashes, dict):
+        # Only the seven data artifacts are hashed; the table and completion
+        # marker are metadata. Never follow file names supplied by the table.
+        data_files = required[:7]
+        if not isinstance(hashes, dict) or set(hashes) != set(data_files):
             findings.append("artifact_integrity_invalid")
         else:
-            for name, digest in hashes.items():
-                path = artifact / str(name)
+            for name in data_files:
+                digest = hashes[name]
+                path = artifact / name
+                _plain_path(path)
                 if (
                     not path.is_file()
                     or path.is_symlink()
                     or not isinstance(digest, str)
+                    or len(digest) != 64
+                    or any(char not in "0123456789abcdef" for char in digest)
                     or sha256(path.read_bytes()).hexdigest() != digest
                 ):
                     findings.append(f"artifact_hash_mismatch:{name}")
