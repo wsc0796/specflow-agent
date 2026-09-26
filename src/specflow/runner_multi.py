@@ -302,6 +302,7 @@ def run_multi_agent(
 
     # Build executors: AgentRunner for real, raw agent.execute for mock
     executors: dict[str, AgentExecutor] = {}
+    briefs = {task.agent_id: task.task_brief for task in plan.tasks}
     for identity in registry.list_agents():
         agent = registry.get(identity.agent_id)
         if mock or provider == "mock":
@@ -330,6 +331,12 @@ def run_multi_agent(
                 temperature=0.0,
                 max_tokens=policy.tokens.max_agent_output_tokens,
                 max_input_tokens=policy.tokens.max_agent_input_tokens,
+                task_brief={
+                    "task_description": briefs[identity.agent_id].task_description,
+                    "analysis_focus": briefs[identity.agent_id].analysis_focus,
+                    "evaluation_hints": briefs[identity.agent_id].evaluation_hints,
+                    "repository_scope_hint": briefs[identity.agent_id].repository_scope_hint,
+                },
             )
             executors[identity.agent_id] = runner.execute
     executors.update(_executor_overrides or {})

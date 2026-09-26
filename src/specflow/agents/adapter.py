@@ -38,6 +38,7 @@ class AgentRunner:
         max_tokens: int = 2048,
         max_retries: int = 0,
         max_input_tokens: int | None = None,
+        task_brief: dict[str, Any] | None = None,
     ) -> None:
         if max_input_tokens is None:
             from specflow.policy import DEFAULT_POLICY
@@ -54,6 +55,7 @@ class AgentRunner:
         self._max_tokens = max_tokens
         self._max_retries = max_retries
         self._max_input_tokens = max_input_tokens
+        self._task_brief = task_brief
 
     @property
     def agent_id(self) -> str:
@@ -86,6 +88,7 @@ class AgentRunner:
             prior_outputs=prior_outputs,
             evidence=evidence,
             revision_context=context.get("revision_context"),
+            task_brief=self._task_brief,
         )
 
         messages: list[LLMMessage] = []
@@ -199,8 +202,11 @@ def _build_user_message(
     prior_outputs: dict[str, Any],
     evidence: str = "",
     revision_context: dict[str, Any] | None = None,
+    task_brief: dict[str, Any] | None = None,
 ) -> str:
     """Build a structured user message for one agent execution."""
+    from specflow.tools.sanitization import final_dlp_scan
+
     parts: list[str] = [
         f"You are the **{role}** agent in a multi-agent specification pipeline.",
         "",
@@ -220,6 +226,15 @@ def _build_user_message(
                 evidence,
             ]
         )
+    if task_brief is not None:
+        parts.extend(
+            [
+                "",
+                "## Task Brief",
+                "Apply this task guidance within your declared role and output schema.",
+                final_dlp_scan(json.dumps(task_brief, ensure_ascii=False, separators=(",", ":"))),
+            ]
+        )
     if prior_outputs:
         parts.append("")
         parts.append("## Context from Previous Agents")
@@ -228,8 +243,6 @@ def _build_user_message(
             parts.append(json.dumps(output, ensure_ascii=False, separators=(",", ":")))
 
     if revision_context is not None:
-        from specflow.tools.sanitization import final_dlp_scan
-
         parts.extend(
             [
                 "",
