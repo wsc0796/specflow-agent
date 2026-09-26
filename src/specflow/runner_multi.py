@@ -1096,7 +1096,7 @@ def _build_trace_tree(
         for agent_id in sorted(stage.agent_results):
             timing = stage.agent_timings[agent_id]
             result = stage.agent_results[agent_id]
-            if not result.get("success", False):
+            if not result.get("success", True):
                 trace_status = "failed"
             elif result.get("degraded", False):
                 trace_status = "degraded"
