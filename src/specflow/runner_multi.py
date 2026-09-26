@@ -304,6 +304,7 @@ def run_multi_agent(
                 model=model,
                 temperature=0.0,
                 max_tokens=policy.tokens.max_agent_output_tokens,
+                max_input_tokens=policy.tokens.max_agent_input_tokens,
             )
             executors[identity.agent_id] = runner.execute
     executors.update(_executor_overrides or {})

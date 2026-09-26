@@ -37,7 +37,14 @@ class AgentRunner:
         temperature: float = 0.0,
         max_tokens: int = 2048,
         max_retries: int = 0,
+        max_input_tokens: int | None = None,
     ) -> None:
+        if max_input_tokens is None:
+            from specflow.policy import DEFAULT_POLICY
+
+            max_input_tokens = DEFAULT_POLICY.tokens.max_agent_input_tokens
+        if type(max_input_tokens) is not int or max_input_tokens <= 0:
+            raise ValueError("max_input_tokens must be a positive integer")
         self._identity = identity
         self._llm = llm_client
         self._schema_registry = schema_registry
@@ -46,6 +53,7 @@ class AgentRunner:
         self._temperature = temperature
         self._max_tokens = max_tokens
         self._max_retries = max_retries
+        self._max_input_tokens = max_input_tokens
 
     @property
     def agent_id(self) -> str:
@@ -59,6 +67,7 @@ class AgentRunner:
         """
         # Policy initialization imports plan models and this agents package.
         from specflow.policy.models import SpecFlowError
+        from specflow.token_budget.estimator import TokenEstimator
 
         validated_input = context.get("validated_input", context)
         requirement = validated_input.get("requirement", "")
@@ -82,6 +91,17 @@ class AgentRunner:
         if self._system_prompt.strip():
             messages.append(LLMMessage(role="system", content=self._system_prompt))
         messages.append(LLMMessage(role="user", content=user_message))
+
+        # Deliver every declared input field or fail explicitly before sending.
+        # This deterministic estimate complements actual provider usage checks.
+        if (
+            TokenEstimator().estimate(*(message.content for message in messages))
+            > self._max_input_tokens
+        ):
+            raise SpecFlowError(
+                code="TOKEN_BUDGET_EXCEEDED",
+                safe_message="Required agent input exceeds the estimated token budget",
+            )
 
         for attempt in range(self._max_retries + 1):
             try:
@@ -202,17 +222,8 @@ def _build_user_message(
         parts.append("")
         parts.append("## Context from Previous Agents")
         for agent_id, output in prior_outputs.items():
-            summary = _summarize_output(output)
             parts.append(f"### {agent_id}")
-            parts.append(summary)
+            parts.append(json.dumps(output, ensure_ascii=False, separators=(",", ":")))
 
     parts.extend(["", "Return a JSON object with your structured analysis."])
     return "\n".join(parts)
-
-
-def _summarize_output(output: dict[str, Any], max_chars: int = 500) -> str:
-    """Truncate agent output for context injection."""
-    text = json.dumps(output, ensure_ascii=False)
-    if len(text) <= max_chars:
-        return text
-    return text[:max_chars] + "...(truncated)"
