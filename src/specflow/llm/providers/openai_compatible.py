@@ -41,9 +41,12 @@ class OpenAICompatibleLLMClient:
         started = perf_counter()
         response: httpx.Response | None = None
         transport_failure: str | None = None
+        timeout = self._config.timeout_seconds
+        if request.timeout_seconds is not None:
+            timeout = min(timeout, request.timeout_seconds)
         try:
             with httpx.Client(
-                timeout=httpx.Timeout(self._config.timeout_seconds),
+                timeout=httpx.Timeout(timeout),
                 transport=self._transport,
             ) as client:
                 response = client.post(

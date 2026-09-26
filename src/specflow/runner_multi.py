@@ -35,6 +35,7 @@ from specflow.handoff.exceptions import HandoffIntegrityError
 from specflow.handoff.models import AgentHandoff
 from specflow.handoff.validator import HandoffValidator
 from specflow.llm import LLMClient, OpenAICompatibleConfig, OpenAICompatibleLLMClient
+from specflow.llm.budgeted import LLMCallBudget
 from specflow.llm.mock import MockLLMClient
 from specflow.plan.hash_utils import canonical_json_bytes
 from specflow.policy import (
@@ -233,6 +234,7 @@ def run_multi_agent(
 
     schema_registry = build_schema_registry()
 
+    llm_budget = LLMCallBudget(guard, policy)
     coordinator_client = (
         _RequestObservingLLMClient(
             llm_client,
@@ -244,12 +246,34 @@ def run_multi_agent(
     )
     coordinator = Coordinator(
         agent_registry=registry,
-        llm_client=coordinator_client,
+        llm_client=llm_budget.wrap(
+            llm_client,
+            on_request=coordinator_client.observe if request_observer is not None else None,
+        ),
         model=model,
         provider=provider,
         schema_registry=schema_registry,
     )
-    plan = coordinator.plan(run_id)
+    try:
+        coordinator.engine.transition(MultiAgentWorkflowState.PLANNING, "planning started")
+        plan = coordinator.plan(run_id)
+        llm_budget.check()
+    except SpecFlowError as error:
+        logger.error("run %s planning stopped by policy: code=%s", run_id, error.code)
+        _persist_failed_run(
+            output=output,
+            run_id=run_id,
+            coordinator=coordinator,
+            registry=registry,
+            model=model,
+            stages=[],
+            plan=None,
+            discovered_files=discovered_files,
+            guard=guard,
+            error=error.code,
+            llm_budget=llm_budget,
+        )
+        return 3
 
     # Build executors: AgentRunner for real, raw agent.execute for mock
     executors: dict[str, AgentExecutor] = {}
@@ -269,7 +293,10 @@ def run_multi_agent(
             )
             runner = AgentRunner(
                 identity=identity,
-                llm_client=agent_client,
+                llm_client=llm_budget.wrap(
+                    llm_client,
+                    on_request=agent_client.observe if request_observer is not None else None,
+                ),
                 schema_registry=schema_registry,
                 system_prompt=(
                     f"You are the **{identity.role.value}** agent. {identity.description}"
@@ -292,7 +319,6 @@ def run_multi_agent(
     revision_exhausted = False
 
     try:
-        coordinator.engine.transition(MultiAgentWorkflowState.PLANNING, "plan compiled")
         coordinator.engine.transition(MultiAgentWorkflowState.ANALYZING, "repository analysis")
         _run_and_accumulate(
             stages,
@@ -473,6 +499,7 @@ def run_multi_agent(
             error="MULTI_AGENT_RUN_FAILED",
             failure_context=error.audit.context(),
             stage_failure=error.audit,
+            llm_budget=llm_budget,
         )
         return 3
     except HandoffIntegrityError as error:
@@ -496,6 +523,7 @@ def run_multi_agent(
             guard=guard,
             error=error_code,
             failure_context=error.audit_context,
+            llm_budget=llm_budget,
         )
         return 3
     except SpecFlowError as error:
@@ -516,6 +544,7 @@ def run_multi_agent(
             discovered_files=discovered_files,
             guard=guard,
             error=error.code,
+            llm_budget=llm_budget,
         )
         return 3
     except ScheduleExecutionError as error:
@@ -542,6 +571,7 @@ def run_multi_agent(
             discovered_files=discovered_files,
             guard=guard,
             error=error_code,
+            llm_budget=llm_budget,
         )
         return 3
     except Exception:
@@ -561,6 +591,7 @@ def run_multi_agent(
             discovered_files=discovered_files,
             guard=guard,
             error="MULTI_AGENT_RUN_FAILED",
+            llm_budget=llm_budget,
         )
         return 3
 
@@ -619,7 +650,7 @@ def run_multi_agent(
         },
         "execution_policy_hash": policy_hash,
         "budget_usage": {
-            "llm_calls": guard.llm_calls,
+            **llm_budget.snapshot(),
             "input_tokens": guard.total_input_tokens,
             "output_tokens": guard.total_output_tokens,
             "revision_count": guard.revision_count,
@@ -671,6 +702,13 @@ def run_multi_agent(
         provider=provider,
         model=model,
     )
+    metrics = replace(
+        metrics,
+        llm_call_count=guard.llm_calls,
+        input_tokens=guard.total_input_tokens,
+        output_tokens=guard.total_output_tokens,
+        total_tokens=guard.total_input_tokens + guard.total_output_tokens,
+    )
     try:
         _safe_write(run_dir, "metrics.json", metrics.as_dict(), guard)
         _finalize_run_directory(run_dir, guard)
@@ -695,6 +733,10 @@ class _RequestObservingLLMClient:
         self._call_index = 0
 
     def complete(self, request):
+        self.observe(request)
+        return self._delegate.complete(request)
+
+    def observe(self, request):
         self._call_index += 1
         if self._observer is not None:
             try:
@@ -713,7 +755,6 @@ class _RequestObservingLLMClient:
                 )
             except Exception:
                 logger.warning("Multi-Agent request observation failed for %s", self._receiver)
-        return self._delegate.complete(request)
 
 
 def _build_registry() -> AgentRegistry:
@@ -767,11 +808,9 @@ def _budgeted_executor(
     executor: AgentExecutor, validated_input: dict[str, Any], guard: RuntimeGuard
 ) -> AgentExecutor:
     def run(context: dict[str, Any]) -> dict[str, Any]:
-        guard.consume_llm_call()
         guard.check_wall_time()
         result = executor({**context, "validated_input": validated_input})
-        usage = result.get("usage", {})
-        guard.consume_tokens(usage.get("input_tokens", 0), usage.get("output_tokens", 0))
+        guard.check_wall_time()
         return result
 
     return run
@@ -1191,6 +1230,7 @@ def _persist_failed_run(
     error: str,
     failure_context: Mapping[str, str] | None = None,
     stage_failure: _StageFailureAudit | None = None,
+    llm_budget: LLMCallBudget | None = None,
 ) -> None:
     """Persist FAILED manifest, state history, and partial traces for audit."""
     try:
@@ -1233,6 +1273,8 @@ def _persist_failed_run(
         }
         if failure_context is not None:
             failed_manifest["failure_context"] = dict(failure_context)
+        if llm_budget is not None:
+            failed_manifest["budget_usage"] = llm_budget.snapshot()
         _safe_write(run_dir, "manifest.json", failed_manifest, guard)
         _safe_write(run_dir, "traces.json", traces, guard)
         # Persist partial agent outputs for debugging
@@ -1404,8 +1446,8 @@ def _repo_summary(repo: Path) -> str:
 def _create_real_llm_client(provider: str, model: str, *, policy: ExecutionPolicy) -> LLMClient:
     """Create a real OpenAI-compatible LLM client from env vars.
 
-    The provider timeout is capped at the run's wall-clock budget so a hung
-    provider request can never outlive the run deadline.
+    Cap the configured I/O timeout; the request budget also supplies remaining
+    time per call. Neither setting can forcibly stop arbitrary synchronous work.
     """
     config = OpenAICompatibleConfig.from_env()
     capped_timeout = min(config.timeout_seconds, policy.max_wall_time_seconds)

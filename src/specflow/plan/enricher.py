@@ -52,10 +52,15 @@ class SemanticPlanEnricher:
         A failed enrichment for an individual agent results in a degraded
         (fallback) brief for that agent only — other agents are unaffected.
         """
+        # Policy models import plan hashing during initialization.
+        from specflow.policy.models import SpecFlowError
+
         briefs: list[SemanticTaskBrief] = []
         for agent in spec.agents:
             try:
                 brief = self._enrich_one(agent.agent_id, agent.role.value)
+            except SpecFlowError:
+                raise
             except Exception:
                 brief = SemanticTaskBrief.degraded_default(
                     agent_id=agent.agent_id,

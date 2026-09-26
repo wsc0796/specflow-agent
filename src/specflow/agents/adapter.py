@@ -55,8 +55,11 @@ class AgentRunner:
         """Call the LLM and return structured output.
 
         Merges *context* into the user message and expects JSON back.
-        On any failure returns a degraded result — never raises.
+        Provider/content failures return a degraded result; policy stops propagate.
         """
+        # Policy initialization imports plan models and this agents package.
+        from specflow.policy.models import SpecFlowError
+
         validated_input = context.get("validated_input", context)
         requirement = validated_input.get("requirement", "")
         prior_outputs = {
@@ -92,6 +95,8 @@ class AgentRunner:
                     )
                 )
                 break  # success
+            except SpecFlowError:
+                raise
             except Exception as exc:
                 error_code = _error_to_code(exc)
                 retryable = _is_retryable_error(error_code)

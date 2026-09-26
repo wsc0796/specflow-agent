@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from math import isfinite
 from typing import Literal
 
 from specflow.llm.exceptions import LLMResponseError
@@ -33,6 +34,7 @@ class LLMRequest:
     temperature: float = 0.0
     max_tokens: int = 1024
     response_format: str | None = None
+    timeout_seconds: float | None = None
 
     def __post_init__(self) -> None:
         if not self.model.strip():
@@ -43,6 +45,12 @@ class LLMRequest:
             raise LLMResponseError("LLMRequest.temperature must be between 0 and 2")
         if self.max_tokens <= 0:
             raise LLMResponseError("LLMRequest.max_tokens must be positive")
+        if self.timeout_seconds is not None and (
+            type(self.timeout_seconds) not in (int, float)
+            or not isfinite(self.timeout_seconds)
+            or self.timeout_seconds <= 0
+        ):
+            raise LLMResponseError("LLMRequest.timeout_seconds must be positive and finite")
 
 
 @dataclass(frozen=True)

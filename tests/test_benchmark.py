@@ -120,6 +120,6 @@ def test_benchmark_cli_writes_report_and_baseline(tmp_path: Path) -> None:
     assert report["status"] == "passed"
     generated_baseline = json.loads(baseline.read_text(encoding="utf-8"))
     committed_baseline = json.loads(
-        Path("benchmarks/results/mock-baseline.json").read_text(encoding="utf-8")
+        Path("benchmarks/results/mock-baseline-request-budget-v1.json").read_text(encoding="utf-8")
     )
     assert generated_baseline == committed_baseline

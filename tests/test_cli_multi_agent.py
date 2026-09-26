@@ -173,6 +173,7 @@ class TestMultiAgentRunner:
                 output=tmp_path / "output",
                 provider="openai-compatible",
                 model="test-model",
+                policy=ExecutionPolicy(max_llm_calls=12),
                 request_observer=observations.append,
             )
             == 0
