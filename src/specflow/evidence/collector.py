@@ -101,21 +101,27 @@ class EvidenceCollector:
             if read_result is None:
                 continue
             content_hash = str(read_result.get("content_hash", ""))
+            path_matches = [match for match in all_matches if match.get("relative_path") == path]
+            if not content_hash or any(
+                match.get("content_hash") != content_hash for match in path_matches
+            ):
+                warnings.append(f"Source version changed or unavailable; excerpts omitted: {path}")
+                truncated = True
+                continue
             source_hashes[path] = content_hash
             if read_result.get("truncated"):
                 truncated = True
                 warnings.append(f"File truncated: {path}")
 
-            for match in all_matches:
-                if match.get("relative_path") == path:
-                    excerpts.append(
-                        EvidenceExcerpt(
-                            relative_path=path,
-                            line_number=int(match.get("line_number", 1)),
-                            excerpt=str(match.get("excerpt", "")),
-                            match_count=int(match.get("match_count", 1)),
-                        )
+            for match in path_matches:
+                excerpts.append(
+                    EvidenceExcerpt(
+                        relative_path=path,
+                        line_number=int(match.get("line_number", 1)),
+                        excerpt=str(match.get("excerpt", "")),
+                        match_count=int(match.get("match_count", 1)),
                     )
+                )
 
         total_chars = sum(len(e.excerpt) for e in excerpts)
         if total_chars > self._config.max_total_evidence_chars:

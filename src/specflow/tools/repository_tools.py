@@ -144,11 +144,17 @@ class SearchCodeTool(_RepositoryTool):
                 continue
             searched_files += 1
             truncated = truncated or file_truncated
+            content_hash = ""
             for line_number, line in enumerate(content.splitlines(), start=1):
                 haystack = line if case_sensitive else line.casefold()
                 count = haystack.count(needle)
                 if not count:
                     continue
+                if not content_hash:
+                    # Bind matches to the same bounded, sanitized snapshot
+                    # definition used by ReadFileTool, not to the excerpt alone.
+                    safe_content = _sanitize_file_content(content)
+                    content_hash = hashlib.sha256(safe_content.encode("utf-8")).hexdigest()
                 excerpt = sanitize_tool_text(line.strip())[: self._policy.limits.max_excerpt_chars]
                 matches.append(
                     {
@@ -156,6 +162,7 @@ class SearchCodeTool(_RepositoryTool):
                         "line_number": line_number,
                         "excerpt": excerpt,
                         "match_count": count,
+                        "content_hash": content_hash,
                     }
                 )
                 if len(matches) >= self._policy.limits.max_search_matches:
