@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 from time import perf_counter
 from typing import Any
@@ -27,12 +28,14 @@ class EvidenceCollector:
         repository_root: Path,
         *,
         config: EvidenceCollectionConfig | None = None,
+        check_deadline: Callable[[], None] | None = None,
     ) -> None:
         self._executor = executor
         self._root = repository_root
         self._config = config or EvidenceCollectionConfig()
         self._records: list[ToolCallRecord] = []
         self._call_counter = 0
+        self._check_deadline = check_deadline
 
     @property
     def tool_call_records(self) -> tuple[ToolCallRecord, ...]:
@@ -155,6 +158,8 @@ class EvidenceCollector:
 
     def _execute_tool(self, tool_name: str, arguments: dict[str, Any]) -> dict[str, Any] | None:
         """Execute one tool call and record it."""
+        if self._check_deadline is not None:
+            self._check_deadline()
         if self._call_counter >= self._config.max_tool_calls:
             raise EvidenceLimitError("Tool call limit exceeded")
         self._call_counter += 1
@@ -181,6 +186,8 @@ class EvidenceCollector:
                     truncated=bool(result.output.get("truncated", False)),
                 )
             )
+            if self._check_deadline is not None:
+                self._check_deadline()
             return dict(result.output)
         else:
             self._records.append(
@@ -194,6 +201,8 @@ class EvidenceCollector:
                     error_type=result.error_type,
                 )
             )
+            if self._check_deadline is not None:
+                self._check_deadline()
             return None
 
     @staticmethod

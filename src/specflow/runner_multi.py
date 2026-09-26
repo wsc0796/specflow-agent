@@ -165,6 +165,15 @@ def run_multi_agent(
     discovered_files = 0
     selected_file_count = 0
     referenced_file_count = 0
+    collector: EvidenceCollector | None = None
+
+    def check_evidence_deadline() -> None:
+        if guard.remaining_time() <= 0:
+            raise SpecFlowError(
+                code="TIME_BUDGET_EXCEEDED",
+                safe_message="Evidence collection exceeded the run deadline",
+            )
+
     try:
         tool_registry = ToolRegistry()
         RepositoryToolSet(
@@ -175,6 +184,7 @@ def run_multi_agent(
         collector = EvidenceCollector(
             tool_executor,
             repo,
+            check_deadline=check_evidence_deadline,
             config=EvidenceCollectionConfig(
                 max_selected_files=min(10, policy.repository.max_selected_files),
                 max_total_evidence_chars=policy.repository.max_total_evidence_chars,
@@ -194,6 +204,21 @@ def run_multi_agent(
         discovered_files = evidence.discovered_file_count
         selected_file_count = len(evidence.selected_files)
         referenced_file_count = len({excerpt.relative_path for excerpt in evidence.excerpts})
+    except SpecFlowError as error:
+        logger.error("run %s evidence collection stopped by policy: code=%s", run_id, error.code)
+        _persist_pre_execution_failure(
+            output=output,
+            run_id=run_id,
+            started_at=started_at,
+            guard=guard,
+            error=error.code,
+            discovered_files=None,
+            selected_file_count=None,
+            referenced_file_count=None,
+            tool_call_count=len(collector.tool_call_records) if collector is not None else 0,
+            failure_context={"phase": "evidence_collection"},
+        )
+        return 3
     except Exception:
         # Evidence is a required, untrusted input boundary.  Continuing would
         # let agents produce an ungrounded plan with no audit evidence.
@@ -1209,10 +1234,11 @@ def _persist_pre_execution_failure(
     started_at: str,
     guard: RuntimeGuard,
     error: str,
-    discovered_files: int,
-    selected_file_count: int,
-    referenced_file_count: int,
+    discovered_files: int | None,
+    selected_file_count: int | None,
+    referenced_file_count: int | None,
     tool_call_count: int,
+    failure_context: Mapping[str, str] | None = None,
 ) -> None:
     """Persist a classified failure before Coordinator planning or Agent execution."""
     try:
@@ -1225,11 +1251,16 @@ def _persist_pre_execution_failure(
             "workflow_history": [],
             "error": error,
             "stages_completed": 0,
+            "tool_call_count": tool_call_count,
+        }
+        counts = {
             "discovered_files": discovered_files,
             "selected_file_count": selected_file_count,
             "referenced_file_count": referenced_file_count,
-            "tool_call_count": tool_call_count,
         }
+        manifest.update({key: value for key, value in counts.items() if value is not None})
+        if failure_context is not None:
+            manifest["failure_context"] = dict(failure_context)
         _safe_write(run_dir, "manifest.json", manifest, guard)
         _finalize_run_directory(run_dir, guard)
     except Exception:
