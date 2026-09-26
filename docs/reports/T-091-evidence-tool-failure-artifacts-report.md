@@ -1,5 +1,7 @@
 # T-091 修复报告
 
+最终验证：974 passed、3 skipped、3 warnings；独立审查通过。详见 [批次汇总](audit-repairs-T087-T093-validation-2026-09-26.md)。
+
 日期：2026-09-26。list_files 失败直接转安全 EvidenceCollectionError；multi-agent 任意采集/setup异常均保存 EVIDENCE_COLLECTION_FAILED、阶段、实际工具次数及允许名单内工具类型，不打印原始 traceback。
 
 | 验收 | 结果 | 证据 |

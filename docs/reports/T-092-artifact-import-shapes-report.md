@@ -1,5 +1,7 @@
 # T-092 修复报告
 
+最终验证：974 passed、3 skipped、3 warnings；独立审查通过。详见 [批次汇总](audit-repairs-T087-T093-validation-2026-09-26.md)。
+
 日期：2026-09-26。导入器对顶层null/列表、metadata、source集合及元素先检查结构，再访问字段；非法status/tool_name等不再触发不可哈希异常。错误结构返回FAILED/findings，正常导入保持通过。
 
 | 验收 | 结果 | 证据 |

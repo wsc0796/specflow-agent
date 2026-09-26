@@ -1,5 +1,7 @@
 # T-088 修复报告
 
+最终验证：974 passed、3 skipped、3 warnings；独立审查通过。详见 [批次汇总](audit-repairs-T087-T093-validation-2026-09-26.md)。
+
 独立审查补修：先逐字符串值 DLP 再 JSON 序列化，避免 authorization/access_token 正则吞掉后置字段。
 review-dlp-red：2 failed/7 passed；review-dlp-green：28 passed，真实 HTTP=0。新增实际请求 JSON 解析与后置字段完整性断言。
 

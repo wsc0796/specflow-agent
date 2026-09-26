@@ -3,7 +3,8 @@
 import json
 import time
 from concurrent.futures import CancelledError
-from threading import Barrier, Event, Thread, Timer
+from contextlib import contextmanager
+from threading import Barrier, Event, Thread
 
 import pytest
 
@@ -25,43 +26,87 @@ def _timeout_error(action):
     return raised.value
 
 
-def test_timeout_audits_running_and_queued_future_after_cleanup(monkeypatch):
+@contextmanager
+def _controlled_timeout(monkeypatch, release, ready, pause_main):
+    """Observe all abort states before releasing work; waits only bound test failure."""
     import specflow.coordinator.scheduler as scheduler_module
 
+    original_completed = scheduler_module.as_completed
+    original_abort = scheduler_module._abort_agent
+    observations = []
+    futures_at_pause = []
+    pause_entered, resume = Event(), Event()
+    pause_checks = []
+
+    def inspect_pause():
+        if pause_entered.wait(5):
+            pause_checks.append(not release.is_set() and any(f.running() for f in futures_at_pause))
+        resume.set()
+
+    inspector = Thread(target=inspect_pause) if pause_main else None
+
+    def controlled(futures, timeout):
+        ready(futures)
+        futures_at_pause.extend(futures)
+        if pause_main:
+            pause_entered.set()
+            assert resume.wait(5)
+            assert pause_checks == [True]
+        assert not release.is_set()
+        return original_completed(futures, timeout=0)
+
+    def observe_abort(agent_id, future):
+        assert not release.is_set()
+        observation = original_abort(agent_id, future)
+        observations.append(observation)
+        if len(observations) == len(futures_at_pause):
+            release.set()
+        return observation
+
+    monkeypatch.setattr(scheduler_module, "as_completed", controlled)
+    monkeypatch.setattr(scheduler_module, "_abort_agent", observe_abort)
+    if inspector is not None:
+        inspector.start()
+    try:
+        yield
+        assert len(observations) == len(futures_at_pause)
+        assert observations
+    finally:
+        release.set()
+        pause_entered.set()
+        resume.set()
+        if inspector is not None:
+            inspector.join(5)
+            assert not inspector.is_alive()
+
+
+@pytest.mark.parametrize("pause_main", [False, True])
+def test_timeout_audits_running_and_queued_future_after_cleanup(monkeypatch, pause_main):
     started = Event()
     release = Event()
     queued_called = Event()
 
     def running(_):
         started.set()
-        assert release.wait(2)
+        assert release.wait(5)
         return {"agent_id": "running"}
 
     def queued(_):
         queued_called.set()
         return {"agent_id": "queued"}
 
-    original = scheduler_module.as_completed
-    timers = []
+    def ready(futures):
+        assert started.wait(5)
 
-    def controlled(futures, timeout):
-        assert started.wait(1)
-        timer = Timer(0.02, release.set)
-        timer.start()
-        timers.append(timer)
-        return original(futures, timeout=0)
-
-    monkeypatch.setattr(scheduler_module, "as_completed", controlled)
-    error = _timeout_error(
-        lambda: MultiAgentScheduler(max_parallel_workers=1).execute(
-            (("running", "queued"),),
-            {"running": running, "queued": queued},
-            {},
-            deadline=time.monotonic() + 5,
+    with _controlled_timeout(monkeypatch, release, ready, pause_main):
+        error = _timeout_error(
+            lambda: MultiAgentScheduler(max_parallel_workers=1).execute(
+                (("running", "queued"),),
+                {"running": running, "queued": queued},
+                {},
+                deadline=time.monotonic() + 30,
+            )
         )
-    )
-    for timer in timers:
-        timer.join(1)
     assert queued_called.is_set() is False
     assert error.scheduler_abort == SchedulerAbortAudit(
         reason="deadline_exceeded",
@@ -80,76 +125,60 @@ def test_timeout_audits_running_and_queued_future_after_cleanup(monkeypatch):
     )
 
 
-def test_timeout_records_finished_future_without_claiming_business_success(monkeypatch):
-    import specflow.coordinator.scheduler as scheduler_module
-
-    finished = Event()
+@pytest.mark.parametrize("pause_main", [False, True])
+def test_timeout_records_finished_future_without_claiming_business_success(monkeypatch, pause_main):
+    slow_started = Event()
     release = Event()
 
     def done(_):
-        finished.set()
         return {"agent_id": "done", "success": True, "output": {"private": "never-persist"}}
 
     def slow(_):
-        assert release.wait(2)
+        slow_started.set()
+        assert release.wait(5)
         return {"agent_id": "slow"}
 
-    original = scheduler_module.as_completed
-    timers = []
+    def ready(futures):
+        done_future = next(f for f, agent_id in futures.items() if agent_id == "done")
+        done_future.result(timeout=5)
+        assert slow_started.wait(5)
 
-    def controlled(futures, timeout):
-        assert finished.wait(1)
-        timer = Timer(0.02, release.set)
-        timer.start()
-        timers.append(timer)
-        return original(futures, timeout=0)
-
-    monkeypatch.setattr(scheduler_module, "as_completed", controlled)
-    error = _timeout_error(
-        lambda: MultiAgentScheduler(max_parallel_workers=1).execute(
-            (("done", "slow"),),
-            {"done": done, "slow": slow},
-            {},
-            deadline=time.monotonic() + 5,
+    with _controlled_timeout(monkeypatch, release, ready, pause_main):
+        error = _timeout_error(
+            lambda: MultiAgentScheduler(max_parallel_workers=1).execute(
+                (("done", "slow"),),
+                {"done": done, "slow": slow},
+                {},
+                deadline=time.monotonic() + 30,
+            )
         )
-    )
-    for timer in timers:
-        timer.join(1)
     assert error.scheduler_abort.agents[0] == SchedulerAbortAgent(
         "done", True, False, "finished_unvalidated", "finished_unvalidated"
     )
     assert "success" not in error.scheduler_abort.as_dict()["agents"][0]
 
 
-def test_timeout_when_all_tasks_started_never_invents_cancelled_before_start(monkeypatch):
-    import specflow.coordinator.scheduler as scheduler_module
-
+@pytest.mark.parametrize("pause_main", [False, True])
+def test_timeout_when_all_tasks_started_never_invents_cancelled_before_start(
+    monkeypatch, pause_main
+):
     started = Barrier(3)
     release = Event()
 
     def slow(_):
-        started.wait(1)
-        assert release.wait(2)
+        started.wait(5)
+        assert release.wait(5)
         return {"agent_id": "slow"}
 
-    original = scheduler_module.as_completed
-    timers = []
+    def ready(futures):
+        started.wait(5)
 
-    def controlled(futures, timeout):
-        started.wait(1)
-        timer = Timer(0.02, release.set)
-        timer.start()
-        timers.append(timer)
-        return original(futures, timeout=0)
-
-    monkeypatch.setattr(scheduler_module, "as_completed", controlled)
-    error = _timeout_error(
-        lambda: MultiAgentScheduler(max_parallel_workers=2).execute(
-            (("one", "two"),), {"one": slow, "two": slow}, {}, deadline=time.monotonic() + 5
+    with _controlled_timeout(monkeypatch, release, ready, pause_main):
+        error = _timeout_error(
+            lambda: MultiAgentScheduler(max_parallel_workers=2).execute(
+                (("one", "two"),), {"one": slow, "two": slow}, {}, deadline=time.monotonic() + 30
+            )
         )
-    )
-    for timer in timers:
-        timer.join(1)
     assert all(agent.cancel_succeeded is False for agent in error.scheduler_abort.agents)
     assert all(agent.state_during_abort == "running" for agent in error.scheduler_abort.agents)
 
