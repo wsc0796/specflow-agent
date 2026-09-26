@@ -25,7 +25,7 @@ from specflow.agents.risk_review import RiskReviewAgent
 from specflow.agents.synthesis import SynthesisAgent
 from specflow.agents.test_strategy import TestStrategyAgent
 from specflow.coordinator.coordinator import Coordinator
-from specflow.coordinator.exceptions import ScheduleExecutionError
+from specflow.coordinator.exceptions import ScheduleExecutionError, SchedulerAbortAudit
 from specflow.coordinator.scheduler import MultiAgentScheduler, StageExecutionResult
 from specflow.coordinator.state_machine import MultiAgentWorkflowState
 from specflow.evaluation.metrics import AgentMetrics, RunMetrics
@@ -572,6 +572,7 @@ def run_multi_agent(
             guard=guard,
             error=error_code,
             llm_budget=llm_budget,
+            scheduler_abort=error.scheduler_abort,
         )
         return 3
     except Exception:
@@ -792,12 +793,26 @@ def _run_and_accumulate(
         agent_id: _budgeted_executor(executors[agent_id], validated_inputs[agent_id], guard)
         for agent_id in agent_ids
     }
-    result = scheduler.execute(
-        (agent_ids,),
-        guarded_executors,
-        {**context, "prior_outputs": dict(prior_outputs)},
-        deadline=guard.deadline,
-    )[0]
+    try:
+        result = scheduler.execute(
+            (agent_ids,),
+            guarded_executors,
+            {**context, "prior_outputs": dict(prior_outputs)},
+            deadline=guard.deadline,
+        )[0]
+    except ScheduleExecutionError as error:
+        if error.scheduler_abort is None:
+            raise
+        for agent in error.scheduler_abort.agents:
+            registered = (
+                agent.agent_id in agent_ids
+                and registry.get(agent.agent_id).identity.agent_id == agent.agent_id
+            )
+            if not registered:
+                raise ScheduleExecutionError("Invalid scheduler abort audit") from error
+        raise ScheduleExecutionError(
+            str(error), scheduler_abort=error.scheduler_abort.with_stage_index(stage_index)
+        ) from error
     result = replace(result, stage_index=stage_index)
     _validate_stage_results(result, registry, schema_registry)
     results.append(result)
@@ -1009,6 +1024,7 @@ def _build_trace_tree(
     error_code: str | None = None,
     failure_context: Mapping[str, str] | None = None,
     stage_failure: _StageFailureAudit | None = None,
+    scheduler_abort: SchedulerAbortAudit | None = None,
 ) -> list[dict[str, object]]:
     root_id = f"run-{uuid4().hex}"
     coordinator_id = f"coordinator-{uuid4().hex}"
@@ -1017,6 +1033,8 @@ def _build_trace_tree(
         failure_fields["error_code"] = error_code
     if failure_context is not None:
         failure_fields["failure_context"] = dict(failure_context)
+    if scheduler_abort is not None:
+        failure_fields["scheduler_abort"] = scheduler_abort.as_dict()
     traces: list[dict[str, object]] = [
         {
             "span_id": root_id,
@@ -1231,6 +1249,7 @@ def _persist_failed_run(
     failure_context: Mapping[str, str] | None = None,
     stage_failure: _StageFailureAudit | None = None,
     llm_budget: LLMCallBudget | None = None,
+    scheduler_abort: SchedulerAbortAudit | None = None,
 ) -> None:
     """Persist FAILED manifest, state history, and partial traces for audit."""
     try:
@@ -1261,6 +1280,7 @@ def _persist_failed_run(
             error_code=error if failure_context is not None else None,
             failure_context=failure_context,
             stage_failure=stage_failure,
+            scheduler_abort=scheduler_abort,
         )
         failed_manifest = {
             "run_id": run_id,
@@ -1275,6 +1295,8 @@ def _persist_failed_run(
             failed_manifest["failure_context"] = dict(failure_context)
         if llm_budget is not None:
             failed_manifest["budget_usage"] = llm_budget.snapshot()
+        if scheduler_abort is not None:
+            failed_manifest["scheduler_abort"] = scheduler_abort.as_dict()
         _safe_write(run_dir, "manifest.json", failed_manifest, guard)
         _safe_write(run_dir, "traces.json", traces, guard)
         # Persist partial agent outputs for debugging

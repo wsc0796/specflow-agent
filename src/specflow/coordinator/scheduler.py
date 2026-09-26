@@ -5,11 +5,16 @@ from __future__ import annotations
 import time
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from typing import Any
 
-from specflow.coordinator.exceptions import ScheduleExecutionError
+from specflow.coordinator.exceptions import (
+    AbortFutureState,
+    ScheduleExecutionError,
+    SchedulerAbortAgent,
+    SchedulerAbortAudit,
+)
 
 # Type alias: an executor is a callable that receives context and returns results.
 AgentExecutor = Callable[[dict[str, Any]], dict[str, Any]]
@@ -126,44 +131,63 @@ class MultiAgentScheduler:
             # wait for started work to exit before the caller releases shared
             # run capacity.
             executor = ThreadPoolExecutor(max_workers=self._max_workers)
+            future_map = {}
+            abort_agents: tuple[SchedulerAbortAgent, ...] | None = None
+            timeout_cause: TimeoutError | None = None
             try:
                 remaining = None
                 if deadline is not None:
                     remaining = max(0.0, deadline - time.monotonic())
                 if remaining is not None and remaining <= 0:
-                    raise ScheduleExecutionError(
-                        "TIME_BUDGET_EXCEEDED: stage exceeded the wall-clock budget"
-                    )
+                    abort_agents = ()
+                else:
+                    for agent_id in stage_agent_ids:
+                        agent_ctx: dict[str, Any] = {
+                            **context,
+                            "prior_outputs": dict(prior_outputs),
+                        }
+                        submitted_at = datetime.now(UTC).isoformat()
+                        future = executor.submit(agent_executors[agent_id], agent_ctx)
+                        future_map[future] = agent_id
+                        agent_timings[agent_id] = AgentExecutionTiming(submitted_at=submitted_at)
 
-                future_map = {}
-                for agent_id in stage_agent_ids:
-                    agent_ctx: dict[str, Any] = {
-                        **context,
-                        "prior_outputs": dict(prior_outputs),
-                    }
-                    submitted_at = datetime.now(UTC).isoformat()
-                    future = executor.submit(agent_executors[agent_id], agent_ctx)
-                    future_map[future] = agent_id
-                    agent_timings[agent_id] = AgentExecutionTiming(submitted_at=submitted_at)
-
-                try:
-                    for future in as_completed(future_map, timeout=remaining):
-                        agent_id = future_map[future]
-                        try:
-                            agent_results[agent_id] = future.result()
-                            agent_timings[agent_id].completed_at = datetime.now(UTC).isoformat()
-                        except Exception as exc:
-                            raise ScheduleExecutionError(
-                                f"Agent {agent_id!r} execution failed: {exc}"
-                            ) from exc
-                except TimeoutError as exc:
-                    for future in future_map:
-                        future.cancel()
-                    raise ScheduleExecutionError(
-                        "TIME_BUDGET_EXCEEDED: stage did not finish within the wall-clock budget"
-                    ) from exc
+                    try:
+                        for future in as_completed(future_map, timeout=remaining):
+                            agent_id = future_map[future]
+                            try:
+                                agent_results[agent_id] = future.result()
+                                agent_timings[agent_id].completed_at = datetime.now(UTC).isoformat()
+                            except Exception as exc:
+                                raise ScheduleExecutionError(
+                                    f"Agent {agent_id!r} execution failed: {exc}"
+                                ) from exc
+                    except TimeoutError as exc:
+                        timeout_cause = exc
+                        abort_agents = tuple(
+                            _abort_agent(agent_id, future)
+                            for future, agent_id in future_map.items()
+                        )
             finally:
                 executor.shutdown(wait=True, cancel_futures=True)
+
+            if abort_agents is not None:
+                after_cleanup = tuple(
+                    replace(agent, state_after_cleanup=_future_state(future))
+                    for agent, future in zip(abort_agents, future_map, strict=True)
+                )
+                audit = SchedulerAbortAudit(
+                    reason="deadline_exceeded",
+                    stage_index=stage_idx,
+                    agents=after_cleanup,
+                    cleanup_completed=True,
+                )
+                error = ScheduleExecutionError(
+                    "TIME_BUDGET_EXCEEDED: stage did not finish within the wall-clock budget",
+                    scheduler_abort=audit,
+                )
+                if timeout_cause is not None:
+                    raise error from timeout_cause
+                raise error
 
             completed_at = datetime.now(UTC).isoformat()
 
@@ -181,3 +205,26 @@ class MultiAgentScheduler:
             )
 
         return tuple(results)
+
+
+def _abort_agent(agent_id: str, future) -> SchedulerAbortAgent:
+    """Cancel once and record only Future state, never result or exception text."""
+    cancelled = future.cancel()
+    state = _future_state(future)
+    return SchedulerAbortAgent(
+        agent_id=agent_id,
+        cancel_attempted=True,
+        cancel_succeeded=cancelled,
+        state_during_abort=state,
+        state_after_cleanup=state,
+    )
+
+
+def _future_state(future) -> AbortFutureState:
+    if future.cancelled():
+        return "cancelled_before_start"
+    if future.running():
+        return "running"
+    if future.done():
+        return "finished_unvalidated"
+    return "pending"
