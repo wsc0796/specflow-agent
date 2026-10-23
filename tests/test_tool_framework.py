@@ -164,6 +164,63 @@ def test_tool_result_success_contract() -> None:
     assert result.output["value"] == "ok"
 
 
+@pytest.mark.parametrize("newline", ["\n", "\r\n"], ids=["lf", "crlf"])
+def test_tool_result_nested_bearer_redaction_preserves_source_layout(newline: str) -> None:
+    source = newline.join(
+        [
+            "from fastapi.security import HTTPBearer",
+            "from typing import Any",
+            "",
+            "last_line = 'keep this source line'",
+        ]
+    )
+    credential = "fixtureCredential123"
+    sensitive_value = "fixture-sensitive-value"
+    separators = [" ", "\t", newline + "\t"]
+    notes = [f"Bearer{separator}{credential}{newline}last note" for separator in separators]
+
+    result = ToolResult.success(
+        call_id="call-nested",
+        tool_name="fake_echo",
+        output={
+            "data": {
+                "sources": [{"content": source, "notes": notes}],
+                "count": 2,
+                "ratio": 0.5,
+                "ok": True,
+                "missing": None,
+                "password": sensitive_value,
+            }
+        },
+    )
+
+    data = result.output["data"]
+    assert data == {
+        "sources": [
+            {
+                "content": source,
+                "notes": [
+                    f"Bearer{separator}<redacted>{newline}last note" for separator in separators
+                ],
+            }
+        ],
+        "count": 2,
+        "ratio": 0.5,
+        "ok": True,
+        "missing": None,
+        "password": "<redacted>",
+    }
+    assert isinstance(data, dict)
+    assert isinstance(data["sources"], list)
+    assert isinstance(data["sources"][0], dict)
+    assert type(data["count"]) is int
+    assert type(data["ratio"]) is float
+    assert type(data["ok"]) is bool
+    assert data["sources"][0]["content"].splitlines()[-1] == source.splitlines()[-1]
+    assert credential not in str(result.output)
+    assert sensitive_value not in str(result.output)
+
+
 def test_tool_result_failed_contract() -> None:
     result = ToolResult.failed(
         call_id="call-001",
