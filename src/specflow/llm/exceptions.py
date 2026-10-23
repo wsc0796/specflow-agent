@@ -5,15 +5,23 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from specflow.llm.diagnostics import LLMFailureDiagnostics
     from specflow.policy.errors import ErrorCode
 
 
 class LLMError(Exception):
     """Base error for provider-neutral LLM client failures."""
 
-    def __init__(self, message: str, *, code: ErrorCode | None = None) -> None:
+    def __init__(
+        self,
+        message: str,
+        *,
+        code: ErrorCode | None = None,
+        diagnostics: LLMFailureDiagnostics | None = None,
+    ) -> None:
         super().__init__(message)
         self.code = code
+        self.diagnostics = diagnostics
 
 
 class LLMCircuitError(LLMError):

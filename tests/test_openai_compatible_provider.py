@@ -14,6 +14,7 @@ from specflow.llm import (
     OpenAICompatibleLLMClient,
 )
 from specflow.llm.resilience import ProviderResilienceGuard
+from specflow.policy.errors import ErrorCategory, error_category, is_retryable
 
 _TEST_CREDENTIAL = "test-credential-not-a-real-key"
 
@@ -182,6 +183,15 @@ def test_invalid_json_response_fails_safely() -> None:
         _client(lambda _: httpx.Response(200, content=b"not-json")).complete(_request())
 
     assert exc_info.value.__context__ is None
+    assert exc_info.value.code == "PROVIDER_RESPONSE_INVALID"
+    assert exc_info.value.diagnostics.as_dict() == {
+        "failure_stage": "response_normalization",
+        "finish_reason": None,
+        "usage": {"input_tokens": None, "output_tokens": None},
+        "usage_status": "unknown",
+        "content_empty": None,
+        "schema_validation": "not_run",
+    }
 
 
 @pytest.mark.parametrize(
@@ -238,3 +248,164 @@ def test_mock_client_remains_available() -> None:
     response = MockLLMClient(response_content="still mock").complete(_request())
 
     assert response.content == "still mock"
+
+
+def _empty_content_payload(usage: object = None, finish_reason: object = "length") -> dict:
+    payload = {
+        "choices": [{"message": {"content": ""}, "finish_reason": finish_reason}],
+    }
+    if usage is not None:
+        payload["usage"] = usage
+    return payload
+
+
+def test_empty_final_content_retains_known_diagnostics_without_retry() -> None:
+    calls = 0
+    payload = _empty_content_payload({"prompt_tokens": 2528, "completion_tokens": 3000})
+
+    def handler(_: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        calls += 1
+        return httpx.Response(200, json=payload)
+
+    with pytest.raises(LLMResponseError) as exc_info:
+        _client(handler).complete(_request())
+
+    error = exc_info.value
+    assert error.code == "PROVIDER_EMPTY_CONTENT"
+    assert error_category(error.code) == ErrorCategory.PERMANENT_PROVIDER
+    assert not is_retryable(error.code)
+    assert error.diagnostics.as_dict() == {
+        "failure_stage": "response_normalization",
+        "finish_reason": "length",
+        "usage": {"input_tokens": 2528, "output_tokens": 3000},
+        "usage_status": "known",
+        "content_empty": True,
+        "schema_validation": "not_run",
+    }
+    assert calls == 1
+
+
+@pytest.mark.parametrize(
+    ("usage", "expected_usage", "status"),
+    [
+        (None, {"input_tokens": None, "output_tokens": None}, "unknown"),
+        ({}, {"input_tokens": None, "output_tokens": None}, "unknown"),
+        ([], {"input_tokens": None, "output_tokens": None}, "unknown"),
+        (
+            {"prompt_tokens": True, "completion_tokens": -1},
+            {"input_tokens": None, "output_tokens": None},
+            "unknown",
+        ),
+        (
+            {"prompt_tokens": "2528", "completion_tokens": 3.0},
+            {"input_tokens": None, "output_tokens": None},
+            "unknown",
+        ),
+        (
+            {"prompt_tokens": 2528, "completion_tokens": False},
+            {"input_tokens": 2528, "output_tokens": None},
+            "partial",
+        ),
+        (
+            {"prompt_tokens": None, "completion_tokens": 3000},
+            {"input_tokens": None, "output_tokens": 3000},
+            "partial",
+        ),
+        (
+            {"prompt_tokens": 0, "completion_tokens": 0},
+            {"input_tokens": 0, "output_tokens": 0},
+            "known",
+        ),
+    ],
+)
+def test_failed_usage_retains_only_known_counts(usage, expected_usage, status) -> None:
+    with pytest.raises(LLMResponseError) as exc_info:
+        _client(lambda _: httpx.Response(200, json=_empty_content_payload(usage))).complete(
+            _request()
+        )
+
+    diagnostics = exc_info.value.diagnostics.as_dict()
+    assert diagnostics["usage"] == expected_usage
+    assert diagnostics["usage_status"] == status
+    assert diagnostics["finish_reason"] == "length"
+    assert diagnostics["content_empty"] is True
+
+
+def test_invalid_structure_preserves_facts_before_validation_exit() -> None:
+    payload = {
+        "choices": [{"message": None, "finish_reason": "stop"}],
+        "usage": {"prompt_tokens": 2528, "completion_tokens": 3000},
+    }
+    with pytest.raises(LLMResponseError) as exc_info:
+        _client(lambda _: httpx.Response(200, json=payload)).complete(_request())
+
+    error = exc_info.value
+    assert error.code == "PROVIDER_RESPONSE_INVALID"
+    assert error_category(error.code) == ErrorCategory.PERMANENT_PROVIDER
+    assert not is_retryable(error.code)
+    assert error.diagnostics.as_dict() == {
+        "failure_stage": "response_normalization",
+        "finish_reason": "stop",
+        "usage": {"input_tokens": 2528, "output_tokens": 3000},
+        "usage_status": "known",
+        "content_empty": None,
+        "schema_validation": "not_run",
+    }
+
+
+def test_failure_diagnostics_drop_arbitrary_provider_strings() -> None:
+    sensitive = "provider-private-text-and-credential"
+    payload = _empty_content_payload(
+        {"prompt_tokens": 2528, "completion_tokens": 3000, "private": sensitive},
+        sensitive,
+    )
+    payload["id"] = sensitive
+    payload["choices"][0]["message"]["reasoning_content"] = sensitive
+    with pytest.raises(LLMResponseError) as exc_info:
+        _client(lambda _: httpx.Response(200, json=payload)).complete(_request())
+
+    diagnostics = exc_info.value.diagnostics
+    assert diagnostics.finish_reason == "unknown"
+    assert sensitive not in repr(diagnostics)
+    assert sensitive not in str(diagnostics.as_dict())
+    assert sensitive not in str(exc_info.value)
+
+
+def test_successful_response_keeps_existing_finish_reason_contract() -> None:
+    payload = _response().json()
+    payload["choices"][0]["finish_reason"] = "provider-specific-success-reason"
+    response = _client(lambda _: httpx.Response(200, json=payload)).complete(_request())
+
+    assert response.finish_reason == "provider-specific-success-reason"
+    assert response.content == '{"ok":true}'
+    assert response.usage.input_tokens == 12
+    assert response.usage.output_tokens == 5
+
+
+@pytest.mark.parametrize(
+    ("content", "code", "content_empty"),
+    [(" \n\t", "PROVIDER_EMPTY_CONTENT", True), (None, "PROVIDER_RESPONSE_INVALID", None)],
+)
+def test_absent_content_is_distinguished_from_empty_text(content, code, content_empty) -> None:
+    payload = _response().json()
+    payload["choices"][0]["message"]["content"] = content
+    with pytest.raises(LLMResponseError) as exc_info:
+        _client(lambda _: httpx.Response(200, json=payload)).complete(_request())
+
+    assert exc_info.value.code == code
+    assert exc_info.value.diagnostics.content_empty is content_empty
+
+
+def test_invalid_usage_does_not_become_a_successful_response() -> None:
+    payload = _response().json()
+    payload["usage"]["prompt_tokens"] = False
+    with pytest.raises(LLMResponseError) as exc_info:
+        _client(lambda _: httpx.Response(200, json=payload)).complete(_request())
+
+    assert exc_info.value.code == "PROVIDER_RESPONSE_INVALID"
+    assert exc_info.value.diagnostics.as_dict()["usage"] == {
+        "input_tokens": None,
+        "output_tokens": 5,
+    }
+    assert exc_info.value.diagnostics.content_empty is False

@@ -8,8 +8,9 @@ from typing import Any
 
 from specflow.agents.models import AgentIdentity
 from specflow.llm.client import LLMClient
+from specflow.llm.diagnostics import LLMFailureDiagnostics
 from specflow.llm.exceptions import LLMError
-from specflow.llm.models import LLMMessage, LLMRequest
+from specflow.llm.models import LLMMessage, LLMRequest, LLMResponse
 from specflow.policy.errors import ErrorCode
 from specflow.policy.errors import is_retryable as _is_retryable_error
 from specflow.prompts.security import UNTRUSTED_REPOSITORY_EVIDENCE_WARNING
@@ -111,7 +112,8 @@ class AgentRunner:
                 error_code = _error_to_code(exc)
                 retryable = _is_retryable_error(error_code)
                 if not retryable or attempt >= self._max_retries:
-                    return _failed_result(self._identity, error_code.value)
+                    diagnostics = exc.diagnostics if isinstance(exc, LLMError) else None
+                    return _failed_result(self._identity, error_code.value, diagnostics=diagnostics)
                 backoff = min(0.5 * (2**attempt), 5.0)  # 0.5s, 1s, 2s, 4s, 5s cap
                 time.sleep(backoff)
 
@@ -122,7 +124,11 @@ class AgentRunner:
                 validated = output_model.model_validate(data)
                 data = validated.model_dump()
             except Exception:
-                return _failed_result(self._identity, "SCHEMA_VALIDATION_FAILED")
+                return _failed_result(
+                    self._identity,
+                    "SCHEMA_VALIDATION_FAILED",
+                    diagnostics=_response_failure_diagnostics(response, "schema_validation"),
+                )
 
             usage = response.usage
             return {
@@ -138,7 +144,11 @@ class AgentRunner:
                 },
             }
         except json.JSONDecodeError:
-            return _failed_result(self._identity, "JSON_PARSE_FAILED")
+            return _failed_result(
+                self._identity,
+                "JSON_PARSE_FAILED",
+                diagnostics=_response_failure_diagnostics(response, "json_parse"),
+            )
         except Exception:
             return _failed_result(self._identity, "AGENT_EXECUTION_FAILED")
 
@@ -163,9 +173,27 @@ def _error_to_code(error: Exception) -> ErrorCode:
     return ErrorCode.INTERNAL_UNEXPECTED
 
 
-def _failed_result(identity: AgentIdentity, error_code: str) -> dict[str, Any]:
+def _response_failure_diagnostics(response: LLMResponse, phase: str) -> LLMFailureDiagnostics:
+    """Keep bounded response facts, never failed content or exception text."""
+    usage = getattr(response, "usage", None)
+    content = getattr(response, "content", None)
+    return LLMFailureDiagnostics(
+        phase=phase,
+        finish_reason=getattr(response, "finish_reason", None),
+        input_tokens=getattr(usage, "input_tokens", None),
+        output_tokens=getattr(usage, "output_tokens", None),
+        content_empty=not content.strip() if isinstance(content, str) else None,
+    )
+
+
+def _failed_result(
+    identity: AgentIdentity,
+    error_code: str,
+    *,
+    diagnostics: LLMFailureDiagnostics | None = None,
+) -> dict[str, Any]:
     """Return an artifact-safe failure envelope without exception contents."""
-    return {
+    result = {
         "agent_id": identity.agent_id,
         "role": identity.role.value,
         "success": False,
@@ -173,6 +201,9 @@ def _failed_result(identity: AgentIdentity, error_code: str) -> dict[str, Any]:
         "degraded": True,
         "schema_validated": False,
     }
+    if isinstance(diagnostics, LLMFailureDiagnostics):
+        result["failure_diagnostics"] = diagnostics.as_dict()
+    return result
 
 
 def _build_user_message(

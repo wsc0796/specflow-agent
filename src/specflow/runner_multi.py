@@ -37,6 +37,7 @@ from specflow.handoff.exceptions import HandoffIntegrityError, HandoffPayloadErr
 from specflow.handoff.models import AgentHandoff
 from specflow.handoff.validator import HandoffValidator
 from specflow.llm import LLMClient, OpenAICompatibleConfig, OpenAICompatibleLLMClient
+from specflow.llm.diagnostics import LLMFailureDiagnostics
 from specflow.llm.mock import MockLLMClient
 from specflow.plan.hash_utils import canonical_json_bytes
 from specflow.policy import (
@@ -64,6 +65,20 @@ from specflow.trace.models import AgentTraceSpan
 AgentExecutor = Callable[[dict[str, Any]], dict[str, Any]]
 
 logger = logging.getLogger(__name__)
+
+
+class _AgentExecutionFailure(SpecFlowError):
+    """Keep safe failed-attempt facts separate from trusted stage outputs."""
+
+    def __init__(self, primary: dict[str, Any], diagnostics: list[dict[str, Any]]) -> None:
+        super().__init__(primary["error_code"], "Required agent execution failed.")
+        self.failure_diagnostics = diagnostics
+        self.failure_context = {
+            "agent_id": primary["agent_id"],
+            "agent_role": primary["agent_role"],
+            "failure_stage": primary["failure_stage"],
+            "stage_index": str(primary["stage_index"]),
+        }
 
 
 def run_multi_agent(
@@ -500,7 +515,7 @@ def _run_multi_agent_owned(
         return RunResult(3, error_code=error_code, artifact_directory=directory)
     except SpecFlowError as error:
         logger.error(
-            "run %s stopped by policy: code=%s phase=%s",
+            "run %s stopped by runtime check: code=%s phase=%s",
             run_id,
             error.code,
             coordinator.engine.state.value,
@@ -516,6 +531,12 @@ def _run_multi_agent_owned(
             discovered_files=discovered_files,
             guard=guard,
             error=error.code,
+            failure_context=(
+                error.failure_context if isinstance(error, _AgentExecutionFailure) else None
+            ),
+            failure_diagnostics=(
+                error.failure_diagnostics if isinstance(error, _AgentExecutionFailure) else None
+            ),
         )
         return RunResult(3, error_code=error.code, artifact_directory=directory)
     except ScheduleExecutionError as error:
@@ -801,6 +822,7 @@ def _validate_stage_results(
     schema_registry: object,
 ) -> None:
     """Fail closed before outputs can become inter-agent handoffs."""
+    failed_diagnostics = _stage_failure_diagnostics(stage, registry)
     for agent_id, result in stage.agent_results.items():
         if result.get("agent_id") != agent_id:
             raise ValueError("AGENT_EXECUTION_FAILED")
@@ -819,6 +841,11 @@ def _validate_stage_results(
                     "Execution admission or provider circuit rejected work.",
                     retryable=False,
                 )
+            primary = next(
+                (item for item in failed_diagnostics if item["agent_id"] == agent_id), None
+            )
+            if primary is not None:
+                raise _AgentExecutionFailure(primary, failed_diagnostics)
             raise ValueError("AGENT_EXECUTION_FAILED")
         if result.get("schema_validated") is False:
             raise ValueError("SCHEMA_VALIDATION_FAILED")
@@ -832,6 +859,45 @@ def _validate_stage_results(
         except Exception as exc:
             raise ValueError("SCHEMA_VALIDATION_FAILED") from exc
         result["schema_validated"] = True
+
+
+def _stage_failure_diagnostics(
+    stage: StageExecutionResult, registry: AgentRegistry
+) -> list[dict[str, Any]]:
+    """Project only recognized failure metadata; never copy a failed payload."""
+    expected_phases = {
+        ErrorCode.PROVIDER_EMPTY_CONTENT.value: "response_normalization",
+        ErrorCode.PROVIDER_RESPONSE_INVALID.value: "response_normalization",
+        ErrorCode.JSON_PARSE_FAILED.value: "json_parse",
+        ErrorCode.JSON_NOT_OBJECT.value: "json_parse",
+        ErrorCode.SCHEMA_VALIDATION_FAILED.value: "schema_validation",
+    }
+    diagnostics = []
+    for agent_id, result in stage.agent_results.items():
+        if (
+            not isinstance(result, dict)
+            or result.get("success") is not False
+            or result.get("agent_id") != agent_id
+        ):
+            continue
+        output = result.get("output")
+        code = output.get("error_code") if isinstance(output, dict) else None
+        if not isinstance(code, str) or code not in expected_phases:
+            continue
+        safe = LLMFailureDiagnostics.from_dict(result.get("failure_diagnostics"))
+        if safe is None or safe.phase != expected_phases[code]:
+            continue
+        identity = registry.get(agent_id).identity
+        diagnostics.append(
+            {
+                "agent_id": identity.agent_id,
+                "agent_role": identity.role.value,
+                "stage_index": stage.stage_index,
+                "error_code": code,
+                **safe.as_dict(),
+            }
+        )
+    return diagnostics
 
 
 _ABSOLUTE_PATH_RE = re.compile(r"(?<!\w)(?:[A-Za-z]:[\\/]|/)[^\s\"']+")
@@ -1146,6 +1212,7 @@ def _persist_failed_run(
     error: str,
     failure_context: Mapping[str, str] | None = None,
     quarantine_payloads: bool = False,
+    failure_diagnostics: list[dict[str, Any]] | None = None,
 ) -> Path | None:
     """Persist FAILED manifest, state history, and partial traces for audit."""
     try:
@@ -1187,6 +1254,8 @@ def _persist_failed_run(
         }
         if failure_context is not None:
             failed_manifest["failure_context"] = dict(failure_context)
+        if failure_diagnostics:
+            failed_manifest["failure_diagnostics"] = failure_diagnostics
         _safe_write(run_dir, "manifest.json", failed_manifest, guard)
         _safe_write(run_dir, "traces.json", traces, guard)
         # Failed payload verification invalidates the trust boundary. Stage

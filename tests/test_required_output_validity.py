@@ -106,7 +106,13 @@ def test_real_runner_rejects_invalid_required_payload(tmp_path, monkeypatch, rol
     assert role in provider.calls  # the actual AgentRunner consumed this fake response
     assert code == 3
     assert manifest["workflow_state"] == "failed"
-    assert manifest["error"] == "MULTI_AGENT_RUN_FAILED"
+    assert manifest["error"] == "SCHEMA_VALIDATION_FAILED"
+    assert len(manifest["failure_diagnostics"]) == 1
+    diagnostic = manifest["failure_diagnostics"][0]
+    assert diagnostic["agent_role"] == role
+    assert diagnostic["failure_stage"] == "schema_validation"
+    assert diagnostic["schema_validation"] == "failed"
+    assert diagnostic["usage"] == {"input_tokens": 10, "output_tokens": 10}
     assert not (run_dir / "metrics.json").exists()  # no successful/PASS metrics
     if role != "review":
         assert "review" not in provider.calls  # fake PASS must never be requested

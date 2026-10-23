@@ -2,9 +2,14 @@
 
 import json
 
+import pytest
+
 from specflow.agents.adapter import AgentRunner
 from specflow.agents.models import AgentIdentity, AgentRole
+from specflow.llm.diagnostics import LLMFailureDiagnostics
+from specflow.llm.exceptions import LLMResponseError
 from specflow.llm.models import LLMResponse, LLMUsage
+from specflow.policy.errors import ErrorCode
 from specflow.schema.agent_payloads import DesignPayload
 from specflow.schema.registry import SchemaRegistry
 
@@ -39,15 +44,18 @@ class FakeLLMClient:
             }
         )
         self.last_request = None
+        self.calls = 0
+        self.finish_reason = "stop"
 
     def complete(self, request):
+        self.calls += 1
         self.last_request = request
         return LLMResponse(
             content=self.content,
             model="test",
             usage=LLMUsage(input_tokens=100, output_tokens=50),
             latency_ms=12,
-            finish_reason="stop",
+            finish_reason=self.finish_reason,
         )
 
 
@@ -61,6 +69,7 @@ class TestAgentRunner:
         assert result["agent_id"] == "test-agent-v1"
         assert result["success"] is True
         assert result["output"]["summary"] == "A valid design response."
+        assert "failure_diagnostics" not in result
 
     def test_runner_propagates_real_response_usage(self):
         """Regression: token counts live on ``LLMResponse.usage``.
@@ -158,6 +167,7 @@ class TestAgentRunner:
         assert result["output"]["degraded"] is True
         assert result["output"]["error_code"] == "INTERNAL_UNEXPECTED"
         assert "API down" not in str(result)
+        assert "failure_diagnostics" not in result
 
     def test_runner_uses_json_response_format(self):
         ident = _make_identity()
@@ -205,3 +215,166 @@ class TestAgentRunner:
         assert "sk-" not in serialized
         assert "private" not in serialized
         assert result["output"]["error_code"] == "INTERNAL_UNEXPECTED"
+
+    def test_json_parse_failure_preserves_usage_without_raw_content(self):
+        client = FakeLLMClient(content="unparsed private response body")
+        result = AgentRunner(
+            _make_identity(),
+            client,
+            model="test",
+            schema_registry=_schema_registry(),
+            max_retries=2,
+        ).execute({})
+        assert client.calls == 1
+        assert result["success"] is False
+        assert result["output"] == {"degraded": True, "error_code": "JSON_PARSE_FAILED"}
+        assert result["failure_diagnostics"] == {
+            "failure_stage": "json_parse",
+            "finish_reason": "stop",
+            "usage": {"input_tokens": 100, "output_tokens": 50},
+            "usage_status": "known",
+            "content_empty": False,
+            "schema_validation": "not_run",
+        }
+        assert "private response" not in json.dumps(result)
+        assert "usage" not in result  # Failure usage does not rewrite the execution budget.
+
+    def test_schema_failure_preserves_usage_without_invalid_business_output(self):
+        client = FakeLLMClient(content='{"summary":"private invalid design"}')
+        result = AgentRunner(
+            _make_identity(),
+            client,
+            model="test",
+            schema_registry=_schema_registry(),
+            max_retries=2,
+        ).execute({})
+        assert client.calls == 1
+        assert result["success"] is False
+        assert result["schema_validated"] is False
+        assert result["output"] == {"degraded": True, "error_code": "SCHEMA_VALIDATION_FAILED"}
+        assert result["failure_diagnostics"] == {
+            "failure_stage": "schema_validation",
+            "finish_reason": "stop",
+            "usage": {"input_tokens": 100, "output_tokens": 50},
+            "usage_status": "known",
+            "content_empty": False,
+            "schema_validation": "failed",
+        }
+        assert "private invalid design" not in json.dumps(result)
+        assert "usage" not in result
+
+    def test_malicious_finish_reason_is_unknown_in_failure_diagnostics(self):
+        client = FakeLLMClient(content="not json")
+        client.finish_reason = "Bearer SENSITIVE_FINISH_MARKER"
+        result = AgentRunner(
+            _make_identity(), client, model="test", schema_registry=_schema_registry()
+        ).execute({})
+        assert result["failure_diagnostics"]["finish_reason"] == "unknown"
+        assert "SENSITIVE_FINISH_MARKER" not in json.dumps(result)
+        assert client.calls == 1
+
+    def test_provider_empty_content_diagnostics_survive_without_retry(self):
+        calls = 0
+        diagnostics = LLMFailureDiagnostics(
+            phase="response_normalization",
+            finish_reason="length",
+            input_tokens=2417,
+            output_tokens=3000,
+            content_empty=True,
+        )
+
+        class EmptyContentClient:
+            def complete(self, request):
+                nonlocal calls
+                calls += 1
+                raise LLMResponseError(
+                    "private provider exception",
+                    code=ErrorCode.PROVIDER_EMPTY_CONTENT,
+                    diagnostics=diagnostics,
+                )
+
+        result = AgentRunner(
+            _make_identity(),
+            EmptyContentClient(),
+            model="test",
+            schema_registry=_schema_registry(),
+            max_retries=2,
+        ).execute({})
+        assert calls == 1
+        assert result["success"] is False
+        assert result["schema_validated"] is False
+        assert result["output"] == {"degraded": True, "error_code": "PROVIDER_EMPTY_CONTENT"}
+        assert result["failure_diagnostics"] == {
+            "failure_stage": "response_normalization",
+            "finish_reason": "length",
+            "usage": {"input_tokens": 2417, "output_tokens": 3000},
+            "usage_status": "known",
+            "content_empty": True,
+            "schema_validation": "not_run",
+        }
+        assert "private provider" not in json.dumps(result)
+        assert "usage" not in result
+
+    @pytest.mark.parametrize(
+        ("input_tokens", "output_tokens", "usage_status"),
+        [(None, None, "unknown"), (37, None, "partial"), (0, 0, "known")],
+    )
+    def test_provider_diagnostics_keep_unknown_usage_and_only_safe_fields(
+        self, input_tokens, output_tokens, usage_status
+    ):
+        diagnostics = LLMFailureDiagnostics.from_dict(
+            {
+                "failure_stage": "response_normalization",
+                "finish_reason": "Bearer sk-private-finish",
+                "usage": {"input_tokens": input_tokens, "output_tokens": output_tokens},
+                "content_empty": None,
+                "usage_status": "forged_status",
+                "schema_validation": "forged_schema_status",
+                "content": "private raw response",
+                "reasoning_content": "private raw reasoning",
+                "Authorization": "Bearer sk-private-key",
+            }
+        )
+
+        class InvalidResponseClient:
+            def complete(self, request):
+                raise LLMResponseError(
+                    "private exception",
+                    code=ErrorCode.PROVIDER_RESPONSE_INVALID,
+                    diagnostics=diagnostics,
+                )
+
+        result = AgentRunner(
+            _make_identity(),
+            InvalidResponseClient(),
+            model="test",
+            schema_registry=_schema_registry(),
+        ).execute({})
+        assert result["failure_diagnostics"] == {
+            "failure_stage": "response_normalization",
+            "finish_reason": "unknown",
+            "usage": {"input_tokens": input_tokens, "output_tokens": output_tokens},
+            "usage_status": usage_status,
+            "content_empty": None,
+            "schema_validation": "not_run",
+        }
+        assert result["output"] == {"degraded": True, "error_code": "PROVIDER_RESPONSE_INVALID"}
+        assert "private" not in json.dumps(result)
+        assert "forged" not in json.dumps(result)
+
+    def test_untyped_exception_diagnostics_are_not_persisted(self):
+        error = LLMResponseError("private exception", code=ErrorCode.PROVIDER_RESPONSE_INVALID)
+        error.diagnostics = {"content": "private raw response", "usage_status": "forged"}
+
+        class UntypedDiagnosticClient:
+            def complete(self, request):
+                raise error
+
+        result = AgentRunner(
+            _make_identity(),
+            UntypedDiagnosticClient(),
+            model="test",
+            schema_registry=_schema_registry(),
+        ).execute({})
+        assert "failure_diagnostics" not in result
+        assert "private" not in json.dumps(result)

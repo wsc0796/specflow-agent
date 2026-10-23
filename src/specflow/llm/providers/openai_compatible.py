@@ -8,6 +8,7 @@ from typing import Any
 
 import httpx
 
+from specflow.llm.diagnostics import LLMFailureDiagnostics
 from specflow.llm.exceptions import LLMError, LLMResponseError, LLMTimeoutError
 from specflow.llm.models import LLMRequest, LLMResponse, LLMUsage
 from specflow.llm.providers.config import OpenAICompatibleConfig
@@ -145,7 +146,11 @@ class OpenAICompatibleLLMClient:
         except (ValueError, UnicodeError):
             invalid_json = True
         if invalid_json:
-            raise LLMResponseError("LLM provider returned invalid JSON")
+            raise LLMResponseError(
+                "LLM provider returned invalid JSON",
+                code=ErrorCode.PROVIDER_RESPONSE_INVALID,
+                diagnostics=LLMFailureDiagnostics(phase="response_normalization"),
+            )
 
         content, model, usage, finish_reason = self._parse_response(payload)
         return LLMResponse(
@@ -175,21 +180,22 @@ class OpenAICompatibleLLMClient:
         return payload
 
     def _parse_response(self, payload: Any) -> tuple[str, str, LLMUsage, str]:
+        diagnostics = self._diagnostics_from_payload(payload)
         if not isinstance(payload, dict):
-            self._invalid_response()
+            self._invalid_response(diagnostics)
         choices = payload.get("choices")
         usage_payload = payload.get("usage")
         if not isinstance(choices, list) or not choices or not isinstance(usage_payload, dict):
-            self._invalid_response()
+            self._invalid_response(diagnostics)
         first = choices[0]
         if not isinstance(first, dict) or not isinstance(first.get("message"), dict):
-            self._invalid_response()
+            self._invalid_response(diagnostics)
         message = first["message"]
         content = message.get("content")
         finish_reason = first.get("finish_reason")
         model = payload.get("model") or self._config.model
-        input_tokens = self._token_count(usage_payload, "prompt_tokens")
-        output_tokens = self._token_count(usage_payload, "completion_tokens")
+        input_tokens = self._token_count(usage_payload, "prompt_tokens", diagnostics)
+        output_tokens = self._token_count(usage_payload, "completion_tokens", diagnostics)
         if (
             not isinstance(content, str)
             or not content.strip()
@@ -198,7 +204,7 @@ class OpenAICompatibleLLMClient:
             or not isinstance(finish_reason, str)
             or not finish_reason.strip()
         ):
-            self._invalid_response()
+            self._invalid_response(diagnostics)
         return (
             content,
             model,
@@ -207,15 +213,43 @@ class OpenAICompatibleLLMClient:
         )
 
     @staticmethod
-    def _token_count(usage: dict[str, Any], key: str) -> int:
+    def _diagnostics_from_payload(payload: Any) -> LLMFailureDiagnostics:
+        if not isinstance(payload, dict):
+            return LLMFailureDiagnostics(phase="response_normalization")
+        usage = payload.get("usage")
+        if not isinstance(usage, dict):
+            usage = {}
+        choices = payload.get("choices")
+        first = choices[0] if isinstance(choices, list) and choices else None
+        if not isinstance(first, dict):
+            first = {}
+        message = first.get("message")
+        content = message.get("content") if isinstance(message, dict) else None
+        return LLMFailureDiagnostics(
+            phase="response_normalization",
+            finish_reason=first.get("finish_reason"),
+            input_tokens=usage.get("prompt_tokens"),
+            output_tokens=usage.get("completion_tokens"),
+            content_empty=not content.strip() if isinstance(content, str) else None,
+        )
+
+    @staticmethod
+    def _token_count(usage: dict[str, Any], key: str, diagnostics: LLMFailureDiagnostics) -> int:
         value = usage.get(key)
         if not isinstance(value, int) or isinstance(value, bool) or value < 0:
-            OpenAICompatibleLLMClient._invalid_response()
+            OpenAICompatibleLLMClient._invalid_response(diagnostics)
         return value
 
     @staticmethod
-    def _invalid_response() -> None:
-        raise LLMResponseError("LLM provider returned invalid response structure")
+    def _invalid_response(diagnostics: LLMFailureDiagnostics) -> None:
+        code = (
+            ErrorCode.PROVIDER_EMPTY_CONTENT
+            if diagnostics.content_empty is True
+            else ErrorCode.PROVIDER_RESPONSE_INVALID
+        )
+        raise LLMResponseError(
+            "LLM provider returned invalid response structure", code=code, diagnostics=diagnostics
+        )
 
     @staticmethod
     def _raise_for_status(status_code: int) -> None:
