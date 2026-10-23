@@ -9,7 +9,7 @@ from typing import Any
 
 from specflow.context import _redact_secrets, _strip_control
 
-_BEARER_RE = re.compile(r"bearer\s+[a-zA-Z0-9._~+/=-]+", re.IGNORECASE)
+_BEARER_RE = re.compile(r"\bbearer(?P<separator>\s+)[a-zA-Z0-9._~+/=-]+", re.IGNORECASE)
 _AUTHORIZATION_RE = re.compile(r"authorization[=:]\s*\S+", re.IGNORECASE)
 _ACCESS_TOKEN_RE = re.compile(r"access_token[=:]\s*\S+", re.IGNORECASE)
 _SENSITIVE_KEY_RE = re.compile(
@@ -42,7 +42,8 @@ def sanitize_json_text(text: str) -> str:
 
 def _redact_tool_secrets(text: str) -> str:
     cleaned = _redact_secrets(text)
-    cleaned = _BEARER_RE.sub("Bearer <redacted>", cleaned)
+    # Preserve source layout while redacting standalone Bearer credentials.
+    cleaned = _BEARER_RE.sub(lambda match: f"Bearer{match.group('separator')}<redacted>", cleaned)
     cleaned = _AUTHORIZATION_RE.sub("authorization=<redacted>", cleaned)
     cleaned = _ACCESS_TOKEN_RE.sub("access_token=<redacted>", cleaned)
     return cleaned

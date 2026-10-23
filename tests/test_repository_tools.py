@@ -1,3 +1,4 @@
+import hashlib
 import os
 import subprocess
 from pathlib import Path
@@ -146,8 +147,72 @@ def test_final_dlp_scan_redacts_but_preserves_line_layout() -> None:
     result = final_dlp_scan(text)
     assert "ghp_1234567890" not in result
     assert "ghp_<redacted>" in result
-    assert "\n" in result  # layout preserved for the provider prompt
+    assert result.count("\n") == text.count("\n")
+    assert result.splitlines()[-1] == text.splitlines()[-1]
     assert "https://example.com/api/v1" in result
+
+
+@pytest.mark.parametrize("newline", ["\n", "\r\n"], ids=["lf", "crlf"])
+def test_final_dlp_preserves_httpbearer_source_and_line_boundaries(newline: str) -> None:
+    text = newline.join(
+        [
+            "from fastapi.security import HTTPBearer",
+            "from sqlalchemy.orm import Session",
+            "final_line = True",
+            "",
+        ]
+    )
+
+    result = final_dlp_scan(text)
+
+    assert result == text
+    assert final_dlp_scan(result) == result
+
+
+@pytest.mark.parametrize("scheme", ["Bearer", "bEaReR"])
+@pytest.mark.parametrize("separator", [" ", "\t", "\n", "\r\n"])
+def test_final_dlp_redacts_bearer_without_consuming_separator(scheme: str, separator: str) -> None:
+    text = f"{scheme}{separator}fixture-credential.123+/=\nlast_line"
+
+    result = final_dlp_scan(text)
+
+    assert "fixture-credential" not in result
+    assert result == f"Bearer{separator}<redacted>\nlast_line"
+    assert final_dlp_scan(result) == result
+
+
+@pytest.mark.parametrize("newline", ["\n", "\r\n"], ids=["lf", "crlf"])
+def test_read_file_httpbearer_preserves_search_line_identity(tmp_path: Path, newline: str) -> None:
+    source = newline.join(
+        [
+            "from fastapi.security import HTTPBearer",
+            "from sqlalchemy.orm import Session",
+            "",
+            "def authenticate(employee):",
+            "    if employee.status != 1:",
+            "        return None",
+            "    return employee",
+            "# Bearer fixture-credential.123",
+            "last_line = True",
+            "",
+        ]
+    )
+    (tmp_path / "authentication.py").write_bytes(source.encode("utf-8"))
+    executor = _executor(tmp_path)
+
+    read = executor.execute(_call("read_file", path="authentication.py"))
+    search = executor.execute(_call("search_code", query="employee", include=["*.py"]))
+
+    assert read.status == search.status == ToolStatus.SUCCESS
+    expected = source.replace("fixture-credential.123", "<redacted>")
+    content = read.output["content"]
+    assert content == expected
+    assert final_dlp_scan(content) == expected
+    assert content.splitlines()[-1] == "last_line = True"
+    for match in search.output["matches"]:
+        assert content.splitlines()[match["line_number"] - 1].strip() == match["excerpt"]
+    assert read.output["content_hash"] == hashlib.sha256(content.encode("utf-8")).hexdigest()
+    assert (tmp_path / "authentication.py").read_bytes() == source.encode("utf-8")
 
 
 def test_search_code_marks_match_truncation(tmp_path: Path) -> None:
