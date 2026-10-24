@@ -8,6 +8,8 @@ import pytest
 from pydantic import ValidationError
 
 from specflow.llm.providers.openai_compatible import OpenAICompatibleLLMClient
+from specflow.llm.resilience import ProviderResilienceGuard
+from specflow.policy import DEFAULT_POLICY
 from specflow.runner_multi import _build_registry, _validated_inputs, run_multi_agent
 from specflow.schema import build_schema_registry
 from specflow.schema.models import DesignInput, ReviewInput, RiskReviewInput
@@ -29,6 +31,7 @@ def test_review_feedback_reaches_only_revised_role(
     finding = "Boundary explanation. " * 50 + "REVIEW_ONLY_TAIL: preserve the active lock."
     findings = [] if empty_findings else [finding, "REVIEW_ONLY_SECOND: retain JWT fields."]
     requests = {}
+    wrapped_attempts = []
     payloads = {
         "repository_analyst": {"summary": "Existing login checks and JWT generation."},
         "design": {"summary": "Design proposal.", "implementation_steps": ["Preserve login."]},
@@ -43,6 +46,7 @@ def test_review_feedback_reaches_only_revised_role(
         "SPECFLOW_LLM_BASE_URL": "https://offline.invalid/v1",
         "SPECFLOW_LLM_API_KEY": "offline-fixture-only",
         "SPECFLOW_LLM_MODEL": "offline-feedback-model",
+        "SPECFLOW_LLM_TIMEOUT_SECONDS": str(DEFAULT_POLICY.max_wall_time_seconds + 60),
     }.items():
         monkeypatch.setenv(name, value)
 
@@ -73,10 +77,24 @@ def test_review_feedback_reaches_only_revised_role(
             },
         )
 
-    def factory(*args, config, **kwargs):
-        return OpenAICompatibleLLMClient(config, transport=httpx.MockTransport(handler))
+    def client_constructor(config, **kwargs):
+        # Keep the real factory's timeout cap and execution-lane wrapper.
+        assert config.timeout_seconds == DEFAULT_POLICY.max_wall_time_seconds
+        executor = kwargs["attempt_executor"]
+        assert callable(executor)
 
-    monkeypatch.setattr("specflow.runner_multi._create_real_llm_client", factory)
+        def observed_attempt(call):
+            wrapped_attempts.append(True)
+            return executor(call)
+
+        return OpenAICompatibleLLMClient(
+            config,
+            **{**kwargs, "attempt_executor": observed_attempt},
+            transport=httpx.MockTransport(handler),
+            resilience_guard=ProviderResilienceGuard(),
+        )
+
+    monkeypatch.setattr("specflow.runner_multi.OpenAICompatibleLLMClient", client_constructor)
     output = tmp_path / "out"
     result = run_multi_agent(
         repo=repo,
@@ -87,11 +105,22 @@ def test_review_feedback_reaches_only_revised_role(
     )
     assert int(result) == 0
     assert len(requests[target_role]) == 2
+    assert len(wrapped_attempts) == 6 + sum(len(messages) for messages in requests.values())
     revised_message = requests[target_role][1]
     assert summary in revised_message
     for item in findings:
         assert item in revised_message
     assert "## Revision Feedback" in revised_message
+    feedback_section = revised_message.split("## Revision Feedback\n", 1)[1]
+    feedback_object, _ = json.JSONDecoder().raw_decode(
+        feedback_section[feedback_section.index("{") :]
+    )
+    assert feedback_object == {
+        "target_agent_id": target_id,
+        "round_number": 1,
+        "summary": summary,
+        "findings": findings,
+    }
     assert requirement in revised_message
     assert "Existing login checks and JWT generation." in revised_message
     for role, messages in requests.items():
