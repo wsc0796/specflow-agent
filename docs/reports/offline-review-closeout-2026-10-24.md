@@ -2,6 +2,8 @@
 
 日期：2026-10-24；基线7fd7f2f；任务见[限定范围](../tasks/offline-review-closeout-2026-10-24.md)。
 
+后续补记：本文保留9586db1时的验收记录。两项旧provider-resilience INFO断言已在[后续收尾](./info-logging-scope-and-h04-plan-2026-10-24.md)按自有输出/第三方日志边界修正，WARNING/INFO均覆盖；新全量1112 passed。旧压缩包及本页历史数字未替换。
+
 本次修改测试和证据表述，不修改生产代码。模型调用0次。
 
 ## 已复现的问题与处理
