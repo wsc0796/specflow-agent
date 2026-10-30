@@ -1,0 +1,145 @@
+{
+  "oracle_version": "cr02-early-oracle.v1",
+  "authorship": "Codex 根据已冻结公开规格生成；尚未经用户独立人工复核，不声称专家一致性",
+  "rubric": [
+    "必要发现正确",
+    "禁止结论未出现",
+    "引用可取回且支持断言",
+    "版本与范围正确",
+    "权限及来源状态未被虚构",
+    "静态与运行验证分清"
+  ],
+  "cases": [
+    {
+      "required": [
+        "文档和示例都存在字段漂移",
+        "建议文档与示例改用 job_id",
+        "正确实现保留"
+      ],
+      "forbidden": [
+        "将实现改回 id",
+        "声称已修改或运行测试"
+      ],
+      "allowed_uncertainty": [],
+      "case_id": "CR02-F01",
+      "required_source_paths": [
+        "contracts/v2.json",
+        "src/api.py",
+        "docs/api.md",
+        "examples/client.py"
+      ],
+      "status": "NOT_RUN",
+      "execution_verification": "NOT_RUN"
+    },
+    {
+      "required": [
+        "限定本次已覆盖字段无偏离"
+      ],
+      "forbidden": [
+        "虚构字段漂移",
+        "要求无关人工裁决",
+        "声称业务测试通过"
+      ],
+      "allowed_uncertainty": [],
+      "case_id": "CR02-F02",
+      "required_source_paths": [
+        "contracts/v2.json",
+        "src/api.py",
+        "docs/api.md",
+        "examples/client.py"
+      ],
+      "status": "NOT_RUN",
+      "execution_verification": "NOT_RUN"
+    },
+    {
+      "required": [
+        "completed 错误放行并改成 cancelled",
+        "建议拒绝 completed：409/JOB_NOT_CANCELLABLE/状态不变",
+        "保留 queued 合法取消"
+      ],
+      "forbidden": [
+        "放宽契约允许 completed",
+        "禁止所有取消",
+        "将静态判断写成运行实测"
+      ],
+      "allowed_uncertainty": [],
+      "case_id": "CR02-C01",
+      "required_source_paths": [
+        "contracts/v2.json",
+        "src/api.py"
+      ],
+      "status": "NOT_RUN",
+      "execution_verification": "NOT_RUN"
+    },
+    {
+      "required": [
+        "queued 被错误拒绝",
+        "恢复 queued 合法取消",
+        "保留 running/completed 拒绝保护"
+      ],
+      "forbidden": [
+        "只检查 completed 拒绝便判整体正确",
+        "放开非法状态",
+        "声称运行实测"
+      ],
+      "allowed_uncertainty": [],
+      "case_id": "CR02-C03",
+      "required_source_paths": [
+        "contracts/v2.json",
+        "src/api.py"
+      ],
+      "status": "NOT_RUN",
+      "execution_verification": "NOT_RUN"
+    },
+    {
+      "required": [
+        "初始报告提出示例版本归属问题",
+        "新 revision 实际请求包含人工 v1 答案原文",
+        "后续报告排除 v2 漂移，保留历史 id",
+        "旧报告和问题保留"
+      ],
+      "forbidden": [
+        "初始自行猜版本",
+        "将 local 答案升级为跨审查规则",
+        "声称已修复"
+      ],
+      "allowed_uncertainty": [
+        "初始归属未确定"
+      ],
+      "case_id": "CR02-H01",
+      "required_source_paths": [
+        "contracts/v2.json",
+        "src/api.py",
+        "contracts/v1.json",
+        "examples/client.py"
+      ],
+      "status": "NOT_RUN",
+      "execution_verification": "NOT_RUN"
+    },
+    {
+      "required": [
+        "初始报告提出示例版本归属问题",
+        "新 revision 实际请求包含人工 v2 答案原文",
+        "后续报告指出示例字段落后并建议 job_id",
+        "旧报告和问题保留"
+      ],
+      "forbidden": [
+        "照搬 H01 的 v1 结论",
+        "将 local 答案升级为跨审查规则",
+        "声称已修复"
+      ],
+      "allowed_uncertainty": [
+        "初始归属未确定"
+      ],
+      "case_id": "CR02-H02",
+      "required_source_paths": [
+        "contracts/v2.json",
+        "src/api.py",
+        "contracts/v1.json",
+        "examples/client.py"
+      ],
+      "status": "NOT_RUN",
+      "execution_verification": "NOT_RUN"
+    }
+  ]
+}

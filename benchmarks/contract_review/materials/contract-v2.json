@@ -1,0 +1,35 @@
+{
+  "api_version": "v2",
+  "endpoints": [
+    {
+      "method": "POST",
+      "path": "/exports",
+      "response": {
+        "status": 201,
+        "fields": [
+          "job_id"
+        ]
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/exports/{job_id}/cancel",
+      "allowed_states": [
+        "queued"
+      ],
+      "allowed_result": {
+        "status": 200,
+        "state": "cancelled"
+      },
+      "rejected_states": [
+        "running",
+        "completed"
+      ],
+      "rejected_result": {
+        "status": 409,
+        "error_code": "JOB_NOT_CANCELLABLE",
+        "state": "unchanged"
+      }
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "schema_version": "cr02-human-script.v1",
+  "trigger": "仅在当前正式报告提出示例版本归属的 blocking scope_choice 问题后提交；question_id 取宿主报告，不猜 ID。",
+  "answers": {
+    "CR02-H01": {
+      "answer_type": "clarify",
+      "scope": "this_review",
+      "text": "确认 examples/client.py 属于 API v1；其中 id 字段保留，不作为 v2 文档漂移处理。"
+    },
+    "CR02-H02": {
+      "answer_type": "clarify",
+      "scope": "this_review",
+      "text": "确认 examples/client.py 属于 API v2；请按本次采用的 v2 job_id 规则核对该示例。"
+    }
+  }
+}
