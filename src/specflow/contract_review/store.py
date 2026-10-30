@@ -74,6 +74,16 @@ DDL = (
     "INSERT INTO contract_review_runtime VALUES (1,NULL,NULL,NULL)",
 )
 SCHEMA_CHECKSUM = digest(DDL)
+EVIDENCE_DDL = (
+    "CREATE TABLE contract_review_verification_evidence (id TEXT PRIMARY KEY, "
+    "review_id TEXT NOT NULL REFERENCES contract_reviews(id), "
+    "input_id TEXT NOT NULL REFERENCES contract_review_inputs(id), "
+    "report_id TEXT NOT NULL REFERENCES contract_review_reports(id), "
+    "body TEXT NOT NULL, created_at TEXT NOT NULL)",
+    "CREATE INDEX contract_review_evidence_by_review "
+    "ON contract_review_verification_evidence(review_id,created_at,id)",
+)
+MIGRATIONS = ((1, DDL), (2, EVIDENCE_DDL))
 
 
 class ReviewStore:
@@ -115,19 +125,29 @@ class ReviewStore:
                 "SELECT name FROM sqlite_master WHERE type='table' "
                 "AND name='contract_review_schema_migrations'"
             ).first()
+            versions = []
             if exists:
                 versions = conn.exec_driver_sql(
                     "SELECT version,checksum FROM contract_review_schema_migrations "
                     "ORDER BY version"
                 ).all()
-                if versions != [(1, SCHEMA_CHECKSUM)]:
+                expected = [(version, digest(statements)) for version, statements in MIGRATIONS]
+                if (
+                    not versions
+                    or len(versions) > len(expected)
+                    or versions != expected[: len(versions)]
+                ):
                     raise ReviewError("DEPENDENCY_UNAVAILABLE", "审查数据版本不兼容。", 503)
-                return
+                if len(versions) == len(expected):
+                    return
             # The write reservation prevents concurrent DB changes while a
             # separate read connection takes a consistent, pre-upgrade backup.
             path = Path(self.database.engine.url.database).resolve()
             backup = path.with_name(
-                path.name + ".before-contract-review-v1-" + identity("b") + ".sqlite3"
+                path.name
+                + f".before-contract-review-v{MIGRATIONS[-1][0]}-"
+                + identity("b")
+                + ".sqlite3"
             )
             with self.database.engine.connect() as source:
                 destination = sqlite3.connect(backup)
@@ -136,12 +156,16 @@ class ReviewStore:
                 finally:
                     destination.close()
             self.migration_backup_path = backup
-            for statement in DDL:
-                conn.exec_driver_sql(statement)
-            conn.execute(
-                text("INSERT INTO contract_review_schema_migrations VALUES (1,:checksum,:applied)"),
-                {"checksum": SCHEMA_CHECKSUM, "applied": now()},
-            )
+            for version, statements in MIGRATIONS[len(versions) :]:
+                for statement in statements:
+                    conn.exec_driver_sql(statement)
+                conn.execute(
+                    text(
+                        "INSERT INTO contract_review_schema_migrations "
+                        "VALUES (:version,:checksum,:applied)"
+                    ),
+                    {"version": version, "checksum": digest(statements), "applied": now()},
+                )
 
     @staticmethod
     def row(conn, statement: str, **params):

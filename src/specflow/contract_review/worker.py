@@ -10,7 +10,11 @@ from pydantic import ValidationError
 from specflow.contract_review.common import ReviewError, canonical, digest, now
 from specflow.contract_review.execution import ExecutionLedger
 from specflow.contract_review.protocol import ReviewResult, SubmitReport
-from specflow.contract_review.report_validation import validate_report
+from specflow.contract_review.report_validation import (
+    require,
+    validate_material_refs,
+    validate_report,
+)
 from specflow.contract_review.sources import strict_json
 
 
@@ -144,18 +148,74 @@ class ReviewWorker:
             raise ReviewError("PROVIDER_RESPONSE_INVALID", "模型用量类型非法。")
         try:
             parsed = strict_json(result["content"])
+            read_refs = [entry["source_ref"] for entry in material_entries if "source_ref" in entry]
             if role == "analysis":
                 action = SubmitReport.model_validate(parsed)
+                validate_material_refs(
+                    [ref.model_dump() for ref in action.reason.evidence_refs],
+                    context["frozen"],
+                    context["sources"],
+                    read_refs,
+                )
+                historical = {}
+                report_ids = {
+                    ref.report_revision_id
+                    for finding in action.report.findings
+                    for ref in finding.related_findings
+                }
+                if report_ids:
+                    with self.service.store.read() as conn:
+                        for report_id in report_ids:
+                            row = self.service.store.row(
+                                conn,
+                                "SELECT body FROM contract_review_reports "
+                                "WHERE id=:id AND review_id=:review",
+                                id=report_id,
+                                review=context["review_id"],
+                            )
+                            if row:
+                                historical[report_id] = {
+                                    item["id"]
+                                    for item in json.loads(row["body"])["payload"]["findings"]
+                                }
                 value = validate_report(
                     action.report.model_dump(exclude_none=True),
                     context["frozen"],
                     context["sources"],
-                    [entry["source_ref"] for entry in material_entries],
+                    read_refs,
+                    historical_reports=historical,
+                    projected_evidence_ids=[
+                        entry["evidence_id"] for entry in material_entries if "evidence_id" in entry
+                    ],
                 )
             else:
                 value = ReviewResult.model_validate(parsed)
                 if value.candidate_report_hash != data["candidate_report_hash"]:
                     raise ValueError("Fixed review candidate mismatch")
+                fields = {
+                    "finding": "findings",
+                    "question": "questions",
+                    "work_item": "work_items",
+                    "acceptance": "acceptance_items",
+                }
+                for issue in value.issues:
+                    if issue.subject_kind == "report":
+                        require(issue.subject_id == "", "Report issue needs an empty subject ID")
+                    else:
+                        require(
+                            issue.subject_id
+                            in {
+                                item["id"]
+                                for item in data["candidate_report"][fields[issue.subject_kind]]
+                            },
+                            "Fixed review subject belongs to another report",
+                        )
+                    validate_material_refs(
+                        [ref.model_dump() for ref in issue.evidence_refs],
+                        context["frozen"],
+                        context["sources"],
+                        read_refs,
+                    )
         except ValueError:
             self.ledger.record_result(
                 context, call_id, result, accepted=False, reason="ACTION_SCHEMA_INVALID"
@@ -193,6 +253,19 @@ class ReviewWorker:
             "resolutions": frozen["resolutions"],
             "sources": list(context["sources"].values()),
         }
+        if context["verification_evidence"]:
+            data["verification_evidence"] = context["verification_evidence"]
+            data["verification_evidence_adoptions"] = frozen["verification_evidence_adoptions"]
+            entries.extend(
+                {
+                    "evidence_id": record["evidence_id"],
+                    "body_hash": record["body_hash"],
+                    "body": record,
+                    "message_index": 1,
+                    "disposition": "retained",
+                }
+                for record in context["verification_evidence"]
+            )
         try:
             corrections, reworks = 0, 0
             while True:

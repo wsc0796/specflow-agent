@@ -4,6 +4,8 @@ import copy
 import json
 import os
 import subprocess
+import threading
+from contextlib import contextmanager
 from pathlib import Path
 
 import pytest
@@ -106,3 +108,146 @@ def review_client(tmp_path, git_repo):
             session.commit()
         client.headers["X-API-Key"] = "test-contract-key"
         yield client, app.state.contract_reviews, body
+
+
+class ControlledAdapter:
+    execution_mode = "test"
+
+    def __init__(self, pauses=None, reject_review=False):
+        self.requests = []
+        self.pauses = pauses or {}
+        self.entered = {index: threading.Event() for index in self.pauses}
+        self.reject_review = reject_review
+        self.before_response = None
+
+    def complete(self, payload):
+        self.requests.append(copy.deepcopy(payload))
+        count = len(self.requests)
+        if self.before_response:
+            self.before_response(count)
+        if count in self.pauses:
+            self.entered[count].set()
+            assert self.pauses[count].wait(8), "Test did not release the controlled call"
+        data = json.loads(payload["messages"][1]["content"])
+        if "candidate_report" in data:
+            result = {
+                "schema_version": "contract-review-review-result.v2",
+                "type": "review_result",
+                "candidate_report_hash": data["candidate_report_hash"],
+                "outcome": "revise" if self.reject_review else "accept",
+                "issues": (
+                    [
+                        {
+                            "subject_kind": "report",
+                            "subject_id": "",
+                            "code": "other",
+                            "reason": "受控返工场景",
+                            "evidence_refs": [],
+                        }
+                    ]
+                    if self.reject_review
+                    else []
+                ),
+                "revision_feedback": "固定复核要求返工。" if self.reject_review else "",
+            }
+        else:
+            missing = "受控替身仅验证程序链，不提供业务语义判断。"
+            findings = [
+                {
+                    "id": "f" + str(index),
+                    "target_ids": [target["target_id"]],
+                    "judgment_status": "insufficient_evidence",
+                    "affected_artifacts": ["documentation"],
+                    "labels": [],
+                    "claim": missing,
+                    "rule_refs": [],
+                    "source_refs": [],
+                    "observation_refs": [],
+                    "verification_evidence_refs": [],
+                    "execution_verification": "NOT_RUN",
+                    "limitations": [missing],
+                }
+                for index, target in enumerate(data["targets"])
+            ]
+            target_to_finding = {finding["target_ids"][0]: finding["id"] for finding in findings}
+            report = {
+                "schema_version": "contract-review-report-payload.v2.1",
+                "summary": missing,
+                "coverage": [
+                    {
+                        "target_id": target["target_id"],
+                        "status": "partial",
+                        "source_refs": [],
+                        "missing_information": [missing],
+                    }
+                    for target in data["targets"]
+                ],
+                "check_results": [
+                    {
+                        "check_id": check["check_id"],
+                        "status": "not_checked",
+                        "finding_ids": [target_to_finding[check["target_id"]]],
+                        "source_refs": [],
+                        "observation_refs": [],
+                        "missing_information": [missing],
+                    }
+                    for check in data["check_manifest"]
+                ],
+                "rule_uses": [],
+                "findings": findings,
+                "questions": [],
+                "work_items": [],
+                "acceptance_items": [],
+                "adopted_child_result_refs": [],
+                "limitations": [missing],
+            }
+            result = {
+                "schema_version": "contract-review-action.v2.1",
+                "action": "submit_report",
+                "reason": {
+                    "gap": "验证程序提交",
+                    "evidence_refs": [],
+                    "expected_information": "保存受控报告",
+                },
+                "report": report,
+            }
+        return {
+            "content": json.dumps(result, ensure_ascii=False),
+            "model": payload["model"],
+            "usage": {"input_tokens": 3, "output_tokens": 4},
+        }
+
+
+@pytest.fixture
+def running_app(tmp_path, git_repo, test_profile):
+    root, _, request = git_repo
+
+    @contextmanager
+    def start(adapter, timeout=1.0):
+        fast = {**test_profile, "model_timeout_seconds": timeout}
+        slow = {**test_profile, "profile_id": "slow-test", "model_timeout_seconds": 5.0}
+        app = create_app(
+            f"sqlite:///{(tmp_path / 'worker.sqlite').as_posix()}",
+            tmp_path / "artifacts",
+            ApiSecurity(api_key="test-key", allowed_repository_roots=(str(tmp_path),)),
+            contract_review_profiles={fast["profile_id"]: fast, slow["profile_id"]: slow},
+            contract_review_adapter=adapter,
+        )
+        with TestClient(app) as client:
+            with app.state.database.factory() as session:
+                session.add(Project(id="project-test", name="Fixture", repository_path=str(root)))
+                session.commit()
+            client.headers["X-API-Key"] = "test-key"
+            body = {**request, "execution_profile_id": fast["profile_id"]}
+            try:
+                yield client, app.state.contract_reviews, body
+            finally:
+                for event in adapter.pauses.values():
+                    event.set()
+
+    return start
+
+
+@pytest.fixture
+def controlled_adapter():
+    return ControlledAdapter

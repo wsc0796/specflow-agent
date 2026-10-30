@@ -10,6 +10,7 @@ from specflow.contract_review.process_identity import (
     current_process_identity,
     original_process_exited,
 )
+from specflow.contract_review.sources import select_text
 
 
 class ExecutionLedger:
@@ -189,6 +190,12 @@ class ExecutionLedger:
                 "attempt_token": token,
                 "frozen": frozen,
                 "sources": sources,
+                "verification_evidence": [
+                    self.service.verifications.record(
+                        conn, row["review_id"], binding["evidence_id"]
+                    )
+                    for binding in frozen["verification_evidence_adoptions"]
+                ],
                 "deadline": deadline,
             }
 
@@ -665,11 +672,40 @@ class ExecutionLedger:
                 "adopted_ruleset_version": None,
                 "verification_mode": "static_only",
                 "execution_mode": frozen["execution_profile"]["execution_mode"],
-                "rules": frozen["adoption_records"],
+                "rules": [
+                    {
+                        **adoption,
+                        "body": select_text(
+                            context["sources"][adoption["body_ref"]["source_id"]]["body"],
+                            adoption["body_ref"]["selector"],
+                        ),
+                        "report_usage": next(
+                            (
+                                item
+                                for item in report["rule_uses"]
+                                if item["adoption_id"] == adoption["adoption_id"]
+                            ),
+                            None,
+                        ),
+                    }
+                    for adoption in frozen["adoption_records"]
+                ],
                 "check_manifest": frozen["check_manifest"],
                 "payload": report,
                 "quality": quality,
-                "verification_evidence_summary": [],
+                "verification_evidence_summary": [
+                    {
+                        "evidence_id": record["evidence_id"],
+                        "provider": record["provider"],
+                        "status": record["status"],
+                        "origin": view["origin"],
+                        "current_adoption": view["current_adoption"],
+                        "current_applicability": view["current_applicability"],
+                        "applicable_to_current_input": view["applicable_to_current_input"],
+                    }
+                    for record in context["verification_evidence"]
+                    for view in [self.service.verifications.view(record, frozen)]
+                ],
                 "created_at": now(),
             }
             status = (

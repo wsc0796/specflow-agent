@@ -4,11 +4,13 @@ from __future__ import annotations
 
 import json
 import re
+from copy import deepcopy
 
 from specflow.contract_review.common import ReviewError, canonical, digest, identity, now
 from specflow.contract_review.inputs import freeze_input
 from specflow.contract_review.schemas import ExecutionProfile
 from specflow.contract_review.store import ReviewStore
+from specflow.contract_review.verification import VerificationService
 
 
 class ReviewService:
@@ -17,6 +19,7 @@ class ReviewService:
         self.snapshot_reader = snapshot_reader
         self.profiles = {}
         self.worker = None
+        self.verifications = VerificationService(self)
         for name, value in (profiles or {}).items():
             try:
                 profile = ExecutionProfile.model_validate(value)
@@ -238,7 +241,9 @@ class ReviewService:
             raise ReviewError("REVIEW_NOT_FOUND", "审查不存在。", 404)
         return row
 
-    def enqueue_revision(self, conn, review_id, expected_version, frozen):
+    def enqueue_revision(
+        self, conn, review_id, expected_version, frozen, verification_evidence_ids=None
+    ):
         """Atomic host operation used by later revision/resolution endpoints."""
         review = self.require_review(conn, review_id)
         if type(expected_version) is not int or review["version"] != expected_version:
@@ -279,6 +284,18 @@ class ReviewService:
             )["n"]
             + 1
         )
+        previous = self.verifications.input(conn, review_id, review["current_input_id"])
+        evidence_ids = (
+            verification_evidence_ids
+            if verification_evidence_ids is not None
+            else [item["evidence_id"] for item in previous["verification_evidence_adoptions"]]
+        )
+        frozen = deepcopy(frozen)
+        frozen["verification_evidence_adoptions"] = self.verifications.adopt(
+            conn, review_id, frozen, evidence_ids
+        )
+        frozen.pop("input_hash", None)
+        frozen["input_hash"] = digest(frozen)
         self.save_input(conn, review_id, frozen, revision_no)
         job_id = identity("job")
         updated = self.store.execute(

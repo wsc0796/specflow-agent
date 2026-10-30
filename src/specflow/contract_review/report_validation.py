@@ -1,6 +1,7 @@
 """Deterministic report ownership, reference and coverage validation, not semantics."""
 
 from specflow.contract_review.common import canonical, digest
+from specflow.contract_review.inputs import match_effective_scope
 from specflow.contract_review.protocol import ReportPayload
 from specflow.contract_review.sources import select_text
 
@@ -42,12 +43,55 @@ def source_was_read(reference, reads, body):
     return next_line > end
 
 
-def validate_report(value, frozen, sources, read_refs, observations=None, historical_reports=None):
+def validate_source_refs(values, sources, read_refs):
+    unique(values, "source reference")
+    for ref in values:
+        require(ref["source_id"] in sources, "Source belongs to another input")
+        source = sources[ref["source_id"]]
+        require(
+            digest(source["body"].encode("utf-8")) == source["body_hash"], "Source body damaged"
+        )
+        select_text(source["body"], ref["selector"])
+        require(
+            source_was_read(ref, read_refs, source["body"]), "Referenced body was not projected"
+        )
+
+
+def validate_rule_body(adoption, sources, read_refs):
+    ref = adoption["body_ref"]
+    validate_source_refs([ref], sources, read_refs)
+    body = select_text(sources[ref["source_id"]]["body"], ref["selector"])
+    require(digest(body.encode("utf-8")) == adoption["body_hash"], "Adopted rule body damaged")
+
+
+def validate_material_refs(values, frozen, sources, read_refs, observations=()):
+    unique(values, "material")
+    adoptions = keyed(frozen["adoption_records"], "adoption_id")
+    for ref in values:
+        if ref["kind"] == "source":
+            validate_source_refs([ref["source_ref"]], sources, read_refs)
+        elif ref["kind"] == "rule":
+            require(ref["adoption_id"] in adoptions, "Unknown adoption")
+            validate_rule_body(adoptions[ref["adoption_id"]], sources, read_refs)
+        else:
+            require(ref["observation_id"] in observations, "Unknown accepted observation")
+
+
+def validate_report(
+    value,
+    frozen,
+    sources,
+    read_refs,
+    observations=None,
+    historical_reports=None,
+    projected_evidence_ids=(),
+):
     payload = ReportPayload.model_validate(value).model_dump(exclude_none=True)
     observations, historical_reports = observations or {}, historical_reports or {}
     targets = keyed(frozen["target_manifest"], "target_id")
     checks = keyed(frozen["check_manifest"], "check_id")
     adoptions = keyed(frozen["adoption_records"], "adoption_id")
+    evidence_adoptions = keyed(frozen["verification_evidence_adoptions"], "evidence_id")
     coverage, results = (
         keyed(payload["coverage"], "target_id"),
         keyed(payload["check_results"], "check_id"),
@@ -72,36 +116,49 @@ def validate_report(value, frozen, sources, read_refs, observations=None, histor
         unique(values, label)
         require(all(item in allowed for item in values), f"Unknown {label}")
 
-    def source_refs(values, *, read=True):
-        unique(values, "source reference")
-        for ref in values:
-            require(ref["source_id"] in sources, "Source belongs to another input")
-            source = sources[ref["source_id"]]
-            require(
-                digest(source["body"].encode("utf-8")) == source["body_hash"], "Source body damaged"
-            )
-            select_text(source["body"], ref["selector"])
-            if read:
-                require(
-                    source_was_read(ref, read_refs, source["body"]),
-                    "Referenced body was not projected",
-                )
+    def source_refs(values):
+        validate_source_refs(values, sources, read_refs)
 
     def materials(values):
-        unique(values, "material")
-        for ref in values:
-            if ref["kind"] == "source":
-                source_refs([ref["source_ref"]])
-            elif ref["kind"] == "rule":
-                refs([ref["adoption_id"]], adoptions, "adoption")
-            else:
-                refs([ref["observation_id"]], observations, "accepted observation")
+        validate_material_refs(values, frozen, sources, read_refs, observations)
+
+    def external_refs(values, target_ids, *, supporting):
+        refs(values, evidence_adoptions, "adopted evidence")
+        refs(values, projected_evidence_ids, "projected evidence")
+        for evidence_id in values:
+            binding = evidence_adoptions[evidence_id]
+            require(
+                binding["adopting_input_revision_id"] == frozen["input_revision_id"],
+                "Evidence adoption belongs to another input",
+            )
+            checks = keyed(binding["target_checks"], "target_id")
+            require(
+                set(checks) == set(targets), "Evidence applicability must cover current targets"
+            )
+            if supporting:
+                require(
+                    all(
+                        checks[target_id]["applicability"] == "applicable"
+                        for target_id in target_ids
+                    ),
+                    "External evidence is not applicable to each supported target",
+                )
 
     for identifier, item in uses.items():
         require(identifier in adoptions, "Unknown adoption")
         if item["usage"] == "support":
             require(
                 adoptions[identifier]["disposition"] == "adopted", "Unadopted rule used as support"
+            )
+            adoption = adoptions[identifier]
+            validate_rule_body(adoption, sources, read_refs)
+            require(adoption["target_id"] in targets, "Rule targets another input")
+            require(
+                match_effective_scope(
+                    adoption["effective_scope_expression"], targets[adoption["target_id"]]
+                )
+                == "match",
+                "Rule effective scope is unresolved or excluded",
             )
     for item in findings.values():
         refs(item["target_ids"], targets, "target")
@@ -110,11 +167,10 @@ def validate_report(value, frozen, sources, read_refs, observations=None, histor
         unique(item["affected_artifacts"], "artifact role")
         unique(item["labels"], "label")
         source_refs(item["source_refs"])
-        # External adoption is wired in TASK-03; no undeclared evidence can pass.
-        refs(
+        external_refs(
             item["verification_evidence_refs"],
-            {entry["evidence_id"] for entry in frozen["verification_evidence_adoptions"]},
-            "evidence",
+            item["target_ids"],
+            supporting=item["judgment_status"] in ("supported_deviation", "no_deviation"),
         )
         for relation in item["related_findings"]:
             previous = historical_reports.get(relation["report_revision_id"], {})
@@ -251,11 +307,7 @@ def validate_report(value, frozen, sources, read_refs, observations=None, histor
         refs(item["target_ids"], targets, "target")
         refs(item["rule_refs"], adoptions, "adoption")
         source_refs(item["source_refs"])
-        refs(
-            item["evidence_refs"],
-            {entry["evidence_id"] for entry in frozen["verification_evidence_adoptions"]},
-            "evidence",
-        )
+        external_refs(item["evidence_refs"], item["target_ids"], supporting=True)
     mapping = {
         "not_checked": "unchecked",
         "unsupported": "unsupported_structure",

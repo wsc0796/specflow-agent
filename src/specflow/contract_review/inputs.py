@@ -20,6 +20,16 @@ def match_scope(scope: dict, target: dict) -> str:
     return "scope_unresolved" if unresolved else "match"
 
 
+def match_effective_scope(expression: dict, target: dict) -> str:
+    base = match_scope(expression["base_scope"], target)
+    if base != "match":
+        return base
+    removals = [match_scope(scope, target) for scope in expression["removal_slices"]]
+    if "match" in removals:
+        return "no_match"
+    return "scope_unresolved" if "scope_unresolved" in removals else "match"
+
+
 def freeze_input(
     request, snapshot: dict, profile: dict, input_id: str, original_request=None
 ) -> dict:
@@ -63,11 +73,16 @@ def freeze_input(
         for target in targets:
             outcome = match_scope(value["scope"], target)
             matched = outcome == "match"
-            reason = {
-                "match": "EXACT_SCOPE_MATCH",
-                "no_match": "VERSION_OR_TARGET_OUT_OF_SCOPE",
-                "scope_unresolved": "SCOPE_UNRESOLVED",
-            }[outcome]
+            historical = target["api_version"] not in value["scope"]["api_versions"]
+            reason = (
+                "VERSION_OUT_OF_SCOPE"
+                if historical
+                else {
+                    "match": "EXACT_SCOPE_MATCH",
+                    "no_match": "TARGET_OUT_OF_SCOPE",
+                    "scope_unresolved": "SCOPE_UNRESOLVED",
+                }[outcome]
+            )
             adoptions.append(
                 {
                     "adoption_id": identity("adopt"),
@@ -89,7 +104,11 @@ def freeze_input(
                     },
                     "target_id": target["target_id"],
                     "matched_target": target,
-                    "disposition": "adopted" if matched else "excluded",
+                    "disposition": "adopted"
+                    if matched
+                    else "historical_only"
+                    if historical
+                    else "excluded",
                     "reason_code": reason,
                     "reason_text": "同一目标精确匹配。"
                     if matched

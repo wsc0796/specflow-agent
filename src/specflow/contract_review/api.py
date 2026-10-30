@@ -10,6 +10,7 @@ from sqlalchemy import text
 
 from specflow.contract_review.common import ReviewError, canonical
 from specflow.contract_review.schemas import CreateReview
+from specflow.contract_review.verification import VerificationImport
 
 router = APIRouter(prefix="/api/v1/contract-reviews", tags=["contract-reviews"])
 
@@ -175,3 +176,38 @@ def event_detail(review_id: str, event_id: str, request: Request):
         if row is None:
             raise ReviewError("RESOURCE_NOT_FOUND", "事件不属于本审查。", 404)
         return {**json.loads(row["body"]), "payload": json.loads(row["payload"])}
+
+
+@router.post("/{review_id}/verification-evidence", status_code=201)
+def import_verification(
+    review_id: str,
+    body: VerificationImport,
+    request: Request,
+    idempotency_key: Annotated[str, Header(min_length=1, max_length=128)],
+):
+    query_fields(request)
+    status, response = service(request).verifications.import_evidence(
+        review_id, body, idempotency_key
+    )
+    return JSONResponse(response, status_code=status)
+
+
+@router.get("/{review_id}/verification-evidence")
+def verification_list(
+    review_id: str,
+    request: Request,
+    input_revision_id: Annotated[str | None, Query(min_length=1, max_length=64)] = None,
+    report_revision_id: Annotated[str | None, Query(min_length=1, max_length=64)] = None,
+    cursor: Annotated[str | None, Query(max_length=512)] = None,
+    limit: Annotated[int, Query(ge=1, le=100)] = 20,
+):
+    query_fields(request, ("input_revision_id", "report_revision_id", "cursor", "limit"))
+    return service(request).verifications.list(
+        review_id, input_revision_id, report_revision_id, cursor, limit
+    )
+
+
+@router.get("/{review_id}/verification-evidence/{evidence_id}")
+def verification_detail(review_id: str, evidence_id: str, request: Request):
+    query_fields(request)
+    return service(request).verifications.get(review_id, evidence_id)

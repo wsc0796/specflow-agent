@@ -1,159 +1,15 @@
 """Controlled-adapter lifecycle evidence, never business-semantic acceptance."""
 
-import copy
 import json
 import threading
 import time
-from contextlib import contextmanager
 
 import pytest
-from fastapi.testclient import TestClient
 
-from specflow.api_security import ApiSecurity
 from specflow.contract_review.common import ReviewError, digest, identity
 from specflow.contract_review.execution import ExecutionLedger
-from specflow.db import Project
-from specflow.main import create_app
 
 URL = "/api/v1/contract-reviews"
-
-
-class ControlledAdapter:
-    execution_mode = "test"
-
-    def __init__(self, pauses=None, reject_review=False):
-        self.requests = []
-        self.pauses = pauses or {}
-        self.entered = {index: threading.Event() for index in self.pauses}
-        self.reject_review = reject_review
-        self.before_response = None
-
-    def complete(self, payload):
-        self.requests.append(copy.deepcopy(payload))
-        count = len(self.requests)
-        if self.before_response:
-            self.before_response(count)
-        if count in self.pauses:
-            self.entered[count].set()
-            assert self.pauses[count].wait(8), "Test did not release the controlled call"
-        data = json.loads(payload["messages"][1]["content"])
-        if "candidate_report" in data:
-            result = {
-                "schema_version": "contract-review-review-result.v2",
-                "type": "review_result",
-                "candidate_report_hash": data["candidate_report_hash"],
-                "outcome": "revise" if self.reject_review else "accept",
-                "issues": (
-                    [
-                        {
-                            "subject_kind": "report",
-                            "subject_id": "",
-                            "code": "other",
-                            "reason": "受控返工场景",
-                            "evidence_refs": [],
-                        }
-                    ]
-                    if self.reject_review
-                    else []
-                ),
-                "revision_feedback": "固定复核要求返工。" if self.reject_review else "",
-            }
-        else:
-            missing = "受控替身仅验证程序链，不提供业务语义判断。"
-            findings = [
-                {
-                    "id": "f" + str(index),
-                    "target_ids": [target["target_id"]],
-                    "judgment_status": "insufficient_evidence",
-                    "affected_artifacts": ["documentation"],
-                    "labels": [],
-                    "claim": missing,
-                    "rule_refs": [],
-                    "source_refs": [],
-                    "observation_refs": [],
-                    "verification_evidence_refs": [],
-                    "execution_verification": "NOT_RUN",
-                    "limitations": [missing],
-                }
-                for index, target in enumerate(data["targets"])
-            ]
-            target_to_finding = {finding["target_ids"][0]: finding["id"] for finding in findings}
-            report = {
-                "schema_version": "contract-review-report-payload.v2.1",
-                "summary": missing,
-                "coverage": [
-                    {
-                        "target_id": target["target_id"],
-                        "status": "partial",
-                        "source_refs": [],
-                        "missing_information": [missing],
-                    }
-                    for target in data["targets"]
-                ],
-                "check_results": [
-                    {
-                        "check_id": check["check_id"],
-                        "status": "not_checked",
-                        "finding_ids": [target_to_finding[check["target_id"]]],
-                        "source_refs": [],
-                        "observation_refs": [],
-                        "missing_information": [missing],
-                    }
-                    for check in data["check_manifest"]
-                ],
-                "rule_uses": [],
-                "findings": findings,
-                "questions": [],
-                "work_items": [],
-                "acceptance_items": [],
-                "adopted_child_result_refs": [],
-                "limitations": [missing],
-            }
-            result = {
-                "schema_version": "contract-review-action.v2.1",
-                "action": "submit_report",
-                "reason": {
-                    "gap": "验证程序提交",
-                    "evidence_refs": [],
-                    "expected_information": "保存受控报告",
-                },
-                "report": report,
-            }
-        return {
-            "content": json.dumps(result, ensure_ascii=False),
-            "model": payload["model"],
-            "usage": {"input_tokens": 3, "output_tokens": 4},
-        }
-
-
-@pytest.fixture
-def running_app(tmp_path, git_repo, test_profile):
-    root, _, request = git_repo
-
-    @contextmanager
-    def start(adapter, timeout=1.0):
-        fast = {**test_profile, "model_timeout_seconds": timeout}
-        slow = {**test_profile, "profile_id": "slow-test", "model_timeout_seconds": 5.0}
-        app = create_app(
-            f"sqlite:///{(tmp_path / 'worker.sqlite').as_posix()}",
-            tmp_path / "artifacts",
-            ApiSecurity(api_key="test-key", allowed_repository_roots=(str(tmp_path),)),
-            contract_review_profiles={fast["profile_id"]: fast, slow["profile_id"]: slow},
-            contract_review_adapter=adapter,
-        )
-        with TestClient(app) as client:
-            with app.state.database.factory() as session:
-                session.add(Project(id="project-test", name="Fixture", repository_path=str(root)))
-                session.commit()
-            client.headers["X-API-Key"] = "test-key"
-            body = {**request, "execution_profile_id": fast["profile_id"]}
-            try:
-                yield client, app.state.contract_reviews, body
-            finally:
-                for event in adapter.pauses.values():
-                    event.set()
-
-    return start
 
 
 def wait_status(client, review_id, expected):
@@ -172,8 +28,10 @@ def submit(client, body, key):
     return response.json()
 
 
-def test_intake_to_report_persists_calls_before_actual_adapter_and_returns_quality(running_app):
-    adapter = ControlledAdapter()
+def test_intake_to_report_persists_calls_before_actual_adapter_and_returns_quality(
+    running_app, controlled_adapter
+):
+    adapter = controlled_adapter()
     with running_app(adapter) as (client, domain, body):
 
         def durable_before_io(count):
@@ -214,9 +72,11 @@ def test_intake_to_report_persists_calls_before_actual_adapter_and_returns_quali
         assert events[-1]["event_type"] == "report_committed"
 
 
-def test_timeout_holds_slot_then_late_cleanup_resumes_queue_without_accepting_old_body(running_app):
+def test_timeout_holds_slot_then_late_cleanup_resumes_queue_without_accepting_old_body(
+    running_app, controlled_adapter
+):
     release_first, release_second = threading.Event(), threading.Event()
-    adapter = ControlledAdapter({1: release_first, 2: release_second})
+    adapter = controlled_adapter({1: release_first, 2: release_second})
     with running_app(adapter, timeout=0.1) as (client, domain, body):
         first = submit(client, body, "first")
         assert adapter.entered[1].wait(2)
@@ -260,8 +120,10 @@ def test_timeout_holds_slot_then_late_cleanup_resumes_queue_without_accepting_ol
         assert client.get(URL + "/" + first["review_id"]).json()["budget"]["model_calls"] == 1
 
 
-def test_failed_intent_persistence_dispatches_zero_requests(running_app, monkeypatch):
-    adapter = ControlledAdapter()
+def test_failed_intent_persistence_dispatches_zero_requests(
+    running_app, monkeypatch, controlled_adapter
+):
+    adapter = controlled_adapter()
     with running_app(adapter) as (client, domain, body):
         original = domain.store.event
 
@@ -278,8 +140,8 @@ def test_failed_intent_persistence_dispatches_zero_requests(running_app, monkeyp
         assert failed["budget"]["model_calls"] == 0
 
 
-def test_fixed_review_gets_one_rework_then_fails(running_app):
-    adapter = ControlledAdapter(reject_review=True)
+def test_fixed_review_gets_one_rework_then_fails(running_app, controlled_adapter):
+    adapter = controlled_adapter(reject_review=True)
     with running_app(adapter) as (client, _, body):
         accepted = submit(client, body, "one")
         failed = wait_status(client, accepted["review_id"], {"failed"})
@@ -305,9 +167,9 @@ def test_restart_interrupts_running_preserves_queued_and_fences_old_host(review_
 
 @pytest.mark.parametrize("fail_commit", [False, True])
 def test_revision_switch_clears_current_report_atomically_and_preserves_history(
-    running_app, monkeypatch, fail_commit
+    running_app, monkeypatch, fail_commit, controlled_adapter
 ):
-    adapter = ControlledAdapter()
+    adapter = controlled_adapter()
     with running_app(adapter) as (client, domain, body):
         first = submit(client, body, "first")
         old_status = wait_status(client, first["review_id"], {"completed_degraded"})
@@ -388,3 +250,35 @@ def test_partial_unknown_usage_is_independent_of_local_slot_and_settlement_is_id
     with domain.store.read() as conn:
         assert ledger.owner(conn)["slot_call_id"] is None
         assert ledger.account(conn, accepted["review_id"])["output_tokens"] is None
+
+
+@pytest.mark.parametrize("phase", ["analysis_reason", "review_subject"])
+def test_worker_rejects_foreign_action_material_or_fixed_review_subject(
+    running_app, controlled_adapter, phase
+):
+    adapter = controlled_adapter(reject_review=phase == "review_subject")
+    original = adapter.complete
+
+    def bad_reference(payload):
+        result = original(payload)
+        body = json.loads(result["content"])
+        if phase == "analysis_reason":
+            body["reason"]["evidence_refs"] = [{"kind": "rule", "adoption_id": "another-input"}]
+        elif body.get("type") == "review_result":
+            body["issues"][0].update(subject_kind="finding", subject_id="another-report")
+        result["content"] = json.dumps(body, ensure_ascii=False)
+        return result
+
+    adapter.complete = bad_reference
+    with running_app(adapter) as (client, domain, request):
+        accepted = submit(client, request, "one")
+        failed = wait_status(client, accepted["review_id"], {"failed"})
+        assert failed["error_code"] == (
+            "ACTION_PROTOCOL_ERROR" if phase == "analysis_reason" else "REPORT_REVIEW_FAILED"
+        )
+        assert not failed["report_available"]
+        with domain.store.read() as conn:
+            rows = conn.exec_driver_sql(
+                "SELECT status FROM contract_review_calls ORDER BY rowid"
+            ).all()
+            assert rows[-1].status == "rejected"

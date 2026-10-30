@@ -17,14 +17,18 @@
   OS 锁/持久单 worker、调用前投影/意图、预算/独立收尾、固定复核/报告/查询。
   内部新 revision 入队原子清空当前报告，历史报告保留；公开 revision/答案 API 待接。
   显式注入 test adapter 才执行，默认应用不选择 Provider；没有真实模型调用。
+- TASK-03 工程范围完成：外部核验导入/列表/详情、归属与三类冲突、幂等/CAS、
+  新输入显式采用与逐目标适用性、实际请求证据、报告引用和规则差集三值校验。
+  schema v2 增加核验表，保留 v1 数据/checksum；升级与失败回滚已测试。
 
-详情见 `docs/reports/CR02-TASK-02-progress.md`。正式 AC 尚未逐项关闭，方案 1 未整体完成。
+最新详情见 `docs/reports/CR02-TASK-03-completion.md`。
+正式 AC 尚未逐项关闭，方案 1 未整体完成。
 
 ## 最新验证
 
-全量 **1169 passed / 3 skipped / 2 warnings，127.43 秒**；全库 Ruff check 和
-format --check 通过（250 个 Python 文件），git diff --check 通过。
-跳过与警告均为已有条件。聚焦新功能及旧 Run/API 检查为 105 passed / 1 skipped。
+全量 **1224 passed / 3 skipped / 2 warnings，177.87 秒**；全库 Ruff check 和
+format --check 通过（253 个 Python 文件），git diff --check 通过。
+跳过与警告均为已有条件。contract_review 模块 112 passed，76.43 秒。
 
 环境方法：现有 Python 3.12.10；`uv run --no-project --offline python -B -X utf8 -m pytest -v
 -p no:cacheprovider`；关闭 pytest 外部插件/bytecode，在测试子进程按名称删除
@@ -33,13 +37,13 @@ SPECFLOW_LLM_API_KEY/BASE_URL/MODEL/TIMEOUT_SECONDS，不读取值。
 初次全量的两个 CLI 配置失败已由环境隔离解决。发布元数据失败来自本机旧安装包
 0.1.0；用 `uv build --wheel --offline` 生成当前 1.1.1 wheel，并将其放在当前 src
 之后的 PYTHONPATH 提供真实构建元数据，随后全量通过。未改全局安装或依赖声明。
-构建：`C:/Users/50469/AppData/Local/Temp/specflow-cr02-build-20261030/specflow_agent-1.1.1-py3-none-any.whl`。
-最终日志：`C:/Users/50469/AppData/Local/Temp/specflow-cr02-final-pytest-20261030.log`。
+最新构建：`C:/Users/50469/AppData/Local/Temp/specflow-cr03-build-20261030/specflow_agent-1.1.1-py3-none-any.whl`。
+最终日志：`C:/Users/50469/AppData/Local/Temp/specflow-cr03-final-pytest-20261030.log`。
 
 ## 下一步与边界
 
-沿原 TASK-03—05 接完整规则/外部核验、动态五工具/真实同步 HTTP adapter、
-人工答案派生 revision。之后落实 fresh API、薄 CLI、故障/语义分层验收。
+下一步按 TASK-04 接动态五工具/真实同步 HTTP adapter，再按 TASK-05 接人工答案派生 revision。
+之后落实 fresh API、薄 CLI、故障/语义分层验收。
 本轮受控链完整投影有限材料，超出上下文即失败，尚不是动态取证产品。
 
 权限保持：不运行真实模型/旧评测，不读取凭据/Holdout，不推送发布。

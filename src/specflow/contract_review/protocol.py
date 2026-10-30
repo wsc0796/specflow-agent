@@ -2,11 +2,20 @@
 
 from typing import Annotated, Literal
 
-from pydantic import Field, model_validator
+from pydantic import AfterValidator, Field, model_validator
 
-from specflow.contract_review.schemas import ID, RepoPath, Role, Selector, StrictModel, Text
+from specflow.contract_review.schemas import (
+    ID,
+    RepoPath,
+    Role,
+    Selector,
+    StrictModel,
+    Text,
+    repo_path,
+)
 
 LongText = Annotated[str, Field(min_length=1, max_length=4000)]
+SafeRepoPath = Annotated[RepoPath, AfterValidator(repo_path)]
 IDs = Annotated[list[ID], Field(max_length=100)]
 NonEmptyIDs = Annotated[list[ID], Field(min_length=1, max_length=100)]
 Notes = Annotated[list[Text], Field(max_length=20)]
@@ -151,11 +160,11 @@ class HandlingIntent(StrictModel):
 
 class IncludedScope(StrictModel):
     artifact_role: Role
-    paths: Annotated[list[RepoPath], Field(min_length=1, max_length=100)]
+    paths: Annotated[list[SafeRepoPath], Field(min_length=1, max_length=100)]
 
 
 class ExcludedScope(StrictModel):
-    paths: Annotated[list[RepoPath], Field(min_length=1, max_length=100)]
+    paths: Annotated[list[SafeRepoPath], Field(min_length=1, max_length=100)]
     reason: Text
 
 

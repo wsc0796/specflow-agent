@@ -8,9 +8,13 @@ import pytest
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 
+from specflow.contract_review import store as store_module
 from specflow.contract_review.common import ReviewError
 from specflow.contract_review.instance_lock import InstanceLock
-from specflow.contract_review.store import ReviewStore
+from specflow.contract_review.schemas import CreateReview
+from specflow.contract_review.service import ReviewService
+from specflow.contract_review.sources import GitSnapshotReader
+from specflow.contract_review.store import DDL, SCHEMA_CHECKSUM, ReviewStore
 from specflow.db import Database, Project
 
 
@@ -47,7 +51,7 @@ def test_migration_is_repeatable_and_legacy_reader_preserves_new_data(tmp_path):
                 conn.exec_driver_sql(
                     "SELECT count(*) FROM contract_review_schema_migrations"
                 ).scalar_one()
-                == 1
+                == 2
             )
     finally:
         db.engine.dispose()
@@ -56,13 +60,15 @@ def test_migration_is_repeatable_and_legacy_reader_preserves_new_data(tmp_path):
 def test_future_schema_rejected_without_rewriting_it(review_client):
     _, domain, _ = review_client
     with domain.store.transaction() as conn:
-        conn.exec_driver_sql("UPDATE contract_review_schema_migrations SET version=99")
+        conn.exec_driver_sql(
+            "UPDATE contract_review_schema_migrations SET version=99 WHERE version=2"
+        )
     with pytest.raises(ReviewError):
         domain.store.migrate()
     with domain.store.read() as conn:
         assert (
             conn.exec_driver_sql(
-                "SELECT version FROM contract_review_schema_migrations"
+                "SELECT max(version) FROM contract_review_schema_migrations"
             ).scalar_one()
             == 99
         )
@@ -144,3 +150,67 @@ def test_instance_lock_cannot_be_acquired_twice_until_released(tmp_path):
         first.release()
     second.acquire()
     second.release()
+
+
+@pytest.mark.parametrize("fail_upgrade", [False, True])
+def test_v1_upgrade_preserves_queued_input_and_rolls_back_partial_v2(
+    tmp_path, git_repo, test_profile, monkeypatch, fail_upgrade
+):
+    assert SCHEMA_CHECKSUM == "90c77e6473bdf6bd2d0b2526199421fe2391e8a4dfefee5f6650b2328f48f061"
+    root, _, body = git_repo
+    db = Database(f"sqlite:///{(tmp_path / 'v1.sqlite').as_posix()}")
+    try:
+        db.create_schema()
+        with db.factory() as session:
+            session.add(
+                Project(id=body["project_id"], name="Before upgrade", repository_path=str(root))
+            )
+            session.commit()
+        store = ReviewStore(db)
+        with store.transaction() as conn:
+            for statement in DDL:
+                conn.exec_driver_sql(statement)
+            conn.execute(
+                text("INSERT INTO contract_review_schema_migrations VALUES (1,:hash,'2026-10-30')"),
+                {"hash": SCHEMA_CHECKSUM},
+            )
+        domain = ReviewService(
+            store, GitSnapshotReader(lambda path: path), {test_profile["profile_id"]: test_profile}
+        )
+        _, accepted = domain.create(CreateReview.model_validate(body), "before-upgrade")
+        original = domain.get(accepted["review_id"])
+        if fail_upgrade:
+            monkeypatch.setattr(
+                store_module,
+                "MIGRATIONS",
+                (
+                    (1, DDL),
+                    (2, (*store_module.EVIDENCE_DDL, "INVALID MIGRATION STATEMENT")),
+                ),
+            )
+            with pytest.raises(ReviewError):
+                store.migrate()
+        else:
+            store.migrate()
+            store.migrate()
+        assert domain.get(accepted["review_id"])["input_hash"] == original["input_hash"]
+        with store.read() as conn:
+            assert conn.exec_driver_sql(
+                "SELECT max(version) FROM contract_review_schema_migrations"
+            ).scalar_one() == (1 if fail_upgrade else 2)
+            found = conn.exec_driver_sql(
+                "SELECT name FROM sqlite_master WHERE name='contract_review_verification_evidence'"
+            ).first()
+            assert bool(found) is not fail_upgrade
+        with closing(sqlite3.connect(store.migration_backup_path)) as backup:
+            assert backup.execute(
+                "SELECT max(version) FROM contract_review_schema_migrations"
+            ).fetchone() == (1,)
+            assert backup.execute("SELECT id FROM contract_review_inputs").fetchone() == (
+                accepted["input_revision_id"],
+            )
+        db.create_schema()
+        with db.factory() as session:
+            assert session.get(Project, body["project_id"]).name == "Before upgrade"
+    finally:
+        db.engine.dispose()
