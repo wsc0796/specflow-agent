@@ -106,3 +106,39 @@ def test_scope_requires_one_target_to_satisfy_all_dimensions():
         match_scope(scope, {"api_version": "v2", "endpoint": endpoint, "source_path": "docs/a.md"})
         == "match"
     )
+
+
+def test_git_alternates_cannot_import_objects_outside_allowed_repository(git_repo):
+    root, git, _ = git_repo
+    external = root.parent / "external-objects"
+    option = "--git-dir=" + str(external)
+    git(option, "init", "--bare", "-q")
+    blob = git(option, "hash-object", "-w", "--stdin", data=b"outside allowed repository\n")
+    tree = git(option, "mktree", data=f"100644 blob {blob}\tforeign.md\n".encode())
+    commit = git(option, "commit-tree", tree, data=b"external commit\n")
+    (root / ".git/objects/info/alternates").write_bytes(
+        ((external / "objects").as_posix() + "\n").encode("utf-8")
+    )
+    assert not (root / ".git/objects" / blob[:2] / blob[2:]).exists()
+
+    def allowed(path):
+        if not path.resolve().is_relative_to(root.resolve()):
+            raise ReviewError("REPOSITORY_PATH_FORBIDDEN", "outside allowed root", 403)
+
+    source = GitSource.model_validate(
+        {
+            "kind": "git_commit",
+            "commit_sha": commit,
+            "groups": [{"role": "contract", "paths": ["foreign.md"]}],
+        }
+    )
+    with pytest.raises(ReviewError) as caught:
+        GitSnapshotReader(allowed).prepare(str(root), source)
+    assert caught.value.code == "UNSUPPORTED_SOURCE"
+
+
+def test_regular_object_database_does_not_require_optional_info_directory(git_repo):
+    root, _, request = git_repo
+    (root / ".git/objects/info").rmdir()
+    snapshot = reader_for(root).prepare(str(root), GitSource.model_validate(request["source"]))
+    assert len(snapshot["files"]) == 4

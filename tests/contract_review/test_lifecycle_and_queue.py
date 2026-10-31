@@ -12,6 +12,55 @@ from specflow.contract_review.execution import ExecutionLedger
 URL = "/api/v1/contract-reviews"
 
 
+@pytest.mark.parametrize("partially_started", [False, True])
+def test_io_thread_start_failure_is_terminal_and_never_enters_adapter(
+    running_app, controlled_adapter, monkeypatch, partially_started
+):
+    adapter = controlled_adapter()
+    with running_app(adapter) as (client, domain, body):
+        original = threading.Thread.start
+        failed_once = False
+
+        def fail_start(thread):
+            nonlocal failed_once
+            if thread.name == "contract-review-io" and not failed_once:
+                failed_once = True
+                if partially_started:
+                    original(thread)
+                raise RuntimeError("controlled thread startup failure")
+            return original(thread)
+
+        monkeypatch.setattr(threading.Thread, "start", fail_start)
+        first = submit(client, body, "start-failure")
+        deadline = time.monotonic() + 3
+        while time.monotonic() < deadline:
+            state = client.get(URL + "/" + first["review_id"]).json()
+            if state["status"] == "failed" or domain.worker.faulted:
+                break
+            time.sleep(0.01)
+        assert state["status"] == "failed", state
+        assert state["error_code"] == "IO_START_FAILED"
+        assert adapter.requests == []
+        assert state["budget"]["model_calls"] == 0
+        assert state["dispatch_gate"]["can_claim"]
+        with domain.store.read() as conn:
+            call = domain.store.row(conn, "SELECT id,status,body FROM contract_review_calls")
+            details = json.loads(call["body"])
+            assert call["status"] == "failed"
+            assert details["adapter_entered"] is False
+            assert details["remote_outcome"] == "not_applicable"
+            assert details["usage_reserved"] == {"input_tokens": 0, "output_tokens": 0}
+        assert (
+            domain.worker.ledger.abort_unstarted(call["id"], details["execution_instance_id"])
+            is False
+        )
+        second = submit(client, body, "after-start-failure")
+        assert (
+            wait_status(client, second["review_id"], {"completed_degraded", "failed"})["status"]
+            == "completed_degraded"
+        )
+
+
 def wait_status(client, review_id, expected):
     deadline = time.monotonic() + 8
     while time.monotonic() < deadline:

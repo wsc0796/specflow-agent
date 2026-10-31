@@ -145,9 +145,18 @@ class GitSnapshotReader:
                 raise ReviewError("INVALID_SOURCE", "固定 Git 对象不存在或无法离线读取。", 422)
             return b"".join(chunks)
 
+        metadata_roots = []
         for option in ("--git-dir", "--git-common-dir"):
             metadata = git(["rev-parse", "--path-format=absolute", option], 4096)
-            self.validate_path(Path(os.fsdecode(metadata).strip()).resolve(strict=True))
+            directory = Path(os.fsdecode(metadata).strip()).resolve(strict=True)
+            self.validate_path(directory)
+            metadata_roots.append(directory)
+        objects = (metadata_roots[-1] / "objects").resolve(strict=True)
+        self.validate_path(objects)
+        info = (objects / "info").resolve()
+        self.validate_path(info)
+        if os.path.lexists(info / "alternates"):
+            raise ReviewError("UNSUPPORTED_SOURCE", "当前不支持带替代对象库的 Git 来源。", 422)
         if git(["cat-file", "-t", source.commit_sha], 32) != b"commit\n":
             raise ReviewError("INVALID_SOURCE", "来源必须是完整 commit 对象。", 422)
         selected: dict[str, dict] = {}

@@ -71,13 +71,16 @@ class ReviewWorker:
             return
         result = box.get("result")
         usage = result.get("usage", {}) if isinstance(result, dict) else {}
-        self.ledger.settle_call(
-            call_id,
-            instance_id,
-            usage=usage if isinstance(usage, dict) else {},
-            quiesced=True,
-            evidence="wrapper_thread_exited",
-        )
+        if box.get("not_entered"):
+            self.ledger.abort_unstarted(call_id, instance_id)
+        else:
+            self.ledger.settle_call(
+                call_id,
+                instance_id,
+                usage=usage if isinstance(usage, dict) else {},
+                quiesced=True,
+                evidence="wrapper_thread_exited",
+            )
         with self.service.store.transaction() as conn:
             self.ledger.owner(conn)
             row = self.service.store.row(
@@ -104,10 +107,14 @@ class ReviewWorker:
             ],
         }
         call_id, instance_id = self.ledger.reserve_call(context, role, payload, material_entries)
-        self.ledger.dispatch_started(context, call_id)
         box = {}
+        start_gate, aborted = threading.Event(), threading.Event()
 
         def run():
+            start_gate.wait()
+            if aborted.is_set():
+                box.update(not_entered=True, finished=True)
+                return
             try:
                 box["result"] = self.adapter.complete(payload)
             except BaseException:
@@ -117,7 +124,26 @@ class ReviewWorker:
 
         thread = threading.Thread(target=run, name="contract-review-io")
         self.pending = (thread, box, call_id, instance_id, context)
-        thread.start()
+        start_error = None
+        try:
+            thread.start()
+            if self.stop_event.is_set():
+                raise ReviewError("INTERRUPTED", "宿主正在关闭。")
+            self.ledger.dispatch_started(context, call_id)
+        except BaseException as error:
+            start_error = error.code if isinstance(error, ReviewError) else "IO_START_FAILED"
+        if start_error:
+            # The gate has never opened: even a partially started wrapper
+            # cannot enter the adapter after this failure.
+            aborted.set()
+            start_gate.set()
+            if thread.ident is not None:
+                thread.join()
+            box.update(not_entered=True, finished=True)
+            self.ledger.abort_unstarted(call_id, instance_id)
+            self.pending = None
+            raise ReviewError(start_error, "调用在进入 adapter 前终止。")
+        start_gate.set()
         deadline = min(
             time.monotonic() + profile["model_timeout_seconds"],
             time.monotonic()

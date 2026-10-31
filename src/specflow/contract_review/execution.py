@@ -223,7 +223,14 @@ class ExecutionLedger:
                 or account["model_calls"] >= account["grant"]["model_calls"]
             ):
                 raise ReviewError("BUDGET_EXHAUSTED", "模型请求预算耗尽。")
-            sequence = job_body["model_calls"] + 1
+            sequence = (
+                self.store.row(
+                    conn,
+                    "SELECT count(*) AS n FROM contract_review_steps WHERE job_id=:job",
+                    job=context["job_id"],
+                )["n"]
+                + 1
+            )
             call_id, step_id, instance_id = identity("call"), identity("step"), identity("io")
             logical = digest(
                 {
@@ -359,6 +366,97 @@ class ExecutionLedger:
                 {"execution_instance_id": body["execution_instance_id"]},
                 call_id=call_id,
             )
+
+    def abort_unstarted(self, call_id, instance_id):
+        """Settle a revoked local start gate; never infer this from missing logs."""
+        with self.store.transaction() as conn:
+            self.owner(conn)
+            row = self.store.row(
+                conn, "SELECT * FROM contract_review_calls WHERE id=:id", id=call_id
+            )
+            if row is None:
+                return False
+            body = json.loads(row["body"])
+            if (
+                body["execution_instance_id"] != instance_id
+                or body["owner_boot_id"] != self.boot_id
+                or body.get("adapter_entered") is False
+            ):
+                return False
+            if row["status"] not in ("intent_recorded", "dispatch_started", "UNKNOWN"):
+                return False
+            job = self.store.row(
+                conn, "SELECT * FROM contract_review_jobs WHERE id=:id", id=row["job_id"]
+            )
+            job_body = json.loads(job["body"])
+            account = self.account(conn, body["review_id"])
+            account["model_calls"] -= 1
+            job_body["model_calls"] -= 1
+            body.update(
+                adapter_entered=False,
+                local_io_state="quiesced",
+                remote_outcome="not_applicable",
+                usage={"input_tokens": 0, "output_tokens": 0},
+                usage_reserved={"input_tokens": 0, "output_tokens": 0},
+                acceptance={"accepted": False, "reason": "ADAPTER_NOT_ENTERED"},
+            )
+            body["maintenance_evidence"].append(
+                {"kind": "start_gate_revoked", "owner_boot_id": self.boot_id, "at": now()}
+            )
+            self.store.execute(
+                conn,
+                "UPDATE contract_review_calls SET status='failed',body=:body,version=version+1 "
+                "WHERE id=:id AND version=:version",
+                id=call_id,
+                version=row["version"],
+                body=canonical(body),
+            )
+            self.store.execute(
+                conn,
+                "UPDATE contract_review_runtime SET "
+                "slot_call_id=NULL,slot_execution_instance_id=NULL "
+                "WHERE id=1 AND slot_call_id=:call AND slot_execution_instance_id=:instance",
+                call=call_id,
+                instance=instance_id,
+            )
+            self.store.execute(
+                conn,
+                "UPDATE contract_review_jobs SET body=:body WHERE id=:id",
+                id=row["job_id"],
+                body=canonical(job_body),
+            )
+            self.save_account(conn, body["review_id"], account)
+            self.refresh_usage(conn, body["review_id"])
+            self.store.execute(
+                conn,
+                "INSERT INTO contract_review_budget_entries VALUES (:id,:review,:job,:call,:body)",
+                id=call_id + ":not_started",
+                review=body["review_id"],
+                job=row["job_id"],
+                call=call_id,
+                body=canonical(
+                    {
+                        "model_calls": -1,
+                        "usage": body["usage"],
+                        "evidence": "start_gate_revoked",
+                        "owner_boot_id": self.boot_id,
+                    }
+                ),
+            )
+            self.store.event(
+                conn,
+                body["review_id"],
+                body["input_id"],
+                row["job_id"],
+                "call_quiesced",
+                {
+                    "evidence": "start_gate_revoked",
+                    "adapter_entered": False,
+                    "model_calls_released": 1,
+                },
+                call_id=call_id,
+            )
+            return True
 
     def settle_call(self, call_id, instance_id, *, usage=None, quiesced=False, evidence=None):
         """Current-owner maintenance only; terminal business state is never revived."""
