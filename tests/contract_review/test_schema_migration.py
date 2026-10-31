@@ -51,7 +51,7 @@ def test_migration_is_repeatable_and_legacy_reader_preserves_new_data(tmp_path):
                 conn.exec_driver_sql(
                     "SELECT count(*) FROM contract_review_schema_migrations"
                 ).scalar_one()
-                == 3
+                == 4
             )
     finally:
         db.engine.dispose()
@@ -100,10 +100,12 @@ def test_v2_to_v3_preserves_queued_data_steps_and_rolls_back_ddl(
             with pytest.raises(ReviewError):
                 store.migrate()
         else:
-            store.migrate()
-            backup = store.migration_backup_path
-            store.migrate()
-            assert store.migration_backup_path == backup
+            with monkeypatch.context() as version_three:
+                version_three.setattr(store_module, "MIGRATIONS", store_module.MIGRATIONS[:3])
+                store.migrate()
+                backup = store.migration_backup_path
+                store.migrate()
+                assert store.migration_backup_path == backup
         assert domain.get(accepted["review_id"])["input_hash"] == original["input_hash"]
         assert domain.get(accepted["review_id"])["status"] == "queued"
         with store.read() as conn:
@@ -163,6 +165,79 @@ def test_future_schema_rejected_without_rewriting_it(review_client):
             ).scalar_one()
             == 99
         )
+
+
+@pytest.mark.parametrize("fail_upgrade", [False, True])
+def test_v3_to_v4_preserves_input_and_rolls_back_resolution_table(
+    tmp_path, git_repo, test_profile, monkeypatch, fail_upgrade
+):
+    root, _, body = git_repo
+    db = Database(f"sqlite:///{(tmp_path / 'v3.sqlite').as_posix()}")
+    try:
+        db.create_schema()
+        with db.factory() as session:
+            session.add(
+                Project(id=body["project_id"], name="V3 project", repository_path=str(root))
+            )
+            session.commit()
+        store = ReviewStore(db)
+        with monkeypatch.context() as previous:
+            previous.setattr(store_module, "MIGRATIONS", store_module.MIGRATIONS[:3])
+            store.migrate()
+        domain = ReviewService(
+            store, GitSnapshotReader(lambda path: path), {test_profile["profile_id"]: test_profile}
+        )
+        _, accepted = domain.create(CreateReview.model_validate(body), "before-v4")
+        with store.read() as conn:
+            original = conn.exec_driver_sql("SELECT body FROM contract_review_inputs").scalar_one()
+            versions = conn.exec_driver_sql(
+                "SELECT version,checksum FROM contract_review_schema_migrations ORDER BY version"
+            ).all()
+        if fail_upgrade:
+            monkeypatch.setattr(
+                store_module,
+                "MIGRATIONS",
+                (
+                    *store_module.MIGRATIONS[:3],
+                    (4, (*store_module.RESOLUTION_DDL, "INVALID MIGRATION STATEMENT")),
+                ),
+            )
+            with pytest.raises(ReviewError):
+                store.migrate()
+        else:
+            store.migrate()
+            backup = store.migration_backup_path
+            store.migrate()
+            assert store.migration_backup_path == backup
+        with store.read() as conn:
+            assert (
+                conn.exec_driver_sql("SELECT body FROM contract_review_inputs").scalar_one()
+                == original
+            )
+            assert (
+                conn.exec_driver_sql(
+                    "SELECT version,checksum FROM contract_review_schema_migrations "
+                    "WHERE version<=3 ORDER BY version"
+                ).all()
+                == versions
+            )
+            found = conn.exec_driver_sql(
+                "SELECT name FROM sqlite_master WHERE name='contract_review_resolutions'"
+            ).first()
+            assert bool(found) is not fail_upgrade
+            assert conn.exec_driver_sql(
+                "SELECT max(version) FROM contract_review_schema_migrations"
+            ).scalar_one() == (3 if fail_upgrade else 4)
+        assert domain.get(accepted["review_id"])["status"] == "queued"
+        with closing(sqlite3.connect(store.migration_backup_path)) as backup:
+            assert backup.execute(
+                "SELECT max(version) FROM contract_review_schema_migrations"
+            ).fetchone() == (3,)
+            assert backup.execute("SELECT body FROM contract_review_inputs").fetchone() == (
+                original,
+            )
+    finally:
+        db.engine.dispose()
 
 
 def test_database_enforces_one_active_job_and_compare_and_swap(review_client):
@@ -288,7 +363,7 @@ def test_v1_upgrade_preserves_queued_input_and_rolls_back_partial_v2(
         with store.read() as conn:
             assert conn.exec_driver_sql(
                 "SELECT max(version) FROM contract_review_schema_migrations"
-            ).scalar_one() == (1 if fail_upgrade else 3)
+            ).scalar_one() == (1 if fail_upgrade else 4)
             found = conn.exec_driver_sql(
                 "SELECT name FROM sqlite_master WHERE name='contract_review_verification_evidence'"
             ).first()

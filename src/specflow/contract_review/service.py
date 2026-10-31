@@ -6,6 +6,7 @@ import json
 import re
 from copy import deepcopy
 
+from specflow.contract_review.checkpoints import CheckpointService
 from specflow.contract_review.common import ReviewError, canonical, digest, identity, now
 from specflow.contract_review.inputs import freeze_input
 from specflow.contract_review.schemas import ExecutionProfile
@@ -20,6 +21,7 @@ class ReviewService:
         self.profiles = {}
         self.worker = None
         self.verifications = VerificationService(self)
+        self.checkpoints = CheckpointService(self)
         for name, value in (profiles or {}).items():
             try:
                 profile = ExecutionProfile.model_validate(value)
@@ -365,6 +367,7 @@ class ReviewService:
                 id=review_id,
             )
             quality = None
+            report_body = None
             if row["current_report_id"]:
                 report = self.store.row(
                     conn,
@@ -376,6 +379,7 @@ class ReviewService:
                 if report is None or report["input_id"] != row["current_input_id"]:
                     raise ReviewError("INTERNAL_ERROR", "当前报告归属不完整。", 500)
                 quality = json.loads(report["body"])["quality"]
+                report_body = json.loads(report["body"])
             return {
                 "review_id": review_id,
                 "project_id": row["project_id"],
@@ -389,6 +393,15 @@ class ReviewService:
                 "check_manifest": frozen["check_manifest"],
                 "quality": quality,
                 "report_available": row["current_report_id"] is not None,
+                "remaining_blocking_question_ids": self.checkpoints.remaining(
+                    conn, review_id, report_body
+                )
+                if report_body
+                else [],
+                "resolutions": frozen["resolutions"]
+                + self.checkpoints.resolutions(conn, review_id, row["current_report_id"])
+                if report_body
+                else frozen["resolutions"],
                 "execution_profile": frozen["execution_profile"],
                 "input_hash": frozen["input_hash"],
                 "budget": json.loads(account["body"]),

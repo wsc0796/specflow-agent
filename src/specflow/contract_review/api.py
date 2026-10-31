@@ -8,6 +8,7 @@ from fastapi import APIRouter, Header, Query, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
+from specflow.contract_review.checkpoints import ResolutionBatch, RevisionRequest
 from specflow.contract_review.common import ReviewError, canonical
 from specflow.contract_review.schemas import CreateReview
 from specflow.contract_review.verification import VerificationImport
@@ -81,6 +82,30 @@ async def create_review(
 def get_review(review_id: str, request: Request):
     query_fields(request)
     return service(request).get(review_id)
+
+
+@router.post("/{review_id}/resolution-batches")
+def resolution_batch(
+    review_id: str,
+    body: ResolutionBatch,
+    request: Request,
+    idempotency_key: Annotated[str, Header(min_length=1, max_length=128)],
+):
+    query_fields(request)
+    status, response = service(request).checkpoints.answer(review_id, body, idempotency_key)
+    return JSONResponse(response, status_code=status)
+
+
+@router.post("/{review_id}/revisions", status_code=202)
+def revise_review(
+    review_id: str,
+    body: RevisionRequest,
+    request: Request,
+    idempotency_key: Annotated[str, Header(min_length=1, max_length=128)],
+):
+    query_fields(request)
+    status, response = service(request).checkpoints.revise(review_id, body, idempotency_key)
+    return JSONResponse(response, status_code=status)
 
 
 @router.get("/{review_id}/report")

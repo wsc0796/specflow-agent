@@ -103,6 +103,34 @@ def validate_report(
         "rule": adoptions,
         "source": sources,
     }
+    for resolution in frozen.get("resolutions", []):
+        if resolution["answer"]["answer_type"] != "mark_insufficient":
+            continue
+        question = resolution["question"]
+        affected = set(question["target_ids"])
+        require(
+            not any(
+                item["blocking"]
+                and item["kind"] == question["kind"]
+                and set(item["target_ids"]) == affected
+                for item in questions.values()
+            ),
+            "Insufficient material cannot reopen the same blocking question",
+        )
+        require(
+            all(
+                item["readiness"] == "not_ready"
+                for item in work.values()
+                if affected.intersection(item["target_ids"])
+            ),
+            "Insufficient material cannot make related work ready",
+        )
+        require(
+            all(
+                coverage[target]["status"] != "covered" for target in affected if target in coverage
+            ),
+            "Insufficient material must retain a coverage gap",
+        )
     require(set(coverage) == set(targets), "Coverage must equal frozen targets")
     require(set(results) == set(checks), "Results must equal frozen checks")
 

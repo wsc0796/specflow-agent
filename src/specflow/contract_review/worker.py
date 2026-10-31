@@ -387,6 +387,7 @@ class ReviewWorker:
             "check_manifest": frozen["check_manifest"],
             "adoption_records": frozen["adoption_records"],
             "resolutions": frozen["resolutions"],
+            "review_directives": frozen.get("review_directives", []),
             "sources": list(context["sources"].values()),
         }
         if context["verification_evidence"]:

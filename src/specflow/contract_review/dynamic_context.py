@@ -110,6 +110,7 @@ class RunState:
             "adoption_records": self.rules,
             "rule_materials": rule_materials,
             "resolutions": self.frozen["resolutions"],
+            "review_directives": self.frozen.get("review_directives", []),
             "source_catalog": {"items": catalog[:20], "total": len(catalog)},
             "available_tools": sorted(self.tools.allowed_tools),
             "observations": [],

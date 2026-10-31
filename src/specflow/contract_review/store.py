@@ -96,7 +96,15 @@ DYNAMIC_DDL = (
     "CREATE UNIQUE INDEX contract_review_one_active_child "
     "ON contract_review_child_tasks(job_id) WHERE status='running'",
 )
-MIGRATIONS = ((1, DDL), (2, EVIDENCE_DDL), (3, DYNAMIC_DDL))
+RESOLUTION_DDL = (
+    "CREATE TABLE contract_review_resolutions (id TEXT PRIMARY KEY, "
+    "review_id TEXT NOT NULL REFERENCES contract_reviews(id), "
+    "input_id TEXT NOT NULL REFERENCES contract_review_inputs(id), "
+    "report_id TEXT NOT NULL REFERENCES contract_review_reports(id), "
+    "question_id TEXT NOT NULL, body TEXT NOT NULL, created_at TEXT NOT NULL, "
+    "UNIQUE(report_id,question_id))",
+)
+MIGRATIONS = ((1, DDL), (2, EVIDENCE_DDL), (3, DYNAMIC_DDL), (4, RESOLUTION_DDL))
 
 
 class ReviewStore:
