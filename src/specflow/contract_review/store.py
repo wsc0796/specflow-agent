@@ -83,7 +83,20 @@ EVIDENCE_DDL = (
     "CREATE INDEX contract_review_evidence_by_review "
     "ON contract_review_verification_evidence(review_id,created_at,id)",
 )
-MIGRATIONS = ((1, DDL), (2, EVIDENCE_DDL))
+DYNAMIC_DDL = (
+    "ALTER TABLE contract_review_steps ADD COLUMN body TEXT NOT NULL DEFAULT '{}'",
+    "CREATE TABLE contract_review_actions (id TEXT PRIMARY KEY, job_id TEXT NOT NULL "
+    "REFERENCES contract_review_jobs(id), call_id TEXT NOT NULL REFERENCES contract_review_ca"
+    "lls(id), "
+    "status TEXT NOT NULL, body TEXT NOT NULL)",
+    "CREATE TABLE contract_review_child_tasks (id TEXT PRIMARY KEY, job_id TEXT NOT NULL "
+    "REFERENCES contract_review_jobs(id), parent_call_id TEXT NOT NULL "
+    "REFERENCES contract_review_calls(id), result_ref TEXT NOT NULL UNIQUE, status TEXT NOT NULL, "
+    "body TEXT NOT NULL, latest_review TEXT)",
+    "CREATE UNIQUE INDEX contract_review_one_active_child "
+    "ON contract_review_child_tasks(job_id) WHERE status='running'",
+)
+MIGRATIONS = ((1, DDL), (2, EVIDENCE_DDL), (3, DYNAMIC_DDL))
 
 
 class ReviewStore:

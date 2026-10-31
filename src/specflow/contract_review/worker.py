@@ -8,8 +8,9 @@ from datetime import UTC, datetime
 from pydantic import ValidationError
 
 from specflow.contract_review.common import ReviewError, canonical, digest, now
-from specflow.contract_review.execution import ExecutionLedger
+from specflow.contract_review.dynamic_ledger import DynamicLedger
 from specflow.contract_review.protocol import ReviewResult, SubmitReport
+from specflow.contract_review.provider import OpenAIReviewAdapter, ProviderFailure
 from specflow.contract_review.report_validation import (
     require,
     validate_material_refs,
@@ -20,15 +21,20 @@ from specflow.contract_review.sources import strict_json
 
 class ReviewWorker:
     def __init__(self, service, adapter):
-        if getattr(adapter, "execution_mode", None) != "test":
-            raise RuntimeError("This vertical slice requires an explicitly controlled test adapter")
+        if getattr(adapter, "execution_mode", None) != "test" and not isinstance(
+            adapter, OpenAIReviewAdapter
+        ):
+            raise RuntimeError(
+                "Register a controlled test adapter or the supported synchronous HTTP adapter"
+            )
         self.service, self.adapter = service, adapter
-        self.ledger = ExecutionLedger(service)
+        self.ledger = DynamicLedger(service)
         self.stop_event = threading.Event()
         self.wake_event = threading.Event()
         self.thread = None
         self.pending = None
         self.faulted = False
+        self.recovery = None
 
     def start(self):
         self.ledger.start()
@@ -46,21 +52,60 @@ class ReviewWorker:
                 thread.join()
                 self._maintain_pending()
 
+        if self.recovery:
+            context, _ = self.recovery
+            self.ledger.fail(
+                context, "INTERRUPTED", time.monotonic() - context["started_monotonic"]
+            )
+            self.recovery = None
+
     def _loop(self):
         while not self.stop_event.is_set():
+            context = None
             try:
+                if self.recovery:
+                    recovering, code = self.recovery
+                    self.ledger.fail(
+                        recovering, code, time.monotonic() - recovering["started_monotonic"]
+                    )
+                    self.recovery = None
                 self._maintain_pending()
+                self.faulted = False
                 if self.pending is None:
                     context = self.ledger.claim()
                     if context:
                         self._run_job(context)
                         continue
-            except Exception:
-                # If required storage is unavailable, no new dispatch is safe.
-                # Recovery is an explicit subsequent startup, not hidden retry.
+            except ReviewError as error:
+                if error.code not in {
+                    "DATABASE_BUSY",
+                    "DEPENDENCY_UNAVAILABLE",
+                    "STORAGE_CAPACITY_EXCEEDED",
+                    "EVIDENCE_PERSISTENCE_FAILED",
+                }:
+                    self.faulted = True
+                    return
+                if context is not None:
+                    self.recovery = (context, "EVIDENCE_PERSISTENCE_FAILED")
                 self.faulted = True
+            except Exception:
+                # Publish the stopped dispatch state before the failure commit
+                # becomes visible to concurrent HTTP readers.
+                self.faulted = True
+                if context is not None:
+                    try:
+                        elapsed = (
+                            time.monotonic() - context["started_monotonic"]
+                            if "started_monotonic" in context
+                            else None
+                        )
+                        self.ledger.fail(context, "INTERNAL_ERROR", elapsed)
+                    except Exception:
+                        pass  # Storage or execution ownership may itself be unavailable.
+                # If required storage is unavailable, no new dispatch is safe.
+                # Unknown programming failures require an explicit subsequent startup.
                 return
-            self.wake_event.wait(0.02)
+            self.wake_event.wait(0.1 if self.faulted else 0.02)
             self.wake_event.clear()
 
     def _maintain_pending(self):
@@ -70,7 +115,21 @@ class ReviewWorker:
         if thread.is_alive() or not box.get("finished"):
             return
         result = box.get("result")
-        usage = result.get("usage", {}) if isinstance(result, dict) else {}
+        failure = box.get("failure")
+        usage = (
+            failure.usage
+            if failure
+            else result.get("usage", {})
+            if isinstance(result, dict)
+            else {}
+        )
+        outcome = (
+            failure.remote_outcome
+            if failure
+            else "not_applicable"
+            if box.get("kind") == "tool"
+            else "known"
+        )
         if box.get("not_entered"):
             self.ledger.abort_unstarted(call_id, instance_id)
         else:
@@ -80,6 +139,7 @@ class ReviewWorker:
                 usage=usage if isinstance(usage, dict) else {},
                 quiesced=True,
                 evidence="wrapper_thread_exited",
+                remote_outcome=outcome,
             )
         with self.service.store.transaction() as conn:
             self.ledger.owner(conn)
@@ -90,24 +150,10 @@ class ReviewWorker:
                 self.ledger.settle_time(conn, row, time.monotonic() - context["started_monotonic"])
         self.pending = None
 
-    def _invoke(self, context, role, data, material_entries):
+    def perform_io(self, context, call_id, instance_id, operation, timeout, *, kind="model"):
         if self.stop_event.is_set():
             raise ReviewError("INTERRUPTED", "宿主正在关闭。")
-        profile = context["frozen"]["execution_profile"]
-        if profile["execution_mode"] != self.adapter.execution_mode:
-            raise ReviewError("RETRY_PROFILE_UNAVAILABLE", "Adapter 与冻结执行模式不符。")
-        payload = {
-            "model": profile["model"],
-            "temperature": 0.0,
-            "max_tokens": profile["max_output_tokens"],
-            "response_format": {"type": "json_object"},
-            "messages": [
-                {"role": "system", "content": profile[role + "_prompt"]},
-                {"role": "user", "content": canonical(data)},
-            ],
-        }
-        call_id, instance_id = self.ledger.reserve_call(context, role, payload, material_entries)
-        box = {}
+        box = {"kind": kind}
         start_gate, aborted = threading.Event(), threading.Event()
 
         def run():
@@ -116,9 +162,18 @@ class ReviewWorker:
                 box.update(not_entered=True, finished=True)
                 return
             try:
-                box["result"] = self.adapter.complete(payload)
+                box["result"] = operation()
+            except ProviderFailure as error:
+                box["failure"] = error
+            except ReviewError as error:
+                box["failure"] = ProviderFailure(
+                    error.code, remote_outcome="not_applicable" if kind == "tool" else "unknown"
+                )
             except BaseException:
-                box["error"] = "PROVIDER_ERROR"
+                box["failure"] = ProviderFailure(
+                    "TOOL_ERROR" if kind == "tool" else "PROVIDER_ERROR",
+                    remote_outcome="not_applicable" if kind == "tool" else "unknown",
+                )
             finally:
                 box["finished"] = True
 
@@ -133,8 +188,6 @@ class ReviewWorker:
         except BaseException as error:
             start_error = error.code if isinstance(error, ReviewError) else "IO_START_FAILED"
         if start_error:
-            # The gate has never opened: even a partially started wrapper
-            # cannot enter the adapter after this failure.
             aborted.set()
             start_gate.set()
             if thread.ident is not None:
@@ -144,14 +197,16 @@ class ReviewWorker:
             self.pending = None
             raise ReviewError(start_error, "调用在进入 adapter 前终止。")
         start_gate.set()
-        deadline = min(
-            time.monotonic() + profile["model_timeout_seconds"],
-            time.monotonic()
-            + (
-                datetime.fromisoformat(context["deadline"].replace("Z", "+00:00"))
-                - datetime.now(UTC)
-            ).total_seconds(),
+        deadlines = [context["deadline"]]
+        if context.get("child_deadline"):
+            deadlines.append(context["child_deadline"])
+        remaining_scope = min(
+            (
+                datetime.fromisoformat(value.replace("Z", "+00:00")) - datetime.now(UTC)
+            ).total_seconds()
+            for value in deadlines
         )
+        deadline = time.monotonic() + min(timeout, remaining_scope)
         while thread.is_alive():
             if self.stop_event.is_set():
                 raise ReviewError("INTERRUPTED", "宿主正在关闭。")
@@ -160,18 +215,68 @@ class ReviewWorker:
                 raise ReviewError("CALL_RESULT_UNKNOWN", "等待超时，本地调用仍未收尾。")
             thread.join(min(0.02, remaining))
         self._maintain_pending()
-        if box.get("error"):
-            raise ReviewError(box["error"], "模型依赖失败。")
-        result = box.get("result")
-        if not isinstance(result, dict) or not isinstance(result.get("content"), str):
-            raise ReviewError("PROVIDER_RESPONSE_INVALID", "模型响应结构非法。")
-        if len(result["content"].encode("utf-8")) > 128 * 1024:
-            raise ReviewError("PROVIDER_RESPONSE_INVALID", "模型响应超过读取上限。")
-        usage = result.get("usage", {})
-        if not isinstance(usage, dict) or any(
-            type(value) is not int or value < 0 for value in usage.values()
-        ):
-            raise ReviewError("PROVIDER_RESPONSE_INVALID", "模型用量类型非法。")
+        if box.get("failure"):
+            raise box["failure"]
+        return box.get("result")
+
+    def model_call(self, context, role, data, material_entries):
+        profile = context["frozen"]["execution_profile"]
+        if profile["execution_mode"] != self.adapter.execution_mode:
+            raise ReviewError("RETRY_PROFILE_UNAVAILABLE", "Adapter 与冻结执行模式不符。")
+        payload = {
+            "model": profile["model"],
+            "temperature": 0.0,
+            "max_tokens": profile["max_output_tokens"],
+            "response_format": {"type": "json_object"},
+            "messages": [
+                {"role": "system", "content": profile[role + "_prompt"]},
+                {"role": "user", "content": canonical(data)},
+            ],
+        }
+        if isinstance(self.adapter, OpenAIReviewAdapter):
+            payload = self.adapter.prepare(payload, profile)
+        retries = profile.get("dependency_retry_limit", 0)
+        retry_of = None
+        for attempt in range(retries + 1):
+            call_id, instance_id = self.ledger.reserve_call(
+                context, role, payload, material_entries, retry_of=retry_of
+            )
+            operation = (
+                (lambda: self.adapter.complete(payload, profile=profile))
+                if isinstance(self.adapter, OpenAIReviewAdapter)
+                else (lambda: self.adapter.complete(payload))
+            )
+            try:
+                result = self.perform_io(
+                    context, call_id, instance_id, operation, profile["model_timeout_seconds"]
+                )
+                if not isinstance(result, dict) or not isinstance(result.get("content"), str):
+                    raise ProviderFailure("PROVIDER_RESPONSE_INVALID", remote_outcome="known")
+                try:
+                    if len(result["content"].encode("utf-8")) > 128 * 1024:
+                        raise ProviderFailure("PROVIDER_RESPONSE_TOO_LARGE", remote_outcome="known")
+                except UnicodeError:
+                    raise ProviderFailure(
+                        "PROVIDER_RESPONSE_INVALID", remote_outcome="known"
+                    ) from None
+                usage = result.get("usage", {})
+                if not isinstance(usage, dict) or any(
+                    type(value) is not int or value < 0 for value in usage.values()
+                ):
+                    raise ProviderFailure("PROVIDER_RESPONSE_INVALID", remote_outcome="known")
+                if usage.get("output_tokens", 0) > profile["max_output_tokens"]:
+                    raise ProviderFailure("BUDGET_EXHAUSTED", usage=usage, remote_outcome="known")
+            except ProviderFailure as error:
+                self.ledger.record_failure(context, call_id, error)
+                if error.retryable and attempt < retries:
+                    retry_of = call_id
+                    continue
+                raise ReviewError(error.code, "模型依赖失败。") from None
+            return call_id, result
+        raise ReviewError("PROVIDER_ERROR", "依赖请求没有结果。")
+
+    def _invoke(self, context, role, data, material_entries):
+        call_id, result = self.model_call(context, role, data, material_entries)
         try:
             parsed = strict_json(result["content"])
             read_refs = [entry["source_ref"] for entry in material_entries if "source_ref" in entry]
@@ -257,6 +362,11 @@ class ReviewWorker:
     def _run_job(self, context):
         context["started_monotonic"] = time.monotonic()
         frozen = context["frozen"]
+        if frozen["execution_profile"]["engine_version"] == "contract-review-engine.v2":
+            from specflow.contract_review.dynamic_runner import DynamicRunner
+
+            DynamicRunner(self, context).run()
+            return
         reads = [
             {"source_id": source_id, "selector": {"kind": "full"}}
             for source_id in context["sources"]

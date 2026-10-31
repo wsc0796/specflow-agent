@@ -43,7 +43,8 @@ class ExecutionLedger:
             )
             for call in calls:
                 body = json.loads(call["body"])
-                body.update(local_io_state="unconfirmed", remote_outcome="unknown")
+                if body["local_io_state"] != "quiesced":
+                    body["local_io_state"] = "unconfirmed"
                 self.store.execute(
                     conn,
                     "UPDATE contract_review_calls SET "
@@ -277,7 +278,8 @@ class ExecutionLedger:
             )
             self.store.execute(
                 conn,
-                "INSERT INTO contract_review_steps VALUES (:id,:job,:seq,:role,:logical)",
+                "INSERT INTO contract_review_steps (id,job_id,step_seq,role,logical_call_id) "
+                "VALUES (:id,:job,:seq,:role,:logical)",
                 id=step_id,
                 job=context["job_id"],
                 seq=sequence,
@@ -390,8 +392,23 @@ class ExecutionLedger:
             )
             job_body = json.loads(job["body"])
             account = self.account(conn, body["review_id"])
-            account["model_calls"] -= 1
-            job_body["model_calls"] -= 1
+            released = int(body.get("kind", "model") == "model")
+            account["model_calls"] -= released
+            job_body["model_calls"] -= released
+            if released and body.get("child_task_id"):
+                child = self.store.row(
+                    conn,
+                    "SELECT body FROM contract_review_child_tasks WHERE id=:id",
+                    id=body["child_task_id"],
+                )
+                child_body = json.loads(child["body"])
+                child_body["model_calls"] -= 1
+                self.store.execute(
+                    conn,
+                    "UPDATE contract_review_child_tasks SET body=:body WHERE id=:id",
+                    id=body["child_task_id"],
+                    body=canonical(child_body),
+                )
             body.update(
                 adapter_entered=False,
                 local_io_state="quiesced",
@@ -436,7 +453,7 @@ class ExecutionLedger:
                 call=call_id,
                 body=canonical(
                     {
-                        "model_calls": -1,
+                        "model_calls": -released,
                         "usage": body["usage"],
                         "evidence": "start_gate_revoked",
                         "owner_boot_id": self.boot_id,
@@ -452,13 +469,22 @@ class ExecutionLedger:
                 {
                     "evidence": "start_gate_revoked",
                     "adapter_entered": False,
-                    "model_calls_released": 1,
+                    "model_calls_released": released,
                 },
                 call_id=call_id,
             )
             return True
 
-    def settle_call(self, call_id, instance_id, *, usage=None, quiesced=False, evidence=None):
+    def settle_call(
+        self,
+        call_id,
+        instance_id,
+        *,
+        usage=None,
+        quiesced=False,
+        evidence=None,
+        remote_outcome=None,
+    ):
         """Current-owner maintenance only; terminal business state is never revived."""
         with self.store.transaction() as conn:
             runtime = self.owner(conn)
@@ -478,6 +504,12 @@ class ExecutionLedger:
                 return False
             changed = False
             usage_changed = False
+            if (
+                remote_outcome in ("known", "not_applicable")
+                and body["remote_outcome"] == "unknown"
+            ):
+                body["remote_outcome"] = remote_outcome
+                changed = True
             for dimension in ("input_tokens", "output_tokens"):
                 value = (usage or {}).get(dimension)
                 old_value = body["usage"][dimension]
@@ -581,6 +613,7 @@ class ExecutionLedger:
                 {"review": review_id},
             )
         ]
+        calls = [call for call in calls if call.get("kind", "model") == "model"]
         account = self.account(conn, review_id)
         known_dimensions = 0
         account["token_ledger"] = {}
@@ -635,7 +668,7 @@ class ExecutionLedger:
             body = json.loads(row["body"])
             body.update(
                 result=result,
-                remote_outcome="known",
+                remote_outcome="not_applicable" if body.get("kind") == "tool" else "known",
                 acceptance={
                     "accepted": accepted,
                     "reason": reason,

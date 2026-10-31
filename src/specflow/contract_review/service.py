@@ -27,7 +27,7 @@ class ReviewService:
                     raise ValueError("Profile registration identity mismatch")
             except ValueError:
                 raise RuntimeError("Invalid non-secret contract-review profile") from None
-            self.profiles[name] = profile.model_dump()
+            self.profiles[name] = profile.frozen()
 
     @staticmethod
     def key_hash(key: str) -> str:
@@ -394,7 +394,9 @@ class ReviewService:
                 "budget": json.loads(account["body"]),
                 "adopted_ruleset_version": None,
                 "current_ruleset_version": None,
-                "evidence_integrity": "complete",
+                "evidence_integrity": "incomplete"
+                if self.worker and self.worker.faulted
+                else "complete",
                 "dispatch_gate": self.worker.dispatch_gate(conn)
                 if self.worker
                 else {

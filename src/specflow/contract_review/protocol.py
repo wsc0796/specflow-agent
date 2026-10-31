@@ -240,6 +240,12 @@ class AcceptanceItem(StrictModel):
     execution_status: Literal["NOT_RUN"]
 
 
+class ChildReview(StrictModel):
+    child_result_ref: ID
+    disposition: Literal["adopted", "partial", "rejected"]
+    reason: Text
+
+
 class ReportPayload(StrictModel):
     schema_version: Literal["contract-review-report-payload.v2.1"]
     summary: LongText
@@ -250,7 +256,7 @@ class ReportPayload(StrictModel):
     questions: Annotated[list[Question], Field(max_length=20)]
     work_items: Annotated[list[WorkItem], Field(max_length=100)]
     acceptance_items: Annotated[list[AcceptanceItem], Field(max_length=200)]
-    adopted_child_result_refs: Annotated[list, Field(max_length=0)]
+    adopted_child_result_refs: Annotated[list[ChildReview], Field(max_length=20)]
     limitations: Notes
 
 

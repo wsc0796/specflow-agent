@@ -4,6 +4,7 @@ from specflow.contract_review.common import canonical, digest
 from specflow.contract_review.inputs import match_effective_scope
 from specflow.contract_review.protocol import ReportPayload
 from specflow.contract_review.sources import select_text
+from specflow.contract_review.tool_protocol import covers_selector
 
 
 def require(condition, message):
@@ -24,23 +25,7 @@ def keyed(values, key):
 def source_was_read(reference, reads, body):
     requested = reference["selector"]
     matching = [item["selector"] for item in reads if item["source_id"] == reference["source_id"]]
-    if any(item["kind"] == "full" for item in matching):
-        return True
-    if requested["kind"] == "json_pointer":
-        return any(item == requested for item in matching)
-    start, end = (
-        (1, len(body.splitlines()))
-        if requested["kind"] == "full"
-        else (requested["start_line"], requested["end_line"])
-    )
-    intervals = sorted(
-        (item["start_line"], item["end_line"]) for item in matching if item["kind"] == "lines"
-    )
-    next_line = start
-    for lower, upper in intervals:
-        if lower <= next_line <= upper:
-            next_line = upper + 1
-    return next_line > end
+    return covers_selector(matching, requested, len(body.splitlines()))
 
 
 def validate_source_refs(values, sources, read_refs):
@@ -85,8 +70,17 @@ def validate_report(
     observations=None,
     historical_reports=None,
     projected_evidence_ids=(),
+    child_reviews=(),
 ):
     payload = ReportPayload.model_validate(value).model_dump(exclude_none=True)
+    actual_children = keyed(payload["adopted_child_result_refs"], "child_result_ref")
+    expected_children = keyed(list(child_reviews), "child_result_ref")
+    require(actual_children == expected_children, "Child summary differs from latest parent review")
+    if actual_children:
+        require(
+            frozen.get("execution_profile", {}).get("options", {}).get("delegate", False),
+            "Delegation is not enabled",
+        )
     observations, historical_reports = observations or {}, historical_reports or {}
     targets = keyed(frozen["target_manifest"], "target_id")
     checks = keyed(frozen["check_manifest"], "check_id")
