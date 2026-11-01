@@ -22,6 +22,18 @@ def keyed(values, key):
     return {item[key]: item for item in values}
 
 
+def question_checks(question, report):
+    findings = set(question["finding_ids"])
+    for item in report["work_items"]:
+        if item["id"] in question["work_item_ids"]:
+            findings.update(item["finding_ids"])
+    return {
+        item["check_id"]
+        for item in report["check_results"]
+        if findings.intersection(item["finding_ids"])
+    }
+
+
 def source_was_read(reference, reads, body):
     requested = reference["selector"]
     matching = [item["selector"] for item in reads if item["source_id"] == reference["source_id"]]
@@ -108,11 +120,23 @@ def validate_report(
             continue
         question = resolution["question"]
         affected = set(question["target_ids"])
+        affected_checks = set(resolution.get("check_ids", question_checks(question, payload)))
+        affected_findings = {
+            identifier
+            for item in results.values()
+            if item["check_id"] in affected_checks
+            for identifier in item["finding_ids"]
+        }
         require(
             not any(
                 item["blocking"]
                 and item["kind"] == question["kind"]
-                and set(item["target_ids"]) == affected
+                and (
+                    bool(affected_checks.intersection(question_checks(item, payload)))
+                    if affected_checks
+                    else item["prompt"] == question["prompt"]
+                    and set(item["target_ids"]) == affected
+                )
                 for item in questions.values()
             ),
             "Insufficient material cannot reopen the same blocking question",
@@ -121,9 +145,17 @@ def validate_report(
             all(
                 item["readiness"] == "not_ready"
                 for item in work.values()
-                if affected.intersection(item["target_ids"])
+                if affected_findings.intersection(item["finding_ids"])
             ),
             "Insufficient material cannot make related work ready",
+        )
+        require(
+            all(
+                item["status"] != "checked"
+                for item in results.values()
+                if item["check_id"] in affected_checks
+            ),
+            "Insufficient check must retain a gap",
         )
         require(
             all(

@@ -36,8 +36,10 @@
 
 ## 完成结果
 
-最终全仓库 **1389 passed / 3 skipped / 2 warnings，463.37 秒**；contract_review
-277 项全部通过。本轮新增 54 个检查点场景和 2 个迁移场景。全库 Ruff check、
-format --check（268 文件）、git diff --check 与离线 1.1.1 wheel 构建通过。
+2026-11-01 Astra / xhigh 独立审查修复后，最终全仓库
+**1394 passed / 3 skipped / 2 warnings，353.91 秒**；contract_review 282 项全部通过。
+本轮新增 54 个检查点场景、2 个迁移场景及复审修复 5 项回归。全库 Ruff check、
+format --check（269 文件）、git diff --check 与离线 1.1.1 wheel 构建通过。
+两项 P2（未声明 profile 漂移、材料不足误伤同目标独立工作）已修复并经限定复核关闭。
 完成说明、验收映射及复查命令见 `docs/reports/CR02-TASK-05-completion.md`。
 交付为本地聚焦提交，不调用真实模型、不推送或发布。

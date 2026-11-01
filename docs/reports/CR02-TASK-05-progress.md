@@ -1,5 +1,30 @@
 # TASK-05 最终恢复记录
 
+## 2026-11-01 Astra 复审修复（已完成）
+
+用户指定 `gpt-6-astra / xhigh`，独立审查 6271998 发现两项 P2：未声明 profile 漂移、
+mark_insufficient 误伤同目标独立工作。已在原 TASK-05 范围修复，Astra 限定复核原两项
+通过（原反例 2 passed / 4.85 秒）。详见 `CR02-TASK-05-ASTRA-REVIEW-2026-11-01.md`。
+新增 `test_checkpoint_review_fixes.py` 五个场景；全库 Ruff 269 文件通过。首次全量
+1393 passed / 1 failed（旧 scheduler 的20ms时序断言）；对应模块复测15 passed，未改旧代码。
+保持相同代码重跑完整门禁已通过：**1394 passed / 3 skipped / 2 warnings，353.91 秒**，
+其中 contract_review 282 项全部通过，旧调度器用例也通过。最终日志
+`C:/Users/50469/AppData/Local/Temp/specflow-cr05-astra-fixed-pytest-20261101-retry.log`。
+首轮日志仍保留在同目录去掉 -retry 的文件。
+本轮 wheel 在同 TEMP 下 `specflow-cr05-astra-fixed-build-20261101/`。修复基点为 6271998，
+代码、回归与报告作为一个本地聚焦提交交付，不推送发布。当前授权修复已结束，无运行中测试。
+
+收到旁支只读同步：来源 chat `01a19226-c091-76d1-82b0-6cc1a2ce99d2`，检查 HEAD
+同为 6271998；未修改文件或影响测试。旁支报告旧 runner_multi 的失败阶段内成功兄弟产物
+未独立保存、证据引用仅结构校验、Reviewer 缺原始证据输入；旧失败后已接纳的先前阶段仍
+会保存，不能扩大为“所有后续失败都丢结果”。新流程的片段授权、引用校验及父验收有不同
+边界，不能套用旧结论。恢复目前是状态收尾，成功节点复用/续跑属于未实现能力。
+这是旁支证据同步，主窗口未在本轮重复复现，也未新增修复授权；只作为后续候选保留。
+后续顺序建议为有效产物独立保存 → 冻结复用语义 → 有界续跑，保留固定 DAG 与新父子委派。
+原建议附件：`C:/Users/50469/.codex/attachments/6b330ba8-2f4a-4d8d-b1aa-e9fc0c33ae65/已粘贴的文本.txt`。
+
+以下为 2026-10-31 首次交付记录；其测试数字不代替本轮最终门禁。
+
 日期：2026-10-31（Asia/Shanghai）。产品目录：`C:/Users/50469/specflow-h04-f03-20261023`。
 实现基点：`e20d7077d16ada8ecdd4978ede2341679f7e7f53`。状态：工程实现与最终离线门禁完成。
 正式说明：`docs/reports/CR02-TASK-05-completion.md`；当前中枢：`CR02-CURRENT.md`。

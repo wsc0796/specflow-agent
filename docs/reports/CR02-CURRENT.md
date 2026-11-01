@@ -1,6 +1,10 @@
 # CR02 执行检查点
 
-日期：2026-10-31（Asia/Shanghai）。产品目录：`C:/Users/50469/specflow-h04-f03-20261023`。
+2026-11-01 追加：用户指定 Astra / xhigh 独立审查 TASK-05；确认两项 P2 并已修复，
+Astra 限定复核与最终全量均通过，恢复入口仍为 TASK-05-progress 顶部，
+详情见 `CR02-TASK-05-ASTRA-REVIEW-2026-11-01.md`。本轮修复作为本地聚焦提交交付。
+
+日期：2026-11-01（Asia/Shanghai）。产品目录：`C:/Users/50469/specflow-h04-f03-20261023`。
 
 2026-10-30 已选方案 1 并完成基础切片。2026-10-31 用户强调方案 2 的亮点、讨论简历价值后
 要求继续推进；近期目标调整为方案 2（B/A/A/C/C）的最小演示闭环，含可观测性。
@@ -42,11 +46,12 @@ TASK-04 历史恢复记录为 `docs/reports/CR02-TASK-04-progress.md`，不重�
 
 ## TASK-05 最终验证
 
-全量 **1389 passed / 3 skipped / 2 warnings，463.37 秒**；全库 Ruff check 和
-format --check 通过（268 个 Python 文件），git diff --check 通过。
-跳过与警告均为已有条件。全量内 contract_review 模块 277 项全部通过。
-本次新增 54 个检查点场景及 2 个迁移场景；聚焦迁移/上下文/报告校验 47 passed，
-检查点最后受影响定向 12 passed。此前 TASK-04 基线为 1333 passed / 3 skipped。
+全量 **1394 passed / 3 skipped / 2 warnings，353.91 秒**；全库 Ruff check 和
+format --check 通过（269 个 Python 文件），git diff --check 通过。
+跳过与警告均为已有条件。全量内 contract_review 模块 282 项全部通过。
+TASK-05 首次新增 54 个检查点场景及 2 个迁移场景，Astra 修复追加 5 项回归。
+原两项 P2 已由 Astra / xhigh 限定复核关闭（独立反例 2 passed，4.85 秒）。
+首次修复后全量的旧 scheduler 20ms 用例波动已在定向15项及完整重跑中通过，未改旧代码。
 
 环境方法：现有 Python 3.12.10；`uv run --no-project --offline python -B -X utf8 -m pytest -v
 -p no:cacheprovider`；关闭 pytest 外部插件/bytecode，在测试子进程按名称删除
@@ -55,8 +60,8 @@ SPECFLOW_LLM_API_KEY/BASE_URL/MODEL/TIMEOUT_SECONDS，不读取值。
 初次全量的两个 CLI 配置失败已由环境隔离解决。发布元数据失败来自本机旧安装包
 0.1.0；用 `uv build --wheel --offline` 生成当前 1.1.1 wheel，并将其放在当前 src
 之后的 PYTHONPATH 提供真实构建元数据，随后全量通过。未改全局安装或依赖声明。
-最新构建：`C:/Users/50469/AppData/Local/Temp/specflow-cr05-final-build-20261031/specflow_agent-1.1.1-py3-none-any.whl`。
-最终日志：`C:/Users/50469/AppData/Local/Temp/specflow-cr05-final-pytest-20261031.log`。
+最新构建：`C:/Users/50469/AppData/Local/Temp/specflow-cr05-astra-fixed-build-20261101/specflow_agent-1.1.1-py3-none-any.whl`。
+最终日志：`C:/Users/50469/AppData/Local/Temp/specflow-cr05-astra-fixed-pytest-20261101-retry.log`。
 
 ## 下一步与边界
 

@@ -9,6 +9,7 @@ from sqlalchemy import text
 
 from specflow.contract_review.common import ReviewError, canonical, digest, identity, now
 from specflow.contract_review.inputs import freeze_input
+from specflow.contract_review.report_validation import question_checks
 from specflow.contract_review.schemas import (
     ID,
     AuthorityBinding,
@@ -188,6 +189,7 @@ class CheckpointService:
                     "report_revision_id": request.report_revision_id,
                     "question_id": answer.question_id,
                     "question": question,
+                    "check_ids": sorted(question_checks(question, report["payload"])),
                     "answer": answer.model_dump(exclude_none=True),
                     "selected_option": selected,
                     "actor_subject": "shared-service",
@@ -330,7 +332,9 @@ class CheckpointService:
             raw = create.model_dump(exclude_none=True)
             profile_id = request.execution_profile_id or previous["execution_profile"]["profile_id"]
             profile = self.service.profiles.get(profile_id)
-            if profile is None:
+            if profile is None or (
+                "execution_profile_id" not in patch and profile != previous["execution_profile"]
+            ):
                 raise ReviewError("RETRY_PROFILE_UNAVAILABLE", "修订 profile 不可用。")
             source_changed = raw["source"] != old_raw["source"]
             snapshot = None if source_changed else self._snapshot(conn, previous)
