@@ -1,7 +1,7 @@
 """One authorized F01 trial, using the existing API and worker.
 
 Default execution prepares a non-secret run card. --run is still subject to
-the frozen CNY 1 preflight; it currently stops before authentication or I/O.
+the frozen CNY 2 and verified off-peak-window preflight.
 No launcher, credential store, model probe, retry endpoint or database mutation
 is used to bypass that decision. Runtime artifacts are outside the checkout.
 """

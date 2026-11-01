@@ -2,8 +2,8 @@
 
 The official full context ceiling is deliberately used as the input billing
 bound. Character ratios and the downloadable tokenizer's estimates are not
-substitutes for a demonstrated bound. Consequently the approved CNY 1 trial
-currently cannot pass its first reservation. That is an expected safe stop.
+substitutes for a demonstrated bound. The approved CNY 2 trial is restricted
+to its verified off-peak execution window; every request rechecks that window.
 """
 
 from __future__ import annotations
@@ -33,6 +33,8 @@ MODEL_URL = "https://api-docs.deepseek.com/api/list-models/"
 ALIAS_URL = "https://api-docs.deepseek.com/quick_start/agent_integrations/"
 VERIFIED_ON = "2026-11-01"
 MICROYUAN = Decimal("0.000001")
+WINDOW_START = datetime(2026, 11, 1, 10, tzinfo=UTC)
+WINDOW_END = datetime(2026, 11, 1, 16, tzinfo=UTC)
 
 
 def timestamp():
@@ -49,20 +51,30 @@ class TrialStopped(RuntimeError):
         self.code = code
 
 
+def utc_now():
+    return datetime.now(UTC)
+
+
+def require_execution_window(observed=None):
+    instant = utc_now() if observed is None else observed
+    if instant.tzinfo is None or not WINDOW_START <= instant < WINDOW_END:
+        raise TrialStopped("TRIAL_OFF_PEAK_WINDOW_REQUIRED")
+
+
 @dataclass(frozen=True)
 class FlashPolicy:
-    budget_cny: Decimal = Decimal("1")
+    budget_cny: Decimal = Decimal("2")
     call_limit: int = 12
     input_token_bound: int = 1_048_576
-    input_cny_per_million: Decimal = Decimal("2")
-    output_cny_per_million: Decimal = Decimal("8")
+    input_cny_per_million: Decimal = Decimal("1")
+    output_cny_per_million: Decimal = Decimal("4")
     output_token_limit: int = 8000
     evidence: str = "official-context-ceiling-2026-11-01"
 
     def __post_init__(self):
         if (
             not self.budget_cny.is_finite()
-            or not Decimal("0") < self.budget_cny <= Decimal("1")
+            or not Decimal("0") < self.budget_cny <= Decimal("2")
             or type(self.call_limit) is not int
             or not 1 <= self.call_limit <= 12
             or type(self.input_token_bound) is not int
@@ -105,13 +117,17 @@ class FlashPolicy:
             "alias_source": ALIAS_URL,
             "requested_model": REQUEST_MODEL,
             "provider_serving_version_reported_by_docs": "DeepSeek-V4.1-Flash-1017",
-            "billing_basis": "peak, cache-miss upper rate; not a provider invoice",
+            "billing_basis": "off-peak, cache-miss upper rate; not a provider invoice",
+            "not_before_utc": WINDOW_START.isoformat(),
+            "expires_utc": WINDOW_END.isoformat(),
+            "execution_window_shanghai": "2026-11-01 18:00 through 24:00 (exclusive)",
             "thinking_policy": "provider documented default enabled/high",
             "temperature_effective": False,
             "server_tools": "not requested",
         }
 
     def require_first_dispatch(self):
+        require_execution_window()
         if self.quote() > self.budget_cny:
             raise TrialStopped("BUDGET_PRECHECK_FAILED")
 
@@ -170,6 +186,7 @@ class TrialLedger:
 
     def http_started(self, call):
         with self._lock:
+            require_execution_window()
             if call not in self._calls or call in self._http_attempts or self._halt:
                 raise TrialStopped("TRIAL_HTTP_DISPATCH_INVALID")
             self._write("http_transport_entered", trial_call_id=call, remote_receipt="unknown")
@@ -348,8 +365,9 @@ class GuardedFlashAdapter(OpenAIReviewAdapter):
             self._complete_lock.release()
 
     def _complete_one(self, payload, profile):
-        wire = self.prepare(payload, profile)
         try:
+            require_execution_window()
+            wire = self.prepare(payload, profile)
             call = self.trial_ledger.reserve(wire)
         except TrialStopped as error:
             raise ProviderFailure(

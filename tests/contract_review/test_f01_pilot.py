@@ -5,6 +5,7 @@ import importlib.util
 import json
 import os
 import sys
+from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
 
@@ -31,6 +32,11 @@ def load_script(name, filename):
 
 guard = load_script("f01_trial_guard", "f01_trial_guard.py")
 pilot = load_script("f01_pilot", "run_f01_pilot.py")
+
+
+@pytest.fixture(autouse=True)
+def approved_execution_time(monkeypatch):
+    monkeypatch.setattr(guard, "utc_now", lambda: datetime(2026, 11, 1, 10, 30, tzinfo=UTC))
 
 
 def response(*, usage=True, model="deepseek-flash"):
@@ -78,19 +84,45 @@ def adapter_factory(tmp_path):
 
 
 def test_cny_one_cannot_cover_the_demonstrated_context_bound():
-    policy = guard.FlashPolicy()
-    assert policy.quote() == Decimal("2.161152")
+    policy = guard.FlashPolicy(budget_cny=Decimal("1"))
+    assert policy.quote() == Decimal("1.080576")
     assert policy.record()["currency"] == "CNY"
-    assert policy.record()["billing_basis"].startswith("peak")
+    assert policy.record()["billing_basis"].startswith("off-peak")
     with pytest.raises(guard.TrialStopped, match="BUDGET_PRECHECK_FAILED"):
         policy.require_first_dispatch()
+
+
+def test_current_cny_two_grant_covers_first_off_peak_reservation():
+    policy = guard.FlashPolicy()
+    policy.require_first_dispatch()
+    assert policy.budget_cny == Decimal("2")
+    assert policy.quote() == Decimal("1.080576")
+
+
+@pytest.mark.parametrize(
+    ("instant", "allowed"),
+    [
+        (datetime(2026, 11, 1, 9, 59, 59, tzinfo=UTC), False),
+        (datetime(2026, 11, 1, 10, tzinfo=UTC), True),
+        (datetime(2026, 11, 1, 15, 59, 59, tzinfo=UTC), True),
+        (datetime(2026, 11, 1, 16, tzinfo=UTC), False),
+        (datetime(2026, 11, 2, 10, tzinfo=UTC), False),
+        (datetime(2026, 11, 1, 10), False),
+    ],
+)
+def test_off_peak_execution_window_boundaries(instant, allowed):
+    if allowed:
+        guard.require_execution_window(instant)
+    else:
+        with pytest.raises(guard.TrialStopped, match="TRIAL_OFF_PEAK_WINDOW_REQUIRED"):
+            guard.require_execution_window(instant)
 
 
 @pytest.mark.parametrize(
     "values",
     [
         {"budget_cny": Decimal("0")},
-        {"budget_cny": Decimal("1.01")},
+        {"budget_cny": Decimal("2.01")},
         {"budget_cny": Decimal("NaN")},
         {"call_limit": 13},
         {"call_limit": True},
@@ -123,7 +155,9 @@ def test_live_adapter_rejects_a_test_only_input_bound_and_other_channel(tmp_path
 
 
 def test_currency_denial_occurs_before_any_transport(adapter_factory):
-    adapter, ledger, profile, wire, calls = adapter_factory(policy=guard.FlashPolicy())
+    adapter, ledger, profile, wire, calls = adapter_factory(
+        policy=guard.FlashPolicy(budget_cny=Decimal("1"))
+    )
     with pytest.raises(ProviderFailure) as error:
         adapter.complete(wire, profile=profile)
     assert error.value.code == "TRIAL_FEE_LIMIT"
@@ -133,12 +167,35 @@ def test_currency_denial_occurs_before_any_transport(adapter_factory):
     assert ledger.summary()["model_call_reservations"] == 0
 
 
+def test_window_denial_precedes_reservation_and_http(adapter_factory, monkeypatch):
+    adapter, ledger, profile, wire, calls = adapter_factory()
+    monkeypatch.setattr(guard, "utc_now", lambda: datetime(2026, 11, 1, 9, 59, tzinfo=UTC))
+    with pytest.raises(ProviderFailure) as error:
+        adapter.complete(wire, profile=profile)
+    assert error.value.code == "TRIAL_OFF_PEAK_WINDOW_REQUIRED"
+    assert ledger.summary()["model_call_reservations"] == 0
+    assert calls == []
+
+
+def test_transport_rechecks_window_immediately_before_http(adapter_factory, monkeypatch):
+    adapter, ledger, profile, wire, calls = adapter_factory()
+    instants = iter(
+        (datetime(2026, 11, 1, 15, 59, 59, tzinfo=UTC), datetime(2026, 11, 1, 16, tzinfo=UTC))
+    )
+    monkeypatch.setattr(guard, "utc_now", lambda: next(instants))
+    with pytest.raises(ProviderFailure):
+        adapter.complete(wire, profile=profile)
+    assert ledger.summary()["model_call_reservations"] == 1
+    assert ledger.summary()["business_model_http_attempts"] == 0
+    assert calls == []
+
+
 def test_complete_usage_releases_only_its_reservation(adapter_factory):
     adapter, ledger, profile, wire, calls = adapter_factory()
     assert adapter.complete(wire, profile=profile)["model"] == "deepseek-flash"
     summary = ledger.summary()
     assert summary["business_model_http_attempts"] == 1
-    assert summary["cost_cny_upper_accounted"] == "0.000038"
+    assert summary["cost_cny_upper_accounted"] == "0.000019"
     assert Decimal(summary["unsettled_cny_reserved"]) == 0
     assert summary["provider_invoice_cost"] is None
     assert len(calls) == 1
@@ -275,6 +332,7 @@ def test_public_run_is_blocked_before_auth_case_creation_and_api(tmp_path, monke
     )
     public.update(ANTHROPIC_BASE_URL=guard.LAUNCHER_BASE, ANTHROPIC_MODEL=guard.REQUEST_MODEL)
     monkeypatch.setattr(pilot.os, "environ", public)
+    monkeypatch.setattr(pilot, "FlashPolicy", lambda: guard.FlashPolicy(budget_cny=Decimal("1")))
     monkeypatch.setattr(pilot, "_run_api", lambda *_: pytest.fail("API must not start"))
     monkeypatch.setattr(pilot, "prepare_case", lambda *_: pytest.fail("Case must not be created"))
     output = tmp_path / "run"
@@ -296,6 +354,28 @@ def test_channel_mismatch_does_not_fall_back(tmp_path, monkeypatch):
     result = pilot.run_pilot(REPO, tmp_path / "run", live=True)
     assert result["reason"] == "AUTHORIZED_CHANNEL_METADATA_MISMATCH"
     assert result["business_model_http_attempts"] == 0
+
+
+def test_two_cny_preparation_does_not_load_auth_or_start_api(tmp_path, monkeypatch):
+    class PublicEnvironment(dict):
+        def get(self, name, default=None):
+            assert name != "ANTHROPIC_AUTH_TOKEN"
+            return super().get(name, default)
+
+    public = PublicEnvironment(
+        {key: os.environ[key] for key in ("PATH", "SYSTEMROOT", "TEMP", "TMP") if key in os.environ}
+    )
+    public.update(ANTHROPIC_BASE_URL=guard.LAUNCHER_BASE, ANTHROPIC_MODEL=guard.REQUEST_MODEL)
+    monkeypatch.setattr(pilot.os, "environ", public)
+    monkeypatch.setattr(pilot, "_run_api", lambda *_: pytest.fail("Preparation cannot start API"))
+    output = tmp_path / "prepare-only"
+    result = pilot.run_pilot(REPO, output)
+    assert result["status"] == "PREPARED_NOT_DISPATCHED"
+    assert result["trial_policy"]["budget_cny"] == "2"
+    assert result["trial_policy"]["reservation_cny"] == "1.080576"
+    assert result["trial_consumed"] is False
+    assert result["business_model_http_attempts"] == 0
+    assert [p.name for p in output.iterdir()] == ["run.json"]
 
 
 def test_trial_outputs_cannot_be_written_inside_the_product_checkout():
