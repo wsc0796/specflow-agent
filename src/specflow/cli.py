@@ -13,6 +13,11 @@ def main(argv: list[str] | None = None) -> None:
     """Parse arguments and delegate to the runner."""
     args = _parse_args(argv or sys.argv[1:])
 
+    if args.command == "contract-review":
+        from specflow.contract_review.cli import execute
+
+        raise SystemExit(execute(args))
+
     if args.command == "benchmark":
         from specflow.evaluation.benchmark import (
             load_benchmark_cases,
@@ -81,6 +86,9 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
         help="Show the installed package version and exit",
     )
     subparsers = parser.add_subparsers(dest="command")
+    from specflow.contract_review.cli import configure_parser
+
+    configure_parser(subparsers)
 
     run_parser = subparsers.add_parser("run", help="Run specification generation")
     run_parser.add_argument("--repo", required=True, help="Path to the target repository")

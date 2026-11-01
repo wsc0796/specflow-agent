@@ -2,15 +2,16 @@
 
 import base64
 import json
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Header, Query, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from sqlalchemy import text
 
 from specflow.contract_review.checkpoints import ResolutionBatch, RevisionRequest
 from specflow.contract_review.common import ReviewError, canonical
 from specflow.contract_review.decisions import DecisionRequest
+from specflow.contract_review.queries import event_view
 from specflow.contract_review.schemas import CreateReview
 from specflow.contract_review.verification import VerificationImport
 
@@ -120,6 +121,17 @@ def get_review(review_id: str, request: Request):
     return service(request).get(review_id)
 
 
+@router.get("")
+def list_reviews(
+    request: Request,
+    project_id: Annotated[str, Query(min_length=1, max_length=64)],
+    cursor: Annotated[str | None, Query(min_length=1, max_length=512)] = None,
+    limit: Annotated[int, Query(ge=1, le=100)] = 20,
+):
+    query_fields(request, ("project_id", "cursor", "limit"))
+    return service(request).queries.list(project_id, cursor, limit)
+
+
 @router.post("/{review_id}/resolution-batches")
 def resolution_batch(
     review_id: str,
@@ -149,17 +161,32 @@ def get_report(
     review_id: str,
     request: Request,
     report_revision_id: Annotated[str | None, Query(min_length=1, max_length=64)] = None,
+    format: Literal["json", "markdown"] = "json",
+):
+    query_fields(request, ("report_revision_id", "format"))
+    if format == "markdown":
+        return Response(
+            service(request).markdown(review_id, report_revision_id), media_type="text/markdown"
+        )
+    return service(request).report(review_id, report_revision_id)
+
+
+@router.get("/{review_id}/questions")
+def questions(
+    review_id: str,
+    request: Request,
+    report_revision_id: Annotated[str | None, Query(min_length=1, max_length=64)] = None,
 ):
     query_fields(request, ("report_revision_id",))
-    return service(request).report(review_id, report_revision_id)
+    return service(request).queries.questions(review_id, report_revision_id)
 
 
 @router.get("/{review_id}/events")
 def events(
     review_id: str,
     request: Request,
-    job_id: str | None = None,
-    cursor: Annotated[str | None, Query(max_length=512)] = None,
+    job_id: Annotated[str | None, Query(min_length=1, max_length=64)] = None,
+    cursor: Annotated[str | None, Query(min_length=1, max_length=512)] = None,
     limit: Annotated[int, Query(ge=1, le=100)] = 20,
 ):
     query_fields(request, ("job_id", "cursor", "limit"))
@@ -195,7 +222,7 @@ def events(
         rows = (
             conn.execute(
                 text(
-                    "SELECT body,event_seq FROM contract_review_events "
+                    "SELECT * FROM contract_review_events "
                     "WHERE review_id=:review AND event_seq>:after "
                     "AND (:job IS NULL OR job_id=:job) "
                     "ORDER BY event_seq LIMIT :count"
@@ -217,7 +244,7 @@ def events(
                 ).encode("utf-8")
             ).decode("ascii")
         return {
-            "items": [json.loads(row["body"]) for row in rows[:limit]],
+            "items": [event_view(row)[0] for row in rows[:limit]],
             "next_cursor": next_cursor,
         }
 
@@ -230,13 +257,21 @@ def event_detail(review_id: str, event_id: str, request: Request):
         domain.require_review(conn, review_id)
         row = domain.store.row(
             conn,
-            "SELECT body,payload FROM contract_review_events WHERE id=:id AND review_id=:review",
+            "SELECT * FROM contract_review_events WHERE id=:id AND review_id=:review",
             id=event_id,
             review=review_id,
         )
         if row is None:
             raise ReviewError("RESOURCE_NOT_FOUND", "事件不属于本审查。", 404)
-        return {**json.loads(row["body"]), "payload": json.loads(row["payload"])}
+        metadata, payload = event_view(row)
+        if not metadata["payload_available"]:
+            raise ReviewError(
+                "EVENT_PAYLOAD_NOT_AVAILABLE",
+                "事件正文缺失或不能可靠重建。",
+                404,
+                missing_evidence=metadata["missing_evidence"],
+            )
+        return {**metadata, "payload": payload}
 
 
 @router.post("/{review_id}/verification-evidence", status_code=201)

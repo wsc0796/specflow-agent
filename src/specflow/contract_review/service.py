@@ -10,6 +10,7 @@ from specflow.contract_review.checkpoints import CheckpointService
 from specflow.contract_review.common import ReviewError, canonical, digest, identity, now
 from specflow.contract_review.decisions import DecisionService
 from specflow.contract_review.inputs import freeze_input
+from specflow.contract_review.queries import ReviewQueries
 from specflow.contract_review.schemas import ExecutionProfile
 from specflow.contract_review.store import ReviewStore
 from specflow.contract_review.verification import VerificationService
@@ -24,6 +25,7 @@ class ReviewService:
         self.verifications = VerificationService(self)
         self.checkpoints = CheckpointService(self)
         self.decisions = DecisionService(self)
+        self.queries = ReviewQueries(self)
         for name, value in (profiles or {}).items():
             try:
                 profile = ExecutionProfile.model_validate(value)
@@ -397,6 +399,7 @@ class ReviewService:
                 "job_id": job["id"],
                 "job_status": job["status"],
                 "error_code": job["error_code"],
+                **self.queries.diagnostics(conn, job),
                 "check_manifest": frozen["check_manifest"],
                 "quality": quality,
                 "report_available": row["current_report_id"] is not None,
@@ -431,17 +434,17 @@ class ReviewService:
 
     def report(self, review_id, report_id=None):
         with self.store.read() as conn:
-            review = self.require_review(conn, review_id)
-            current = report_id is None
-            report_id = review["current_report_id"] if current else report_id
-            row = self.store.row(
-                conn,
-                "SELECT * FROM contract_review_reports WHERE id=:id AND review_id=:review",
-                id=report_id,
-                review=review_id,
-            )
-            if row is None:
-                raise ReviewError("REPORT_NOT_AVAILABLE", "指定输入尚无正式报告。", 404)
-            if current and row["input_id"] != review["current_input_id"]:
-                raise ReviewError("INTERNAL_ERROR", "当前报告归属不完整。", 500)
-            return json.loads(row["body"])
+            return self.queries.report_record(conn, review_id, report_id)[2]
+
+    def markdown(self, review_id, report_id=None):
+        from specflow.contract_review.reporting import render_report
+
+        with self.store.read() as conn:
+            _, row, report = self.queries.report_record(conn, review_id, report_id)
+            frozen = self.verifications.input(conn, review_id, row["input_id"])
+            try:
+                return render_report(report, frozen)
+            except Exception:
+                raise ReviewError(
+                    "INTERNAL_ERROR", "报告展示生成失败；权威 JSON 仍可查询。", 500
+                ) from None
