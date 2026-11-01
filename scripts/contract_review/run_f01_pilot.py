@@ -13,6 +13,7 @@ import copy
 import json
 import multiprocessing
 import os
+import re
 import secrets
 import socket
 import subprocess
@@ -34,7 +35,7 @@ from f01_trial_guard import (
 
 BASELINE = "ef2c53af26f0a02f61b4e7c8fa07e1d767a17029"
 CASE = "CR02-F01"
-TRIAL = "TR02-F01-COMMON-01"
+SOURCE_TRIAL = "TR02-F01-COMMON-01"
 SAMPLE = "SP02-F01-COMMON-01"
 PROFILE = "pilot-f01-deepseek-flash-v2"
 MATERIALS = (
@@ -106,7 +107,7 @@ def load_case(repository):
         raise TrialStopped("F01_IDENTITY_MISMATCH")
     case = selected[0]
     if (
-        case["trial_id"] != TRIAL
+        case["trial_id"] != SOURCE_TRIAL
         or case["sample_id"] != SAMPLE
         or [(s["path"], s["role"], s["fixture"]) for s in case["sources"]] != list(MATERIALS)
         or case["request"]["target_api_version"] != "v2"
@@ -271,7 +272,9 @@ def collect_review(client, review, job):
     return collected
 
 
-def submit_and_observe(client, case_root, body, *, seconds=600, interval=0.25, on_accept=None):
+def submit_and_observe(
+    client, case_root, body, *, trial_id=SOURCE_TRIAL, seconds=600, interval=0.25, on_accept=None
+):
     project = client.post(
         "/api/v1/projects", json={"name": "Original F01 pilot", "repository_path": str(case_root)}
     )
@@ -281,7 +284,7 @@ def submit_and_observe(client, case_root, body, *, seconds=600, interval=0.25, o
     accepted = client.post(
         "/api/v1/contract-reviews",
         json=body,
-        headers={"Idempotency-Key": TRIAL},
+        headers={"Idempotency-Key": trial_id},
     )
     accepted.raise_for_status()
     accepted = accepted.json()
@@ -323,7 +326,7 @@ def submit_and_observe(client, case_root, body, *, seconds=600, interval=0.25, o
     return evidence
 
 
-def _run_api(root, case_root, body):
+def _run_api(root, case_root, body, *, trial_id=SOURCE_TRIAL):
     context = multiprocessing.get_context("spawn")
     parent, child = context.Pipe(duplex=False)
     stop = context.Event()
@@ -359,6 +362,7 @@ def _run_api(root, case_root, body):
                 client,
                 case_root,
                 body,
+                trial_id=trial_id,
                 on_accept=lambda value: _save(root / "accepted.json", value),
             )
             _save(root / "review-evidence.json", result)
@@ -413,7 +417,15 @@ def trial_account(root):
     }
 
 
-def run_pilot(repository, output, *, live=False):
+def run_pilot(repository, output, *, live=False, trial_id=None):
+    if trial_id is not None and (
+        not isinstance(trial_id, str)
+        or re.fullmatch(r"TR02-F01-COMMON-(?:0[1-9]|[1-9][0-9])", trial_id) is None
+    ):
+        raise TrialStopped("INVALID_F01_TRIAL_ID")
+    if live and (trial_id is None or trial_id == SOURCE_TRIAL):
+        raise TrialStopped("NEW_F01_TRIAL_ID_REQUIRED")
+    trial_id = trial_id or SOURCE_TRIAL
     repository, output = repository.resolve(), output.resolve()
     if output == repository or repository in output.parents:
         raise TrialStopped("OUTPUT_MUST_BE_OUTSIDE_CHECKOUT")
@@ -421,7 +433,8 @@ def run_pilot(repository, output, *, live=False):
     policy = FlashPolicy()
     record = {
         "case_id": CASE,
-        "trial_id": TRIAL,
+        "trial_id": trial_id,
+        "source_trial_id": SOURCE_TRIAL,
         "sample_id": SAMPLE,
         "created_at": timestamp(),
         "requested_live_execution": live,
@@ -455,7 +468,7 @@ def run_pilot(repository, output, *, live=False):
             case_root, body = prepare_case(repository, output, load_case(repository))
             _save(output / "frozen-request.json", body)
             record["trial_consumed"] = True
-            evidence = _run_api(output, case_root, body)
+            evidence = _run_api(output, case_root, body, trial_id=trial_id)
             record.update(status="OBSERVED", semantic_verdict="PENDING_EVIDENCE_REVIEW")
             record["review_id"] = evidence["accepted"]["review_id"]
             record["input_revision_id"] = evidence["accepted"]["input_revision_id"]
@@ -481,12 +494,15 @@ def run_pilot(repository, output, *, live=False):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--trial-id", help="Explicit new F01 execution identity required for --run")
     parser.add_argument(
         "--run", action="store_true", help="Requires every frozen preflight to pass"
     )
     args = parser.parse_args()
     try:
-        result = run_pilot(Path(__file__).resolve().parents[2], args.output, live=args.run)
+        result = run_pilot(
+            Path(__file__).resolve().parents[2], args.output, live=args.run, trial_id=args.trial_id
+        )
     except Exception as error:
         result = {"status": "NOT_STARTED", "reason": type(error).__name__}
     print(json.dumps(result, ensure_ascii=False, indent=2, allow_nan=False))

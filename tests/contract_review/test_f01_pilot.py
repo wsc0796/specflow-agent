@@ -336,7 +336,7 @@ def test_pilot_protocol_guidance_has_a_new_frozen_identity_only(adapter_factory)
     assert profile["analysis_prompt"].startswith(original["analysis_prompt"])
     guidance = profile["analysis_prompt"][len(original["analysis_prompt"]) :]
     assert guidance
-    for forbidden in (pilot.CASE, pilot.TRIAL, pilot.SAMPLE, "job_id", "oracle"):
+    for forbidden in (pilot.CASE, pilot.SOURCE_TRIAL, pilot.SAMPLE, "job_id", "oracle"):
         assert forbidden not in guidance
     assert all(path not in guidance for path, _, _ in pilot.MATERIALS)
     assert {
@@ -489,7 +489,7 @@ def test_public_run_is_blocked_before_auth_case_creation_and_api(tmp_path, monke
     monkeypatch.setattr(pilot, "_run_api", lambda *_: pytest.fail("API must not start"))
     monkeypatch.setattr(pilot, "prepare_case", lambda *_: pytest.fail("Case must not be created"))
     output = tmp_path / "run"
-    result = pilot.run_pilot(REPO, output, live=True)
+    result = pilot.run_pilot(REPO, output, live=True, trial_id="TR02-F01-COMMON-02")
     assert result["status"] == "BLOCKED_BEFORE_DISPATCH"
     assert result["reason"] == "BUDGET_PRECHECK_FAILED"
     assert result["business_model_http_attempts"] == 0
@@ -498,15 +498,87 @@ def test_public_run_is_blocked_before_auth_case_creation_and_api(tmp_path, monke
     assert list(p.name for p in output.iterdir()) == ["run.json"]
     before = (output / "run.json").read_bytes()
     with pytest.raises(FileExistsError):
-        pilot.run_pilot(REPO, output, live=True)
+        pilot.run_pilot(REPO, output, live=True, trial_id="TR02-F01-COMMON-02")
     assert (output / "run.json").read_bytes() == before
 
 
 def test_channel_mismatch_does_not_fall_back(tmp_path, monkeypatch):
     monkeypatch.setenv("ANTHROPIC_BASE_URL", "https://different.invalid/anthropic")
-    result = pilot.run_pilot(REPO, tmp_path / "run", live=True)
+    result = pilot.run_pilot(REPO, tmp_path / "run", live=True, trial_id="TR02-F01-COMMON-02")
     assert result["reason"] == "AUTHORIZED_CHANNEL_METADATA_MISMATCH"
     assert result["business_model_http_attempts"] == 0
+
+
+@pytest.mark.parametrize(
+    "trial_id",
+    [None, "TR02-F01-COMMON-01", "TR02-F01-COMMON-00", "TR02-F02-COMMON-02", "bad", 2],
+)
+def test_live_trial_identity_is_rejected_before_environment_and_api(
+    tmp_path, monkeypatch, trial_id
+):
+    class UnreadableEnvironment(dict):
+        def get(self, *args):
+            pytest.fail("Invalid trial must not read environment or authentication")
+
+    monkeypatch.setattr(pilot.os, "environ", UnreadableEnvironment())
+    monkeypatch.setattr(pilot, "_run_api", lambda *a, **k: pytest.fail("API must not start"))
+    output = tmp_path / "rejected"
+    expected = (
+        "NEW_F01_TRIAL_ID_REQUIRED"
+        if trial_id is None or trial_id == pilot.SOURCE_TRIAL
+        else "INVALID_F01_TRIAL_ID"
+    )
+    with pytest.raises(guard.TrialStopped, match=expected):
+        pilot.run_pilot(REPO, output, live=True, trial_id=trial_id)
+    assert not output.exists()
+
+
+def test_new_execution_identity_preserves_source_and_reaches_idempotency_key(tmp_path, monkeypatch):
+    source_case = pilot.load_case(REPO)
+    assert source_case["trial_id"] == pilot.SOURCE_TRIAL == "TR02-F01-COMMON-01"
+    assert source_case["sample_id"] == pilot.SAMPLE == "SP02-F01-COMMON-01"
+    submitted = []
+
+    class Client:
+        def post(self, path, **kwargs):
+            if path.endswith("projects"):
+                body, status = {"id": "project"}, 201
+            else:
+                submitted.append(copy.deepcopy(kwargs))
+                body = {"review_id": "review", "job_id": "job", "input_revision_id": "input"}
+                status = 202
+            return httpx.Response(
+                status, json=body, request=httpx.Request("POST", "http://local" + path)
+            )
+
+        def get(self, path):
+            return httpx.Response(
+                200, json={"status": "failed"}, request=httpx.Request("GET", "http://local" + path)
+            )
+
+    def fake_local_api(root, case_root, body, *, trial_id):
+        assert trial_id == "TR02-F01-COMMON-02"
+        return pilot.submit_and_observe(Client(), case_root, body, trial_id=trial_id)
+
+    monkeypatch.setenv("ANTHROPIC_BASE_URL", guard.LAUNCHER_BASE)
+    monkeypatch.setenv("ANTHROPIC_MODEL", guard.REQUEST_MODEL)
+    monkeypatch.setattr(pilot, "_run_api", fake_local_api)
+    monkeypatch.setattr(pilot, "collect_review", lambda *_: {})
+    result = pilot.run_pilot(
+        REPO, tmp_path / "execution-02", live=True, trial_id="TR02-F01-COMMON-02"
+    )
+    saved = json.loads((tmp_path / "execution-02" / "run.json").read_text(encoding="utf-8"))
+    assert saved == result
+    assert saved["trial_id"] == "TR02-F01-COMMON-02"
+    assert saved["source_trial_id"] == source_case["trial_id"]
+    assert saved["sample_id"] == source_case["sample_id"]
+    assert saved["business_model_http_attempts"] == 0
+    assert len(submitted) == 1
+    assert submitted[0]["headers"]["Idempotency-Key"] == saved["trial_id"]
+    for key in ("request", "targets", "target_api_version", "ruleset_usage"):
+        assert submitted[0]["json"][key] == source_case["request"][key]
+    assert saved["trial_id"] not in json.dumps(submitted[0]["json"])
+    assert pilot.load_case(REPO) == source_case
 
 
 def test_two_cny_preparation_does_not_load_auth_or_start_api(tmp_path, monkeypatch):
