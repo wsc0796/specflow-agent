@@ -36,7 +36,7 @@ BASELINE = "ef2c53af26f0a02f61b4e7c8fa07e1d767a17029"
 CASE = "CR02-F01"
 TRIAL = "TR02-F01-COMMON-01"
 SAMPLE = "SP02-F01-COMMON-01"
-PROFILE = "pilot-f01-deepseek-flash-v1"
+PROFILE = "pilot-f01-deepseek-flash-v2"
 MATERIALS = (
     ("contracts/v2.json", "contract", "contract-v2.json"),
     ("src/api.py", "implementation", "api-correct.py"),
@@ -158,14 +158,25 @@ def prepare_case(repository, root, case):
 
 def make_profile(adapter):
     from specflow.contract_review.profiles import dynamic_profile
+    from specflow.contract_review.schemas import ExecutionProfile
 
-    return dynamic_profile(
+    profile = dynamic_profile(
         PROFILE,
         REQUEST_MODEL,
         execution_mode=adapter.execution_mode,
         delegation=False,
         provider_binding=adapter.binding,
     )
+    profile["analysis_prompt"] += (
+        "\n证据引用与选源分开：source_catalog 的 ID、路径、哈希和行数只是目录元数据，"
+        "可用于工具 arguments 选择来源，不证明已读取正文。reason.evidence_refs 只能引用"
+        "已投影到模型请求中的正文片段或观察；工具已经执行但观察尚未投影也不算已读。"
+        "只有目标或目录信息时，允许 evidence_refs=[]，据此先请求必要的读取工具。"
+        "引用范围不得超过实际投影的片段。遇到 Referenced body was not projected 反馈时，"
+        "移除未投影的引用，先读取所需正文，待观察进入后续请求再引用；"
+        "添加其他引用不能使原有未读引用合法。\n"
+    )
+    return ExecutionProfile.model_validate(profile).frozen()
 
 
 def _serve(root_text, api_key, stop, connection):

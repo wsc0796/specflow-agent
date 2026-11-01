@@ -14,6 +14,8 @@ import pytest
 from fastapi.testclient import TestClient
 
 from specflow.api_security import ApiSecurity
+from specflow.contract_review.dynamic_runner import DynamicRunner
+from specflow.contract_review.profiles import dynamic_profile
 from specflow.contract_review.provider import ProviderFailure
 from specflow.llm.providers.config import OpenAICompatibleConfig
 from specflow.main import create_app
@@ -319,6 +321,157 @@ def test_original_case_copy_contains_four_sources_and_two_targets(tmp_path):
         assert (case_root / path).read_bytes() == original
     assert not (case_root / "oracles.json").exists()
     assert not (case_root / "human-scripts.json").exists()
+
+
+def test_pilot_protocol_guidance_has_a_new_frozen_identity_only(adapter_factory):
+    adapter, _, profile, _, _ = adapter_factory()
+    original = dynamic_profile(
+        "pilot-f01-deepseek-flash-v1",
+        guard.REQUEST_MODEL,
+        execution_mode=adapter.execution_mode,
+        delegation=False,
+        provider_binding=adapter.binding,
+    )
+    assert profile["profile_id"] == "pilot-f01-deepseek-flash-v2"
+    assert profile["analysis_prompt"].startswith(original["analysis_prompt"])
+    guidance = profile["analysis_prompt"][len(original["analysis_prompt"]) :]
+    assert guidance
+    for forbidden in (pilot.CASE, pilot.TRIAL, pilot.SAMPLE, "job_id", "oracle"):
+        assert forbidden not in guidance
+    assert all(path not in guidance for path, _, _ in pilot.MATERIALS)
+    assert {
+        key: value for key, value in profile.items() if key not in ("profile_id", "analysis_prompt")
+    } == {
+        key: value
+        for key, value in original.items()
+        if key not in ("profile_id", "analysis_prompt")
+    }
+
+
+@pytest.mark.parametrize("mode", ["catalog_only", "unread_reference", "corrected_reference"])
+def test_pilot_evidence_visibility_through_worker(
+    tmp_path, git_repo, controlled_adapter, adapter_factory, monkeypatch, mode
+):
+    fallback = controlled_adapter()
+    requests, dispatched, before_projection = [], [], []
+    original_tool = DynamicRunner._tool
+
+    def tool_with_visibility_check(runner, state, action):
+        dispatched.append(copy.deepcopy(action))
+        original_tool(runner, state, action)
+        observation = next(reversed(state.observations.values()))
+        # An actual successful tool result is still not model-visible at this point.
+        premature = copy.deepcopy(action)
+        premature.pop("child_result_reviews", None)
+        premature["reason"]["evidence_refs"] = [
+            {"kind": "source", "source_ref": observation["source_refs"][0]}
+        ]
+        with pytest.raises(ValueError, match="Referenced body was not projected"):
+            runner._parse(state, premature)
+        premature["reason"]["evidence_refs"] = [
+            {"kind": "observation", "observation_id": observation["observation_id"]}
+        ]
+        with pytest.raises(ValueError, match="Unknown accepted observation"):
+            runner._parse(state, premature)
+        before_projection.append(observation["observation_id"])
+
+    monkeypatch.setattr(DynamicRunner, "_tool", tool_with_visibility_check)
+
+    def handle(request):
+        wire = json.loads(request.content)
+        data = json.loads(wire["messages"][1]["content"])
+        requests.append(data)
+        assert wire["messages"][0]["content"] in (
+            profile["analysis_prompt"],
+            profile["review_prompt"],
+        )
+        if "candidate_report" in data or data["observations"]:
+            action = json.loads(fallback.complete(wire)["content"])
+            if "candidate_report" not in data:
+                observation = data["observations"][0]
+                action["reason"]["evidence_refs"] = [
+                    {"kind": "source", "source_ref": observation["source_refs"][0]},
+                    {"kind": "observation", "observation_id": observation["observation_id"]},
+                ]
+        else:
+            source = next(
+                item for item in data["source_catalog"]["items"] if "documentation" in item["roles"]
+            )
+            assert "body" not in source
+            refs = []
+            if mode == "unread_reference" or (
+                mode == "corrected_reference" and "protocol_feedback" not in data
+            ):
+                refs = [
+                    {
+                        "kind": "source",
+                        "source_ref": {
+                            "source_id": source["source_id"],
+                            "selector": {"kind": "full"},
+                        },
+                    }
+                ]
+            if "protocol_feedback" in data:
+                assert "Referenced body was not projected" in json.dumps(data["protocol_feedback"])
+                if mode == "unread_reference":
+                    # Adding a valid contract citation does not cure the unread citation.
+                    refs.append(
+                        {"kind": "source", "source_ref": data["rule_materials"][0]["source_ref"]}
+                    )
+            action = {
+                "schema_version": "contract-review-action.v2.1",
+                "action": "tool_call",
+                "reason": {
+                    "gap": "读取目标正文",
+                    "evidence_refs": refs,
+                    "expected_information": "取得正文片段",
+                },
+                "tool": "read_source",
+                "arguments": {
+                    "source_id": source["source_id"],
+                    "start_line": 1,
+                    "end_line": source["line_count"],
+                },
+            }
+        return httpx.Response(
+            200,
+            json={
+                "model": "deepseek-flash",
+                "choices": [{"message": {"content": json.dumps(action, ensure_ascii=False)}}],
+                "usage": {"prompt_tokens": 3, "completion_tokens": 4, "total_tokens": 7},
+            },
+        )
+
+    adapter, _, profile, _, calls = adapter_factory(handle)
+    root, _, body = git_repo
+    body = copy.deepcopy(body)
+    body.pop("project_id")
+    body["execution_profile_id"] = pilot.PROFILE
+    app = create_app(
+        database_url=f"sqlite:///{(tmp_path / 'visibility.sqlite').as_posix()}",
+        artifact_root=tmp_path / "artifacts",
+        security=ApiSecurity(api_key="synthetic-local-key", allowed_repository_roots=(str(root),)),
+        contract_review_profiles={pilot.PROFILE: profile},
+        contract_review_adapter=adapter,
+    )
+    with TestClient(app, headers={"X-API-Key": "synthetic-local-key"}) as client:
+        result = pilot.submit_and_observe(client, root, body, seconds=10, interval=0.01)
+    assert len(requests[0]["source_catalog"]["items"]) == 4
+    assert len(requests[0]["targets"]) == 2
+    if mode == "unread_reference":
+        assert result["status"]["status"] == "failed"
+        assert result["status"]["error_code"] == "ACTION_PROTOCOL_ERROR"
+        assert len(calls) == 2
+        assert all("candidate_report" not in data for data in requests)
+        assert dispatched == before_projection == []
+        assert "report_json" not in result
+    else:
+        assert result["status"]["status"] == "completed_degraded"
+        assert len(dispatched) == len(before_projection) == 1
+        assert dispatched[0]["reason"]["evidence_refs"] == []
+        assert len(calls) == (4 if mode == "corrected_reference" else 3)
+        assert result["report_json"]
+    assert result["semantic_verdict"] == "PENDING_EVIDENCE_REVIEW"
 
 
 def test_public_run_is_blocked_before_auth_case_creation_and_api(tmp_path, monkeypatch):
