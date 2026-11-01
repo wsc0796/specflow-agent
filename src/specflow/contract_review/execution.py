@@ -800,13 +800,15 @@ class ExecutionLedger:
                 "target_api_version": frozen["original_request"]["target_api_version"],
                 "snapshot_id": frozen["snapshot_id"],
                 "commit_sha": frozen["commit_sha"],
-                "adopted_ruleset_version": None,
+                "adopted_ruleset_version": frozen["adopted_ruleset_version"],
                 "verification_mode": "static_only",
                 "execution_mode": frozen["execution_profile"]["execution_mode"],
                 "rules": [
                     {
                         **adoption,
-                        "body": select_text(
+                        "body": adoption["body"]
+                        if adoption["origin"]["kind"] == "project_decision"
+                        else select_text(
                             context["sources"][adoption["body_ref"]["source_id"]]["body"],
                             adoption["body_ref"]["selector"],
                         ),

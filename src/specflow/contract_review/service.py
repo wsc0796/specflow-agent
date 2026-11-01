@@ -8,6 +8,7 @@ from copy import deepcopy
 
 from specflow.contract_review.checkpoints import CheckpointService
 from specflow.contract_review.common import ReviewError, canonical, digest, identity, now
+from specflow.contract_review.decisions import DecisionService
 from specflow.contract_review.inputs import freeze_input
 from specflow.contract_review.schemas import ExecutionProfile
 from specflow.contract_review.store import ReviewStore
@@ -22,6 +23,7 @@ class ReviewService:
         self.worker = None
         self.verifications = VerificationService(self)
         self.checkpoints = CheckpointService(self)
+        self.decisions = DecisionService(self)
         for name, value in (profiles or {}).items():
             try:
                 profile = ExecutionProfile.model_validate(value)
@@ -101,6 +103,8 @@ class ReviewService:
         profile = self.profiles.get(profile_id)
         if profile is None:
             raise ReviewError("RETRY_PROFILE_UNAVAILABLE", "尚未配置可执行的审查 profile。")
+        with self.store.read() as conn:
+            self.decisions.check_usage(conn, request.project_id, payload["ruleset_usage"], profile)
         snapshot = self.snapshot_reader.prepare(repository, request.source)
         review_id, input_id, job_id = identity("cr"), identity("ir"), identity("job")
         frozen = freeze_input(request, snapshot, profile, input_id, original_request)
@@ -134,6 +138,9 @@ class ReviewService:
             if current_project is None or current_project["repository_path"] != repository:
                 raise ReviewError("PROJECT_NOT_FOUND", "项目来源已变化。", 404)
             self.snapshot_reader.validate_path(repository)
+            self.decisions.adopt(conn, request.project_id, frozen, payload["ruleset_usage"])
+            frozen.pop("input_hash", None)
+            frozen["input_hash"] = digest(frozen)
             self.store.execute(
                 conn,
                 "INSERT INTO contract_reviews "
@@ -405,8 +412,10 @@ class ReviewService:
                 "execution_profile": frozen["execution_profile"],
                 "input_hash": frozen["input_hash"],
                 "budget": json.loads(account["body"]),
-                "adopted_ruleset_version": None,
-                "current_ruleset_version": None,
+                "adopted_ruleset_version": frozen["adopted_ruleset_version"],
+                "current_ruleset_version": self.decisions.current_version(conn, row["project_id"])
+                if self.decisions.enabled
+                else None,
                 "evidence_integrity": "incomplete"
                 if self.worker and self.worker.faulted
                 else "complete",

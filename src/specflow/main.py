@@ -8,7 +8,7 @@ from fastapi.responses import JSONResponse
 
 from specflow import __version__
 from specflow.api_security import ApiSecurity
-from specflow.contract_review.api import BodyLimitMiddleware
+from specflow.contract_review.api import BodyLimitMiddleware, decisions_router
 from specflow.contract_review.api import router as contract_reviews_router
 from specflow.contract_review.common import ReviewError
 from specflow.contract_review.instance_lock import InstanceLock
@@ -110,6 +110,7 @@ def create_app(
     application.include_router(
         contract_reviews_router, dependencies=[Depends(security.require_api_key)]
     )
+    application.include_router(decisions_router, dependencies=[Depends(security.require_api_key)])
 
     @application.get("/health", tags=["system"])
     def health_check() -> dict[str, str]:

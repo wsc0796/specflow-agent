@@ -15,7 +15,7 @@ from specflow.contract_review.schemas import (
     AuthorityBinding,
     CreateReview,
     GitSource,
-    NoRuleset,
+    RulesetUsage,
     StrictModel,
     Target,
     Text,
@@ -75,7 +75,7 @@ class RevisionRequest(StrictModel):
     authority_bindings: (
         Annotated[list[AuthorityBinding], Field(min_length=1, max_length=100)] | None
     ) = None
-    ruleset_usage: NoRuleset | None = None
+    ruleset_usage: RulesetUsage | None = None
     verification_evidence_ids: Annotated[list[ID], Field(max_length=100)] | None = None
     execution_profile_id: ID | None = None
     supersede_resolution_ids: Annotated[list[ID], Field(min_length=1, max_length=20)] | None = None
@@ -336,6 +336,13 @@ class CheckpointService:
                 "execution_profile_id" not in patch and profile != previous["execution_profile"]
             ):
                 raise ReviewError("RETRY_PROFILE_UNAVAILABLE", "修订 profile 不可用。")
+            self.service.decisions.check_usage(
+                conn,
+                review["project_id"],
+                raw["ruleset_usage"],
+                profile,
+                require_current="ruleset_usage" in patch,
+            )
             source_changed = raw["source"] != old_raw["source"]
             snapshot = None if source_changed else self._snapshot(conn, previous)
         if source_changed:
@@ -350,7 +357,8 @@ class CheckpointService:
         if not set(superseded) <= set(active):
             raise ReviewError("RESOURCE_NOT_FOUND", "更正答案不属于当前输入的有效答案。", 404)
         changed_basis = any(
-            raw[field] != old_raw[field] for field in ("source", "targets", "authority_bindings")
+            raw[field] != old_raw[field]
+            for field in ("source", "targets", "authority_bindings", "ruleset_usage")
         )
         frozen["resolutions"] = [
             item for key, item in active.items() if key not in superseded and not changed_basis
@@ -365,7 +373,7 @@ class CheckpointService:
                 else "adopted",
                 "reason": request.change_reason
                 if key in superseded
-                else "材料、目标或权威绑定变化，原答案不自动带入。"
+                else "材料、目标、规则或权威绑定变化，原答案不自动带入。"
                 if changed_basis
                 else "适用范围与密封材料保持一致。",
             }
@@ -396,6 +404,13 @@ class CheckpointService:
             if replay:
                 return replay
             self._review(conn, review_id, request.expected_version)
+            self.service.decisions.adopt(
+                conn,
+                review["project_id"],
+                frozen,
+                raw["ruleset_usage"],
+                require_current="ruleset_usage" in patch,
+            )
             current_project = self.store.row(
                 conn, "SELECT repository_path FROM projects WHERE id=:id", id=review["project_id"]
             )

@@ -104,7 +104,20 @@ RESOLUTION_DDL = (
     "question_id TEXT NOT NULL, body TEXT NOT NULL, created_at TEXT NOT NULL, "
     "UNIQUE(report_id,question_id))",
 )
-MIGRATIONS = ((1, DDL), (2, EVIDENCE_DDL), (3, DYNAMIC_DDL), (4, RESOLUTION_DDL))
+DECISION_DDL = (
+    "CREATE TABLE project_contract_rulesets (project_id TEXT PRIMARY KEY "
+    "REFERENCES projects(id), version INTEGER NOT NULL CHECK(version>=0))",
+    "CREATE TABLE project_contract_decisions (id TEXT PRIMARY KEY, project_id TEXT NOT NULL "
+    "REFERENCES projects(id), introduced_version INTEGER NOT NULL CHECK(introduced_version>0), "
+    "body TEXT NOT NULL, created_at TEXT NOT NULL, UNIQUE(project_id,introduced_version))",
+)
+MIGRATIONS = (
+    (1, DDL),
+    (2, EVIDENCE_DDL),
+    (3, DYNAMIC_DDL),
+    (4, RESOLUTION_DDL),
+    (5, DECISION_DDL),
+)
 
 
 class ReviewStore:

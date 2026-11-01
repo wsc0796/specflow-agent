@@ -6,6 +6,20 @@ from specflow.contract_review.sources import select_text
 SUPPORT_VERSION = "contract-static-support.v1"
 
 
+def project_rule_material(adoption):
+    """Full frozen text is required; provenance never grants snapshot-tool access."""
+    if digest(adoption["body"].encode("utf-8")) != adoption["body_hash"]:
+        raise ReviewError("SOURCE_INTEGRITY_FAILED", "冻结项目规则正文已变化。")
+    return {
+        "adoption_id": adoption["adoption_id"],
+        "body_ref": adoption["body_ref"],
+        "body": adoption["body"],
+        "body_hash": adoption["body_hash"],
+        "message_index": 1,
+        "disposition": "retained",
+    }
+
+
 def match_scope(scope: dict, target: dict) -> str:
     if target["api_version"] not in scope["api_versions"]:
         return "no_match"

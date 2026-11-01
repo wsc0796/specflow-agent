@@ -55,6 +55,18 @@ def validate_source_refs(values, sources, read_refs):
 
 
 def validate_rule_body(adoption, sources, read_refs):
+    if adoption.get("origin", {}).get("kind") == "project_decision":
+        # Full immutable text is mandatory in each parent/child/review adoption_records.
+        require(
+            adoption["body_ref"]
+            == {"project_decision_id": adoption["origin"]["project_decision_id"]},
+            "Project decision body belongs to another origin",
+        )
+        require(
+            digest(adoption["body"].encode("utf-8")) == adoption["body_hash"],
+            "Adopted rule body damaged",
+        )
+        return
     ref = adoption["body_ref"]
     validate_source_refs([ref], sources, read_refs)
     body = select_text(sources[ref["source_id"]]["body"], ref["selector"])

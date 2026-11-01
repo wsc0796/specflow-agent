@@ -10,10 +10,12 @@ from sqlalchemy import text
 
 from specflow.contract_review.checkpoints import ResolutionBatch, RevisionRequest
 from specflow.contract_review.common import ReviewError, canonical
+from specflow.contract_review.decisions import DecisionRequest
 from specflow.contract_review.schemas import CreateReview
 from specflow.contract_review.verification import VerificationImport
 
 router = APIRouter(prefix="/api/v1/contract-reviews", tags=["contract-reviews"])
+decisions_router = APIRouter(prefix="/api/v1/projects", tags=["contract-decisions"])
 
 
 class BodyLimitMiddleware:
@@ -21,7 +23,13 @@ class BodyLimitMiddleware:
         self.app = app
 
     async def __call__(self, scope, receive, send):
-        if scope["type"] != "http" or not scope["path"].startswith("/api/v1/contract-reviews"):
+        if scope["type"] != "http" or not (
+            scope["path"].startswith("/api/v1/contract-reviews")
+            or (
+                scope["path"].startswith("/api/v1/projects/")
+                and scope["path"].endswith("/contract-decisions")
+            )
+        ):
             return await self.app(scope, receive, send)
         chunks, size = [], 0
         while True:
@@ -60,6 +68,34 @@ def query_fields(request, allowed=()):
         raise ReviewError("INVALID_QUERY", "存在未定义的查询参数。", 422)
     if len(request.query_params.multi_items()) != len(request.query_params):
         raise ReviewError("INVALID_QUERY", "查询参数不得重复。", 422)
+
+
+@decisions_router.post("/{project_id}/contract-decisions", status_code=201)
+async def publish_decision(
+    project_id: str,
+    body: DecisionRequest,
+    request: Request,
+    idempotency_key: Annotated[str, Header(min_length=1, max_length=128)],
+):
+    query_fields(request)
+    from starlette.concurrency import run_in_threadpool
+
+    status, response = await run_in_threadpool(
+        service(request).decisions.publish, project_id, body, idempotency_key, await request.json()
+    )
+    return JSONResponse(response, status_code=status)
+
+
+@decisions_router.get("/{project_id}/contract-decisions")
+def list_decisions(
+    project_id: str,
+    request: Request,
+    ruleset_version: Annotated[int | None, Query(ge=0, le=2**63 - 1)] = None,
+    cursor: Annotated[str | None, Query(max_length=512)] = None,
+    limit: Annotated[int, Query(ge=1, le=100)] = 20,
+):
+    query_fields(request, ("ruleset_version", "cursor", "limit"))
+    return service(request).decisions.list(project_id, ruleset_version, cursor, limit)
 
 
 @router.post("", status_code=202)

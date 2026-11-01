@@ -3,6 +3,7 @@
 from copy import deepcopy
 
 from specflow.contract_review.common import ReviewError, canonical, digest
+from specflow.contract_review.inputs import project_rule_material
 from specflow.contract_review.sources import select_text
 from specflow.contract_review.tool_protocol import CAPABILITIES, CAPABILITY_PURPOSES
 
@@ -81,8 +82,13 @@ class RunState:
         entries, rule_materials = [], []
         for rule in self.rules:
             if rule["disposition"] == "adopted" or self.context.get("child_id"):
+                if rule.get("origin", {}).get("kind") == "project_decision":
+                    material = project_rule_material(rule)
+                    rule_materials.append(material)
+                    entries.append(material)
+                    continue
                 ref = rule["body_ref"]
-                if not any(item["source_ref"] == ref for item in rule_materials):
+                if not any(item.get("source_ref") == ref for item in rule_materials):
                     material = self._source_material(ref)
                     if digest(material["body"].encode("utf-8")) != rule["body_hash"]:
                         raise ReviewError("SOURCE_INTEGRITY_FAILED", "冻结规则片段已变化。")

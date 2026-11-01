@@ -9,6 +9,7 @@ from pydantic import ValidationError
 
 from specflow.contract_review.common import ReviewError, canonical, digest, now
 from specflow.contract_review.dynamic_ledger import DynamicLedger
+from specflow.contract_review.inputs import project_rule_material
 from specflow.contract_review.protocol import ReviewResult, SubmitReport
 from specflow.contract_review.provider import OpenAIReviewAdapter, ProviderFailure
 from specflow.contract_review.report_validation import (
@@ -390,6 +391,11 @@ class ReviewWorker:
             "review_directives": frozen.get("review_directives", []),
             "sources": list(context["sources"].values()),
         }
+        entries.extend(
+            project_rule_material(rule)
+            for rule in frozen["adoption_records"]
+            if rule["origin"]["kind"] == "project_decision"
+        )
         if context["verification_evidence"]:
             data["verification_evidence"] = context["verification_evidence"]
             data["verification_evidence_adoptions"] = frozen["verification_evidence_adoptions"]

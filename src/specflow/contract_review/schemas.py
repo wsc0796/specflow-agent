@@ -179,13 +179,21 @@ class NoRuleset(StrictModel):
     mode: Literal["none"]
 
 
+class ConfirmedRuleset(StrictModel):
+    mode: Literal["applicable_confirmed"]
+    expected_ruleset_version: Annotated[int, Field(ge=0, le=2**63 - 1)]
+
+
+RulesetUsage = Annotated[NoRuleset | ConfirmedRuleset, Field(discriminator="mode")]
+
+
 class DisabledOption(StrictModel):
     enabled: Literal[False] = False
 
 
 class DeliveryOptions(StrictModel):
     write: Literal[False] = False
-    project_memory: Literal[False] = False
+    project_memory: bool = False
     delegate: bool = False
     replay: Literal[False] = False
 
@@ -304,7 +312,7 @@ class CreateReview(StrictModel):
     targets: Annotated[list[Target], Field(min_length=1, max_length=100)]
     source: GitSource
     authority_bindings: Annotated[list[AuthorityBinding], Field(min_length=1, max_length=100)]
-    ruleset_usage: NoRuleset
+    ruleset_usage: RulesetUsage
     execution_profile_id: ID | None = None
     actor_label: Annotated[str, Field(min_length=1, max_length=128)] | None = None
 
