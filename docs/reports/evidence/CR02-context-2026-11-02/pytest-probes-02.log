@@ -1,0 +1,10 @@
+============================= test session starts =============================
+platform win32 -- Python 3.12.10, pytest-9.0.3, pluggy-1.6.0 -- C:\Users\50469\AppData\Local\Programs\Python\Python312\python.exe
+rootdir: C:\Users\50469
+collecting ... collected 3 items
+
+..\AppData\Local\Temp\specflow-context-evidence-20261102-160602-310\test_context_evidence_probe.py::test_E01_ordinary_tool_observation_tail_reaches_actual_wire PASSED [ 33%]
+..\AppData\Local\Temp\specflow-context-evidence-20261102-160602-310\test_context_evidence_probe.py::test_E02_human_resolutions_and_internal_feedback_coexist_on_wire[v1] PASSED [ 66%]
+..\AppData\Local\Temp\specflow-context-evidence-20261102-160602-310\test_context_evidence_probe.py::test_E02_human_resolutions_and_internal_feedback_coexist_on_wire[v2] PASSED [100%]
+
+============================== 3 passed in 5.16s ==============================

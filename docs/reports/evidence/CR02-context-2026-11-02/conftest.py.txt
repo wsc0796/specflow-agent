@@ -1,0 +1,23 @@
+import importlib.util
+import sys
+from pathlib import Path
+import httpx
+import pytest
+
+REPO = Path(r'C:\Users\50469\specflow-h04-f03-20261023')
+sys.path.insert(0, str(REPO / 'tests' / 'contract_review'))
+spec = importlib.util.spec_from_file_location('context_probe_project_fixtures', REPO / 'tests' / 'contract_review' / 'conftest.py')
+base = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(base)
+for name in ('git_repo', 'test_profile', 'running_app', 'controlled_adapter'):
+    globals()[name] = getattr(base, name)
+from test_dynamic_workflow import dynamic_app
+
+@pytest.fixture(autouse=True)
+def block_real_http(monkeypatch):
+    def blocked(*args, **kwargs):
+        raise AssertionError('Real HTTP is forbidden in the offline context evidence probes')
+    async def async_blocked(*args, **kwargs):
+        blocked()
+    monkeypatch.setattr(httpx.HTTPTransport, 'handle_request', blocked)
+    monkeypatch.setattr(httpx.AsyncHTTPTransport, 'handle_async_request', async_blocked)

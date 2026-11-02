@@ -1,0 +1,24 @@
+{
+  "python_executable": "C:\\Users\\50469\\AppData\\Local\\Programs\\Python\\Python312\\python.exe",
+  "command": [
+    "C:\\Users\\50469\\AppData\\Local\\Programs\\Python\\Python312\\python.exe",
+    "-B",
+    "-X",
+    "utf8",
+    "C:\\Users\\50469\\AppData\\Local\\Temp\\specflow-context-evidence-20261102-160602-310\\run-probes.py"
+  ],
+  "pytest_arguments": [
+    "-v",
+    "--tb=short",
+    "-p",
+    "no:cacheprovider",
+    "--confcutdir",
+    "C:\\Users\\50469\\AppData\\Local\\Temp\\specflow-context-evidence-20261102-160602-310",
+    "C:\\Users\\50469\\AppData\\Local\\Temp\\specflow-context-evidence-20261102-160602-310\\test_context_evidence_probe.py"
+  ],
+  "product_baseline": "14209183929dd19a566803e04897d246efdc3cd8",
+  "product_repository_read_only": true,
+  "network": "MockTransport only; real HTTP transport blocked by autouse fixture",
+  "provider_environment": "removed by four names only; values not read or printed",
+  "semantic_status": "NOT_RUN"
+}

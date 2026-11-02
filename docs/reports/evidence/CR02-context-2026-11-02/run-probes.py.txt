@@ -1,0 +1,22 @@
+import json
+import os
+from pathlib import Path
+import sys
+import pytest
+
+for name in ('API_KEY', 'BASE_URL', 'MODEL', 'TIMEOUT_SECONDS'):
+    os.environ.pop('SPECFLOW_LLM_' + name, None)
+root = Path(__file__).parent
+arguments = ['-v', '--tb=short', '-p', 'no:cacheprovider', '--confcutdir', str(root),
+             str(root / 'test_context_evidence_probe.py')]
+(root / 'run-metadata.json').write_text(json.dumps({
+    'python_executable': sys.executable,
+    'command': [sys.executable, '-B', '-X', 'utf8', str(Path(__file__))],
+    'pytest_arguments': arguments,
+    'product_baseline': '14209183929dd19a566803e04897d246efdc3cd8',
+    'product_repository_read_only': True,
+    'network': 'MockTransport only; real HTTP transport blocked by autouse fixture',
+    'provider_environment': 'removed by four names only; values not read or printed',
+    'semantic_status': 'NOT_RUN',
+}, ensure_ascii=False, indent=2), encoding='utf-8')
+raise SystemExit(pytest.main(arguments))

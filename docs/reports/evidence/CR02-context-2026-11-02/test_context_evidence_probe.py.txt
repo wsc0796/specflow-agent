@@ -1,0 +1,180 @@
+import copy
+import json
+from pathlib import Path
+import httpx
+import pytest
+from test_dynamic_workflow import ScriptedAdapter, submit, terminal as dynamic_terminal
+from test_checkpoints import HumanAdapter, waiting, answer, batch, post, terminal as human_terminal
+from specflow.contract_review.common import digest
+from specflow.contract_review.profiles import dynamic_profile
+from specflow.contract_review.provider import OpenAIReviewAdapter
+from specflow.llm.providers.config import OpenAICompatibleConfig
+
+OUT = Path(__file__).parent
+BASELINE = '14209183929dd19a566803e04897d246efdc3cd8'
+INTERNAL = 'INTERNAL_REVIEW_FEEDBACK_ONLY: 请核对报告结构；这不是人工澄清，也不得写入 resolutions。'
+
+def wire_adapter(actor):
+    wire = []
+    def handle(request):
+        payload = json.loads(request.content)
+        wire.append(copy.deepcopy(payload))
+        response = actor.complete(payload)
+        return httpx.Response(200, json={
+            'model': 'controlled-test',
+            'choices': [{'message': {'content': response['content']}}],
+            'usage': {'prompt_tokens': 3, 'completion_tokens': 4},
+        })
+    adapter = OpenAIReviewAdapter(
+        OpenAICompatibleConfig('https://offline.invalid/v1', 'synthetic-probe-key', 'controlled-test', 5),
+        transport=httpx.MockTransport(handle), execution_mode='test',
+    )
+    adapter.pauses = {}
+    return adapter, wire
+
+def models(domain):
+    with domain.store.read() as conn:
+        values = [json.loads(row[0]) for row in conn.exec_driver_sql(
+            'SELECT body FROM contract_review_calls ORDER BY rowid')]
+    return [value for value in values if value.get('kind') == 'model' or 'kind' not in value]
+
+def emit(name, evidence, checks):
+    evidence.update(
+        baseline=BASELINE,
+        evidence_class='associated_program_fixture_not_formal_CR02_semantic_trial',
+        program_status='PASS' if all(checks.values()) else 'FAIL',
+        semantic_status='NOT_RUN',
+        model_correct_use='NOT_RUN',
+        checks=checks,
+        wire_capture_boundary='OpenAIReviewAdapter HTTP request JSON via httpx.MockTransport; headers excluded',
+    )
+    path = OUT / (name + '.json')
+    path.write_text(json.dumps(evidence, ensure_ascii=False, indent=2), encoding='utf-8')
+    assert all(checks.values()), {key: value for key, value in checks.items() if not value}
+
+
+def test_E01_ordinary_tool_observation_tail_reaches_actual_wire(dynamic_app, controlled_adapter, git_repo):
+    root, git, original = git_repo
+    text = ('ordinary tool observation padding. ' * 24) + '\nAPI v2: only queued jobs may cancel. E01_ORDINARY_TAIL_END\n'
+    target = root / 'docs' / 'api.md'
+    target.write_bytes(text.encode('utf-8'))
+    git('add', 'docs/api.md')
+    git('commit', '-qm', 'TEMP-only ordinary observation tail control')
+    original['source']['commit_sha'] = git('rev-parse', 'HEAD')
+    actor = ScriptedAdapter(controlled_adapter(), mode='direct')
+    adapter, wire = wire_adapter(actor)
+    with dynamic_app(adapter, delegation=False) as (client, domain, body):
+        state = dynamic_terminal(client, submit(client, body)['review_id'])
+        records = models(domain)
+        parsed = [json.loads(payload['messages'][1]['content']) for payload in wire]
+        retained = [(index, data, observation) for index, data in enumerate(parsed)
+                    for observation in data['observations']
+                    if observation.get('body', {}).get('text') == text]
+        with domain.store.read() as conn:
+            blob = conn.exec_driver_sql(
+                "SELECT raw_bytes,body_hash FROM contract_review_source_blobs WHERE path='docs/api.md'"
+            ).first()
+        source_exists = blob is not None and bytes(blob[0]).decode('utf-8') == text
+        material_recorded = bool(retained) and all(any(
+            item.get('observation_id') == observation['observation_id']
+            and item.get('disposition') == 'retained'
+            and item.get('body', {}).get('body', {}).get('text') == text
+            for item in records[index]['projection']['material_entries'])
+            for index, _, observation in retained)
+        doc_is_not_mandatory_rule = bool(retained) and all(
+            all(material.get('source_ref', {}).get('source_id') not in
+                {ref['source_id'] for ref in observation['source_refs']}
+                for material in data['rule_materials'])
+            for _, data, observation in retained)
+        budget = dynamic_profile('unused', 'controlled-test', delegation=False)['context_characters']
+        checks = {
+            'terminal_completed_degraded': state['status'] == 'completed_degraded',
+            'tail_begins_after_character_500': text.index('API v2: only queued') > 500,
+            'source_exists_with_exact_body': source_exists,
+            'ordinary_tool_observation_not_mandatory_rule': doc_is_not_mandatory_rule,
+            'material_entries_record_exact_observation': material_recorded,
+            'actual_messages_contain_exact_body_and_tail': bool(retained),
+            'retained_observation_complete_not_truncated': bool(retained) and all(
+                observation['completeness'] == 'complete' and observation['truncation'] is None
+                for _, _, observation in retained),
+            'wire_payload_equals_all_db_projections': [record['projection']['payload'] for record in records] == wire,
+            'all_actual_messages_within_frozen_budget': all(sum(len(m['content']) for m in p['messages']) <= budget for p in wire),
+        }
+        emit('E01-ordinary-tool-tail', dict(
+            case_mapping='E01 associated program fixture; ordinary previous tool observation, not old mandatory-rule-tail test',
+            source_path='docs/api.md', source_text=text, source_characters=len(text),
+            critical_tail_offset=text.index('API v2: only queued'),
+            actual_model_call_count=len(wire), context_characters=budget,
+            retained_request_indices=[index for index, _, _ in retained],
+            final_state=state, wire_payloads=wire,
+            db_projections=[record['projection'] for record in records],
+        ), checks)
+
+
+class OneInternalRevision(HumanAdapter):
+    def __init__(self, fallback):
+        super().__init__(fallback)
+        self.did_revise = False
+    def complete(self, payload):
+        result = super().complete(payload)
+        data = json.loads(payload['messages'][1]['content'])
+        if data['resolutions'] and 'candidate_report' in data and not self.did_revise:
+            action = json.loads(result['content'])
+            action['outcome'] = 'revise'
+            action['issues'] = [dict(subject_kind='report', subject_id='', code='other',
+                                     reason='只验证内部返工字段与人工答案隔离。', evidence_refs=[])]
+            action['revision_feedback'] = INTERNAL
+            result['content'] = json.dumps(action, ensure_ascii=False)
+            self.did_revise = True
+        return result
+
+
+@pytest.mark.parametrize('version', ['v1', 'v2'])
+def test_E02_human_resolutions_and_internal_feedback_coexist_on_wire(
+        version, dynamic_app, controlled_adapter):
+    human_text = ('人工原文保留控制。' * 90) + f'\nHUMAN_{version.upper()}_ONLY: 本轮明确采用 API {version}，只能按人工本轮范围解释。'
+    material_text = 'HUMAN_MATERIAL_ONLY: 这是独立人工材料说明，未新增获准来源。'
+    actor = OneInternalRevision(controlled_adapter())
+    adapter, wire = wire_adapter(actor)
+    with dynamic_app(adapter, delegation=False) as (client, domain, body):
+        review_id, before, report = waiting(client, body)
+        initial_wire_count = len(wire)
+        answers = [answer(value=human_text), answer('q_material', value=material_text)]
+        response = post(client, review_id, batch(before, report, answers))
+        assert response.status_code == 202, response.text
+        final = human_terminal(client, review_id)
+        records = models(domain)
+        parsed = [json.loads(payload['messages'][1]['content']) for payload in wire]
+        next_requests = parsed[initial_wire_count:]
+        coexist = [(index, data) for index, data in enumerate(parsed)
+                   if data.get('revision_feedback', {}).get('revision_feedback') == INTERNAL]
+        with domain.store.read() as conn:
+            resolution_records = [json.loads(row[0]) for row in conn.exec_driver_sql(
+                'SELECT body FROM contract_review_resolutions ORDER BY rowid')]
+        def exact_humans(data):
+            by_question = {item['question_id']: item for item in data['resolutions']}
+            return (by_question.get('q_scope', {}).get('answer', {}).get('text') == human_text
+                    and by_question.get('q_material', {}).get('answer', {}).get('text') == material_text)
+        raw_resolutions = json.dumps(resolution_records, ensure_ascii=False)
+        checks = {
+            'formal_questions_then_this_review_answers': before['status'] == 'awaiting_decision' and all(a['scope'] == 'this_review' for a in answers),
+            'exactly_one_internal_revision': actor.did_revise and len(coexist) == 2,
+            'coexistence_in_next_analysis_and_final_review': len(coexist) == 2 and ['candidate_report' in data for _, data in coexist] == [False, True],
+            'human_originals_preserved_in_all_post_answer_requests': len(next_requests) == 4 and all(exact_humans(data) for data in next_requests),
+            'feedback_separate_from_resolutions_on_wire': len(coexist) == 2 and all(INTERNAL not in json.dumps(data['resolutions'], ensure_ascii=False) for _, data in coexist),
+            'db_has_two_exact_human_resolution_records': len(resolution_records) == 2 and exact_humans({'resolutions': resolution_records}),
+            'db_resolutions_not_polluted_by_internal_feedback': INTERNAL not in raw_resolutions and 'revision_feedback' not in raw_resolutions,
+            'wire_payload_equals_all_db_projections': [record['projection']['payload'] for record in records] == wire,
+            'terminal_completed_degraded': final['status'] == 'completed_degraded',
+        }
+        emit('E02-human-' + version + '-internal-feedback', dict(
+            case_mapping='E02 associated program fixture; distinct human clarification and internal fixed-review revision in same actual request',
+            human_version=version, human_text=human_text, material_text=material_text,
+            internal_revision_feedback=INTERNAL, answers_submitted=answers,
+            initial_model_call_count=initial_wire_count, actual_model_call_count=len(wire),
+            coexisting_request_indices=[index for index, _ in coexist],
+            final_state=final, wire_payloads=wire,
+            db_projections=[record['projection'] for record in records],
+            db_resolutions=resolution_records,
+        ), checks)
+
