@@ -17,7 +17,14 @@ from specflow.contract_review.verification import VerificationService
 
 
 class ReviewService:
-    def __init__(self, store: ReviewStore, snapshot_reader, profiles: dict | None = None):
+    def __init__(
+        self,
+        store: ReviewStore,
+        snapshot_reader,
+        profiles: dict | None = None,
+        *,
+        impact_profiles: dict | None = None,
+    ):
         self.store = store
         self.snapshot_reader = snapshot_reader
         self.profiles = {}
@@ -34,6 +41,9 @@ class ReviewService:
             except ValueError:
                 raise RuntimeError("Invalid non-secret contract-review profile") from None
             self.profiles[name] = profile.frozen()
+        from specflow.contract_review.impact_service import ImpactService
+
+        self.impacts = ImpactService(self, impact_profiles)
 
     @staticmethod
     def key_hash(key: str) -> str:
@@ -74,6 +84,16 @@ class ReviewService:
         queued = self.store.row(
             conn, "SELECT count(*) AS count FROM contract_review_jobs WHERE status='queued'"
         )["count"]
+        # Historical migration fixtures can still exercise their original intake.
+        if self.store.row(
+            conn,
+            "SELECT name FROM sqlite_master "
+            "WHERE type='table' AND name='contract_impact_discoveries'",
+        ):
+            queued += self.store.row(
+                conn,
+                "SELECT count(*) AS count FROM contract_impact_discoveries WHERE status='queued'",
+            )["count"]
         if queued >= 20:
             raise ReviewError("QUEUE_FULL", "审查队列已满。", 429)
         usage = self.store.row(conn, "SELECT * FROM contract_review_capacity WHERE id=1")
@@ -82,7 +102,7 @@ class ReviewService:
         if usage["record_bytes"] >= self.store.record_capacity:
             raise ReviewError("STORAGE_CAPACITY_EXCEEDED", "必要记录容量不足。", 503)
 
-    def create(self, request, key, original_request=None):
+    def create(self, request, key, original_request=None, *, impact_adoption=None):
         payload = request.model_dump(exclude_none=True)
         payload_hash, key_hash = digest(payload), self.key_hash(key)
         scope = "service:contract-review:create:" + request.project_id
@@ -141,6 +161,8 @@ class ReviewService:
                 raise ReviewError("PROJECT_NOT_FOUND", "项目来源已变化。", 404)
             self.snapshot_reader.validate_path(repository)
             self.decisions.adopt(conn, request.project_id, frozen, payload["ruleset_usage"])
+            if impact_adoption is not None:
+                self.impacts.prepare_adoption(conn, impact_adoption, frozen, snapshot)
             frozen.pop("input_hash", None)
             frozen["input_hash"] = digest(frozen)
             self.store.execute(
@@ -193,6 +215,8 @@ class ReviewService:
                 ),
             )
             self.store.event(conn, review_id, input_id, job_id, "review_created", response)
+            if impact_adoption is not None:
+                self.impacts.commit_adoption(conn, impact_adoption, frozen, response)
             return self.remember(conn, scope, key_hash, payload_hash, 202, response)
 
     def save_snapshot(self, conn, project_id, snapshot):

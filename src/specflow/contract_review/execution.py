@@ -1,6 +1,7 @@
 """Fenced job/call ledger. All I/O happens after these short transactions commit."""
 
 import json
+from contextlib import nullcontext
 from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import text
@@ -97,10 +98,10 @@ class ExecutionLedger:
             body=canonical(account),
         )
 
-    def claim(self):
-        with self.store.transaction() as conn:
+    def claim(self, *, _conn=None):
+        with self.store.transaction() if _conn is None else nullcontext(_conn) as conn:
             runtime = self.owner(conn)
-            if runtime["slot_call_id"] is not None:
+            if runtime["slot_call_id"] is not None or runtime["slot_discovery_call_id"] is not None:
                 return None
             row = self.store.row(
                 conn,
@@ -215,7 +216,7 @@ class ExecutionLedger:
         with self.store.transaction() as conn:
             row = self.fence(conn, context)
             runtime = self.owner(conn)
-            if runtime["slot_call_id"] is not None:
+            if runtime["slot_call_id"] is not None or runtime["slot_discovery_call_id"] is not None:
                 raise ReviewError("CALL_RESULT_UNKNOWN", "本地执行尚未收尾。")
             job_body = json.loads(row["body"])
             account = self.account(conn, context["review_id"])
@@ -346,6 +347,9 @@ class ExecutionLedger:
     def dispatch_started(self, context, call_id):
         with self.store.transaction() as conn:
             self.fence(conn, context)
+            runtime = self.owner(conn)
+            if runtime["slot_discovery_call_id"] or runtime["slot_call_id"] != call_id:
+                raise ReviewError("STALE_EXECUTION", "共享物理调用租约已变化。")
             call = self.store.row(
                 conn, "SELECT * FROM contract_review_calls WHERE id=:id", id=call_id
             )
@@ -432,7 +436,8 @@ class ExecutionLedger:
                 conn,
                 "UPDATE contract_review_runtime SET "
                 "slot_call_id=NULL,slot_execution_instance_id=NULL "
-                "WHERE id=1 AND slot_call_id=:call AND slot_execution_instance_id=:instance",
+                "WHERE id=1 AND slot_call_id=:call AND slot_execution_instance_id=:instance "
+                "AND slot_discovery_call_id IS NULL",
                 call=call_id,
                 instance=instance_id,
             )
@@ -555,6 +560,7 @@ class ExecutionLedger:
                 return False
             if (
                 runtime["slot_call_id"] == call_id
+                and runtime["slot_discovery_call_id"] is None
                 and runtime["slot_execution_instance_id"] == instance_id
                 and body["local_io_state"] == "quiesced"
             ):
@@ -759,7 +765,12 @@ class ExecutionLedger:
                     id=call["id"],
                     body=canonical(body),
                 )
-            if elapsed is not None and not self.owner(conn)["slot_call_id"]:
+            runtime = self.owner(conn)
+            if (
+                elapsed is not None
+                and not runtime["slot_call_id"]
+                and not runtime["slot_discovery_call_id"]
+            ):
                 self.settle_time(conn, row, elapsed)
 
     def settle_time(self, conn, row, elapsed):

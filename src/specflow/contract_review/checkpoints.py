@@ -288,7 +288,7 @@ class CheckpointService:
             files.append({**item, "body": blob["raw_bytes"].decode("utf-8")})
         return {**snapshot, "files": files}
 
-    def revise(self, review_id, request, key):
+    def revise(self, review_id, request, key, *, impact_adoption=None):
         patch = request.model_dump(exclude_none=True)
         payload_hash, key_hash = digest(patch), self.service.key_hash(key)
         scope = review_id + ":revisions"
@@ -420,9 +420,13 @@ class CheckpointService:
                 self.service.snapshot_reader.validate_path(repository)
                 self.service.capacity(conn, snapshot["byte_count"])
                 self.service.save_snapshot(conn, review["project_id"], snapshot)
+            if impact_adoption is not None:
+                self.service.impacts.prepare_adoption(conn, impact_adoption, frozen, snapshot)
             response = self.service.enqueue_revision(
                 conn, review_id, request.expected_version, frozen, evidence_ids
             )
+            if impact_adoption is not None:
+                self.service.impacts.commit_adoption(conn, impact_adoption, frozen, response)
             return self.service.remember(conn, scope, key_hash, payload_hash, 202, response)
 
     @staticmethod

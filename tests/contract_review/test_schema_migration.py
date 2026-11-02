@@ -47,12 +47,9 @@ def test_migration_is_repeatable_and_legacy_reader_preserves_new_data(tmp_path):
         with db.factory() as session:
             assert session.get(Project, "p").name == "Before upgrade"
         with store.read() as conn:
-            assert (
-                conn.exec_driver_sql(
-                    "SELECT count(*) FROM contract_review_schema_migrations"
-                ).scalar_one()
-                == 5
-            )
+            assert conn.exec_driver_sql(
+                "SELECT count(*) FROM contract_review_schema_migrations"
+            ).scalar_one() == len(store_module.MIGRATIONS)
     finally:
         db.engine.dispose()
 
@@ -275,10 +272,12 @@ def test_v4_to_v5_preserves_frozen_bytes_backup_and_rollback(
             with pytest.raises(ReviewError):
                 store.migrate()
         else:
-            store.migrate()
-            backup = store.migration_backup_path
-            store.migrate()
-            assert store.migration_backup_path == backup
+            with monkeypatch.context() as target:
+                target.setattr(store_module, "MIGRATIONS", store_module.MIGRATIONS[:5])
+                store.migrate()
+                backup = store.migration_backup_path
+                store.migrate()
+                assert store.migration_backup_path == backup
         with store.read() as conn:
             assert (
                 conn.exec_driver_sql("SELECT body FROM contract_review_inputs").scalar_one()
@@ -434,7 +433,7 @@ def test_v1_upgrade_preserves_queued_input_and_rolls_back_partial_v2(
         with store.read() as conn:
             assert conn.exec_driver_sql(
                 "SELECT max(version) FROM contract_review_schema_migrations"
-            ).scalar_one() == (1 if fail_upgrade else 5)
+            ).scalar_one() == (1 if fail_upgrade else len(store_module.MIGRATIONS))
             found = conn.exec_driver_sql(
                 "SELECT name FROM sqlite_master WHERE name='contract_review_verification_evidence'"
             ).first()

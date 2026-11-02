@@ -99,9 +99,11 @@ class DecisionService:
 
     @property
     def enabled(self):
-        return any(
-            profile["options"]["project_memory"] for profile in self.service.profiles.values()
-        )
+        profiles = list(self.service.profiles.values())
+        impacts = getattr(self.service, "impacts", None)
+        if impacts is not None:
+            profiles.extend(impacts.profiles.values())
+        return any(profile["options"]["project_memory"] for profile in profiles)
 
     def require_enabled(self):
         if not self.enabled:

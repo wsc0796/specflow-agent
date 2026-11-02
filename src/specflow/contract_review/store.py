@@ -8,6 +8,7 @@ from sqlalchemy import text
 from sqlalchemy.exc import OperationalError
 
 from specflow.contract_review.common import ReviewError, canonical, digest, identity, now
+from specflow.contract_review.impact_store import IMPACT_DDL
 
 DDL = (
     "CREATE TABLE contract_review_schema_migrations "
@@ -117,6 +118,7 @@ MIGRATIONS = (
     (3, DYNAMIC_DDL),
     (4, RESOLUTION_DDL),
     (5, DECISION_DDL),
+    (6, IMPACT_DDL),
 )
 
 

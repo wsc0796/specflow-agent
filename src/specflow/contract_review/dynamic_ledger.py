@@ -54,7 +54,8 @@ class DynamicLedger(ExecutionLedger):
                 raise ReviewError("BUDGET_EXHAUSTED", "实际请求超过冻结上下文上限。")
         with self.store.transaction() as conn:
             row = self.fence(conn, context)
-            if self.owner(conn)["slot_call_id"] is not None:
+            runtime = self.owner(conn)
+            if runtime["slot_call_id"] is not None or runtime["slot_discovery_call_id"] is not None:
                 raise ReviewError("CALL_RESULT_UNKNOWN", "本地执行尚未收尾。")
             job = json.loads(row["body"])
             account = self.account(conn, context["review_id"])

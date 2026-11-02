@@ -1,12 +1,13 @@
 # CR02-TASK-IMPACT-01：候选影响发现与显式采用
 
-日期：2026-11-02（Asia/Shanghai）。版本：**v0.1，供审执行单；未获实现授权，未实现**。
+日期：2026-11-02（Asia/Shanghai）。版本：**v0.1，用户批准的离线实现与指定审查已完成**。
 产品 checkout：`C:/Users/50469/specflow-h04-f03-20261023`。
 核对基线：`fbf47b697dc386b9b58f2aacf8416805defe052d`。
 
 依据：`D:/Downloads/agent学习/AI_HANDOFF/2026-10-29-GPT讨论交接/SPEC_FLOW_PLAN_UPDATE_v0.2.3_2026-11-01.md`
 §4、§5、§7，以及原 v0.2.2 规格及同目录修订说明。本文件把计划项具体化，
-以下新增接口、表、协议和类名均为**提案**，不能当作当前已有功能或编码授权。
+用户在本聊天明确回复“是”，批准按本执行单离线实现及 Astra/xhigh 独立审查。
+以下为获准实现合同，交付状态以进度及完成报告为准；该授权不包含真实模型调用。
 F01 人工清单先导仍优先，真实试验不等待本任务实现。
 
 ## 1. 目标、完成条件与范围
@@ -37,13 +38,13 @@ F01 人工清单先导仍优先，真实试验不等待本任务实现。
 | store.py / schema v1—v5 | jobs/calls/events 依赖 review；runtime.slot_call_id 指向 review_calls | 新增发现归属记录，显式接共享调度与 I/O 槽，不塞占位 review |
 | worker.py / ReviewWorker、execution.py | 一个持久 worker；未确认本地 I/O 收尾时不得派发下一调用 | 继续一个 worker、一个物理 I/O 槽，扩展两种任务归属 |
 
-推荐选择：**独立发现资源，复用同一 worker 和密封工具；人工采用与正式创建/修订原子绑定**。
+采用的架构：**独立发现资源，复用同一 worker 和密封工具；人工采用与正式创建/修订原子绑定**。
 不以空 targets/占位 targets 冒充普通审查，也不另起一个可绕过现有槽位的 Provider worker。
-这是本执行单待批准的架构选择；实现影响包括共享槽与事务接点，不是只加一段 prompt。
+用户已批准该架构；实现影响包括共享槽与事务接点，交付状态以完成报告为准。
 
 ## 3. 输入与冻结边界
 
-拟议 `CreateImpactDiscovery` 请求严格拒绝未知字段、显式 null 和非法类型：
+`CreateImpactDiscovery` 请求严格拒绝未知字段、显式 null 和非法类型：
 
 | 字段 | 含义与约束 |
 | --- | --- |
@@ -65,7 +66,7 @@ F01 人工清单先导仍优先，真实试验不等待本任务实现。
 
 ## 4. 模型动作与候选结果
 
-拟议发现协议 `contract-impact-action.v1` 只含 `tool_call` 与 `submit_candidates`。
+发现协议 `contract-impact-action.v1` 只含 `tool_call` 与 `submit_candidates`。
 前者复用登记工具参数；后者提交候选目录和未决事项，不提交正式审查报告。
 用独立发现 profile 构造实际请求；不能把新协议伪装成现有 ExecutionProfile 的 action_protocol。
 
@@ -113,7 +114,7 @@ F01 人工清单先导仍优先，真实试验不等待本任务实现。
 
 ## 5. 显式采用合同
 
-拟议 `ImpactAdoption` 使用不可变 discovery_id + catalog_hash 和一个新幂等键。
+`ImpactAdoption` 使用不可变 discovery_id + catalog_hash 和一个新幂等键。
 对每个 candidate_id 明确选择 take、edit 或 exclude；exclude 必须说明理由，edit 保留前后值。
 用户新增目标单独记为 manual_addition，不能伪装成模型成功发现。
 提交全量目标候选到最终清单的映射；缺项、重复 disposition、跨 discovery 身份均拒绝。
@@ -150,11 +151,11 @@ F01 人工清单先导仍优先，真实试验不等待本任务实现。
 未变化目标/check 身份、人工答案适用性和历史报告继续遵守 TASK-05 语义。
 候选及其人工采用记录是范围来源，不是业务偏离结论、项目规则或外部核验证据。
 
-## 6. 入口与持久化提案
+## 6. 入口与持久化合同
 
 ### API
 
-| 拟议接口 | 行为 |
+| 接口 | 行为 |
 | --- | --- |
 | POST /api/v1/contract-impact-discoveries | 202；只校验、密封、持久受理和入队，不在 HTTP 中调用模型 |
 | GET /api/v1/contract-impact-discoveries/{id} | 当前状态、冻结身份、完成目录/缺口、运行诊断；不暴露本地仓库绝对路径 |
@@ -195,9 +196,9 @@ dispatch_gate 必须一起适配；不能只让新流程检查旧槽、却让旧
 
 ## 7. 首个变更案例与人工采用预期
 
-本任务使用独立开发夹具标签 **IMP-FIELD-01**；它不是原 24 case 的新增试次，
-本轮未创建 fixture、trial 或模型输出。最小案例复用 F01 四份固定正文，增加两份任务局部
-静态夹具以验证测试角色与相似名称负控制，原 F01 六例资产保持不变。
+本任务使用独立开发夹具标签 **IMP-FIELD-01**，不是原 24 case 的新增试次。
+静态夹具定义在 test_impact_discovery.py，只在临时仓库创建并由受控 adapter 验证工程契约，
+未创建真实 trial。最小案例复用 F01 四份固定正文，增加两份任务局部静态夹具，原六例资产保持不变。
 
 变更意图：“本次采用 API v2 的 POST /exports 创建响应 job_id 规则，梳理允许材料中需要核对的对象。”
 允许材料仅为下列六项；不含 Oracle、人工预期或历史模型答案。
@@ -208,10 +209,10 @@ dispatch_gate 必须一起适配；不能只让新流程检查旧槽、却让旧
 | src/api.py（原 api-correct.py） | 创建实现已返回 job_id；应保留 | exclude：实现已符合本次字段要求 |
 | docs/api.md（原 docs-id.md） | v2 文档仍用 id；建议检查响应字段 | take：response_field |
 | examples/client.py（原 example-id.py） | v2 示例读取 id；建议检查字段消费 | take：response_field |
-| tests/test_create_export.py（拟新增） | 显式断言响应字段集合恰为 {id}，与要求 job_id 冲突 | exclude：记录后续测试工作，本次采用范围只含文档和示例 |
-| src/metrics.py（拟新增） | 仅有同名参数，没有 /exports 或响应消费关系 | 不应凭词命中认定受影响；若模型列入，人工排除并计假阳性 |
+| tests/test_create_export.py（任务局部） | 显式断言响应字段集合恰为 {id}，与要求 job_id 冲突 | exclude：记录后续测试工作，本次采用范围只含文档和示例 |
+| src/metrics.py（任务局部） | 仅有同名参数，没有 /exports 或响应消费关系 | 不应凭词命中认定受影响；若模型列入，人工排除并计假阳性 |
 
-拟新增测试角色夹具仅作静态读取，正文约定为：
+测试角色夹具仅作静态读取，正文为：
 
 ```python
 def test_create_export(client):
@@ -220,8 +221,8 @@ def test_create_export(client):
     assert set(response.json()) == {"id"}
 ```
 
-拟新增负控制约定为一个 `record_metric(job_id)` 函数，仅把参数放入 metric 标签；
-没有导出 API 调用或响应处理。实现获准后固定确切字节，再写独立 Oracle，不根据模型输出改预期。
+负控制为 `record_metric(job_id)` 函数，仅把参数放入 metric 标签，没有导出 API 调用或响应处理。
+两份夹具字节由测试代码固定，业务预期沿本任务约定，不根据模型输出改预期。
 测试集合“恰为 {id}”刻意区别于“兼容 id”：当前契约没有明文禁止额外兼容字段。
 
 采用出口：产生一个 v2 审查，正式目标恰为 docs/api.md 和 examples/client.py，各一个
@@ -250,9 +251,9 @@ response_field；规则/实现/测试均不成为该 input 的正式修改目标
 正式检查覆盖只对采用后 manifest 统计，不能用正式两目标闭合证明发现阶段全覆盖。
 不设未经校准的“召回率≥某值”门槛，也不以一个开发夹具签发泛化结论。
 
-## 9. 拟改范围、实施顺序与交付门禁
+## 9. 获准范围、实施顺序与交付门禁
 
-后续获准实现时，改动限于 contract_review 内的发现 schema/service/runner/ledger/API，
+本任务获准改动限于 contract_review 内的发现 schema/service/runner/ledger/API，
 现有 service/checkpoints 的事务接点、store 追加迁移、worker/execution 的共享槽接线、
 必要 main 注册和 tests/contract_review。旧 Run API/旧 Provider/旧评测与学习资产不改；不新增依赖。
 可新增 impact_schemas.py、impact_service.py、impact_runner.py、impact_ledger.py、impact_api.py，
@@ -266,9 +267,9 @@ response_field；规则/实现/测试均不成为该 input 的正式修改目标
 通过任务聚焦测试、全量 pytest、Ruff check/format、diff 检查及既有离线构建门禁后，
 记录固定提交、验证日志、未取得的真实证据及剩余范围。真实试验仍需单独批准。
 
-## 10. 本次规格准备记录
+## 10. 授权前规格准备记录与实施入口
 
-本轮只创建本执行单，未新增任何接口/表/fixture/代码，未跑模型或重开旧门禁。
+最初规格准备轮只创建本执行单，未新增接口/表/fixture/代码，未跑模型或重开旧门禁。
 核对了 CreateReview、freeze_input、GitSnapshotReader、SnapshotTools、RunState、
 ReviewService.create、CheckpointService.revise、ReviewStore v1—v5、ReviewWorker 与 execution 槽引用。
 文档检查覆盖计划 IMP-01—06、首次采用两目标/两检查、相对链接/源码接点及 git diff --check。
@@ -282,5 +283,6 @@ ReviewService.create、CheckpointService.revise、ReviewStore v1—v5、ReviewWo
 - [表与迁移](../../src/specflow/contract_review/store.py)、[单 worker](../../src/specflow/contract_review/worker.py)、[物理调用槽](../../src/specflow/contract_review/execution.py)。
 - [原 F01 输入](../../benchmarks/contract_review/cases.json)、[已有人工先导准备包](../reports/CR02-SIX-CASE-PILOT-READINESS-2026-11-02.md)。
 
-本文件待审决策为第 2 节的独立发现资源/共享 worker 方案及对应第 6 节存储与槽接线。
-批准前不进入实现；这不阻塞用户另行批准原 F01 人工先导，也不取消后续恢复、写入、上下文与记忆专项。
+用户随后批准第 2 节独立发现资源/共享 worker 方案及第 6 节存储与槽接线，授权离线实现与指定审查。
+当前实施及门禁状态见 [完成报告](../reports/CR02-TASK-IMPACT-01-completion.md)。
+该授权不含真实试验，不取消后续恢复、写入、上下文与记忆专项。

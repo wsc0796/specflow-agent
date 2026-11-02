@@ -8,7 +8,6 @@ from datetime import UTC, datetime
 from pydantic import ValidationError
 
 from specflow.contract_review.common import ReviewError, canonical, digest, now
-from specflow.contract_review.dynamic_ledger import DynamicLedger
 from specflow.contract_review.inputs import project_rule_material
 from specflow.contract_review.protocol import ReviewResult, SubmitReport
 from specflow.contract_review.provider import OpenAIReviewAdapter, ProviderFailure
@@ -17,6 +16,7 @@ from specflow.contract_review.report_validation import (
     validate_material_refs,
     validate_report,
 )
+from specflow.contract_review.shared_ledger import SharedLedger
 from specflow.contract_review.sources import strict_json
 
 
@@ -29,7 +29,7 @@ class ReviewWorker:
                 "Register a controlled test adapter or the supported synchronous HTTP adapter"
             )
         self.service, self.adapter = service, adapter
-        self.ledger = DynamicLedger(service)
+        self.ledger = SharedLedger(service)
         self.stop_event = threading.Event()
         self.wake_event = threading.Event()
         self.thread = None
@@ -144,11 +144,20 @@ class ReviewWorker:
             )
         with self.service.store.transaction() as conn:
             self.ledger.owner(conn)
-            row = self.service.store.row(
-                conn, "SELECT * FROM contract_review_jobs WHERE id=:id", id=context["job_id"]
-            )
-            if row["status"] in ("failed", "interrupted"):
-                self.ledger.settle_time(conn, row, time.monotonic() - context["started_monotonic"])
+            if context.get("work_kind") == "impact":
+                row = self.service.impacts.require(conn, context["discovery_id"])
+                if row["status"] in ("failed", "interrupted"):
+                    self.ledger.impact.settle_time(
+                        conn, row, time.monotonic() - context["started_monotonic"]
+                    )
+            else:
+                row = self.service.store.row(
+                    conn, "SELECT * FROM contract_review_jobs WHERE id=:id", id=context["job_id"]
+                )
+                if row["status"] in ("failed", "interrupted"):
+                    self.ledger.settle_time(
+                        conn, row, time.monotonic() - context["started_monotonic"]
+                    )
         self.pending = None
 
     def perform_io(self, context, call_id, instance_id, operation, timeout, *, kind="model"):
@@ -361,6 +370,10 @@ class ReviewWorker:
         return value
 
     def _run_job(self, context):
+        if context.get("work_kind") == "impact":
+            from specflow.contract_review.impact_runner import ImpactRunner
+
+            return ImpactRunner(self, context).run()
         context["started_monotonic"] = time.monotonic()
         frozen = context["frozen"]
         if frozen["execution_profile"]["engine_version"] == "contract-review-engine.v2":
@@ -467,6 +480,24 @@ class ReviewWorker:
                     "evidence_refs": body["maintenance_evidence"],
                     "missing_evidence": "同步 adapter 尚未返回或其进程实例尚未确认退出。",
                 }
+            )
+        if runtime["slot_discovery_call_id"]:
+            row = self.service.store.row(
+                conn,
+                "SELECT body FROM contract_impact_calls WHERE id=:id",
+                id=runtime["slot_discovery_call_id"],
+            )
+            body = json.loads(row["body"])
+            reasons.append("local_io_unconfirmed")
+            blocked.append(
+                dict(
+                    kind="discovery_call",
+                    call_id=runtime["slot_discovery_call_id"],
+                    execution_instance_id=body["execution_instance_id"],
+                    local_io_state=body["local_io_state"],
+                    evidence_refs=body["maintenance_evidence"],
+                    missing_evidence="同步发现调用尚未确认退出。",
+                )
             )
         return {
             "can_claim": not reasons,

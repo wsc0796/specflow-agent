@@ -26,6 +26,7 @@ class BodyLimitMiddleware:
     async def __call__(self, scope, receive, send):
         if scope["type"] != "http" or not (
             scope["path"].startswith("/api/v1/contract-reviews")
+            or scope["path"].startswith("/api/v1/contract-impact-discoveries")
             or (
                 scope["path"].startswith("/api/v1/projects/")
                 and scope["path"].endswith("/contract-decisions")

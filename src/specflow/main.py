@@ -11,6 +11,7 @@ from specflow.api_security import ApiSecurity
 from specflow.contract_review.api import BodyLimitMiddleware, decisions_router
 from specflow.contract_review.api import router as contract_reviews_router
 from specflow.contract_review.common import ReviewError
+from specflow.contract_review.impact_api import router as contract_impacts_router
 from specflow.contract_review.instance_lock import InstanceLock
 from specflow.contract_review.service import ReviewService
 from specflow.contract_review.sources import GitSnapshotReader
@@ -28,6 +29,7 @@ def create_app(
     security: ApiSecurity | None = None,
     contract_review_profiles: dict | None = None,
     contract_review_adapter=None,
+    contract_impact_profiles: dict | None = None,
 ) -> FastAPI:
     database = Database(database_url or default_url())
     run_artifact_root = artifact_root or Path("data/runs")
@@ -45,7 +47,7 @@ def create_app(
         try:
             # Explicit configuration is required. The legacy application never
             # selects a real provider or a fake profile on behalf of a caller.
-            if contract_review_profiles is not None:
+            if contract_review_profiles is not None or contract_impact_profiles is not None:
                 db_path = database.engine.url.database
                 if not db_path or db_path == ":memory:":
                     raise RuntimeError("Contract reviews require a file-backed SQLite database")
@@ -53,7 +55,7 @@ def create_app(
                 review_lock.acquire()
             database.create_schema()
             recover_interrupted_runs(database)
-            if contract_review_profiles is not None:
+            if contract_review_profiles is not None or contract_impact_profiles is not None:
                 store = ReviewStore(database)
                 store.migrate()
 
@@ -66,7 +68,10 @@ def create_app(
                         ) from error
 
                 application.state.contract_reviews = ReviewService(
-                    store, GitSnapshotReader(validate_review_path), contract_review_profiles
+                    store,
+                    GitSnapshotReader(validate_review_path),
+                    contract_review_profiles,
+                    impact_profiles=contract_impact_profiles,
                 )
                 if contract_review_adapter is not None:
                     review_worker = ReviewWorker(
@@ -111,6 +116,9 @@ def create_app(
         contract_reviews_router, dependencies=[Depends(security.require_api_key)]
     )
     application.include_router(decisions_router, dependencies=[Depends(security.require_api_key)])
+    application.include_router(
+        contract_impacts_router, dependencies=[Depends(security.require_api_key)]
+    )
 
     @application.get("/health", tags=["system"])
     def health_check() -> dict[str, str]:
