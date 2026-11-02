@@ -17,6 +17,7 @@ from specflow.api_security import ApiSecurity
 from specflow.contract_review.dynamic_runner import DynamicRunner
 from specflow.contract_review.profiles import dynamic_profile
 from specflow.contract_review.provider import ProviderFailure
+from specflow.contract_review.report_validation import validate_report
 from specflow.llm.providers.config import OpenAICompatibleConfig
 from specflow.main import create_app
 
@@ -332,7 +333,7 @@ def test_pilot_protocol_guidance_has_a_new_frozen_identity_only(adapter_factory)
         delegation=False,
         provider_binding=adapter.binding,
     )
-    assert profile["profile_id"] == "pilot-f01-deepseek-flash-v2"
+    assert profile["profile_id"] == "pilot-f01-deepseek-flash-v3"
     assert profile["analysis_prompt"].startswith(original["analysis_prompt"])
     guidance = profile["analysis_prompt"][len(original["analysis_prompt"]) :]
     assert guidance
@@ -348,13 +349,73 @@ def test_pilot_protocol_guidance_has_a_new_frozen_identity_only(adapter_factory)
     }
 
 
-@pytest.mark.parametrize("mode", ["catalog_only", "unread_reference", "corrected_reference"])
+@pytest.mark.parametrize(
+    "mode",
+    [
+        "catalog_only",
+        "unread_reference",
+        "corrected_reference",
+        "observation_as_acceptance",
+        "observation_as_verification",
+        "rule_as_acceptance",
+        "rule_as_verification",
+    ],
+)
 def test_pilot_evidence_visibility_through_worker(
     tmp_path, git_repo, controlled_adapter, adapter_factory, monkeypatch, mode
 ):
     fallback = controlled_adapter()
     requests, dispatched, before_projection = [], [], []
     original_tool = DynamicRunner._tool
+    original_review = DynamicRunner._review
+
+    def review_with_external_boundary_check(runner, report):
+        # A synthetic external binding exercises the validator; no evidence is imported
+        # into the API run and no tool observation is promoted to external evidence.
+        reads, observations = runner.state.evidence()
+        for collection, field in (
+            ("findings", "verification_evidence_refs"),
+            ("acceptance_items", "evidence_refs"),
+        ):
+            candidate = copy.deepcopy(report)
+            candidate[collection][0][field] = ["external-test"]
+            frozen = copy.deepcopy(runner.state.frozen)
+            with pytest.raises(ValueError, match="Unknown adopted evidence"):
+                validate_report(
+                    candidate,
+                    frozen,
+                    runner.context["sources"],
+                    reads,
+                    observations=observations,
+                    projected_evidence_ids=["external-test"],
+                )
+            frozen["verification_evidence_adoptions"] = [
+                {
+                    "evidence_id": "external-test",
+                    "verification_adoption_id": "external-adoption-test",
+                    "adopting_input_revision_id": frozen["input_revision_id"],
+                    "target_checks": [
+                        {"target_id": target["target_id"], "applicability": "applicable"}
+                        for target in frozen["target_manifest"]
+                    ],
+                }
+            ]
+            with pytest.raises(ValueError, match="Unknown projected evidence"):
+                validate_report(
+                    candidate, frozen, runner.context["sources"], reads, observations=observations
+                )
+            accepted, _ = validate_report(
+                candidate,
+                frozen,
+                runner.context["sources"],
+                reads,
+                observations=observations,
+                projected_evidence_ids=["external-test"],
+            )
+            assert accepted[collection][0][field] == ["external-test"]
+        return original_review(runner, report)
+
+    monkeypatch.setattr(DynamicRunner, "_review", review_with_external_boundary_check)
 
     def tool_with_visibility_check(runner, state, action):
         dispatched.append(copy.deepcopy(action))
@@ -393,6 +454,76 @@ def test_pilot_evidence_visibility_through_worker(
                     {"kind": "source", "source_ref": observation["source_refs"][0]},
                     {"kind": "observation", "observation_id": observation["observation_id"]},
                 ]
+                report = action["report"]
+                finding = report["findings"][0]
+                finding["observation_refs"] = [observation["observation_id"]]
+                finding["source_refs"] = observation["source_refs"]
+                report["check_results"][0]["status"] = "evidence_missing"
+                report["check_results"][0]["observation_refs"] = [observation["observation_id"]]
+                target = data["targets"][0]
+                report["work_items"] = [
+                    {
+                        "id": "w",
+                        "title": "补齐受控案例证据",
+                        "finding_ids": [finding["id"]],
+                        "target_ids": finding["target_ids"],
+                        "rule_refs": [],
+                        "source_refs": [],
+                        "handling_intent": {"kind": "obtain_evidence", "text": "保留未完成项"},
+                        "proposed_scope": {
+                            "include": [
+                                {"artifact_role": "documentation", "paths": [target["source_path"]]}
+                            ],
+                            "exclude": [],
+                        },
+                        "depends_on": [],
+                        "readiness": "not_ready",
+                        "blockers": [
+                            {
+                                "code": "missing_evidence",
+                                "reason": "受控替身不作语义判断",
+                                "refs": [],
+                            }
+                        ],
+                        "acceptance_ids": ["ac"],
+                        "execution_authorized": False,
+                    }
+                ]
+                report["acceptance_items"] = [
+                    {
+                        "id": "ac",
+                        "work_item_id": "w",
+                        "finding_ids": [finding["id"]],
+                        "target_ids": finding["target_ids"],
+                        "rule_refs": [],
+                        "source_refs": observation["source_refs"],
+                        "given": "冻结输入",
+                        "when": "后续静态审查",
+                        "then": "记录剩余缺口",
+                        "verification_method": {
+                            "kind": "static_review",
+                            "procedure": "审查证据完整性",
+                            "required_environment": "受控环境",
+                        },
+                        "expected_evidence": ["审查记录"],
+                        "evidence_refs": [],
+                        "execution_status": "NOT_RUN",
+                    }
+                ]
+                assert not data.get("verification_evidence")
+                assert not data.get("verification_evidence_adoptions")
+                if "_as_" in mode:
+                    identifier = (
+                        observation["observation_id"]
+                        if mode.startswith("observation")
+                        else data["adoption_records"][0]["adoption_id"]
+                    )
+                    if mode.endswith("acceptance"):
+                        report["acceptance_items"][0]["evidence_refs"] = [identifier]
+                    else:
+                        finding["verification_evidence_refs"] = [identifier]
+                    if "protocol_feedback" in data:
+                        assert "Unknown adopted evidence" in json.dumps(data["protocol_feedback"])
         else:
             source = next(
                 item for item in data["source_catalog"]["items"] if "documentation" in item["roles"]
@@ -458,12 +589,12 @@ def test_pilot_evidence_visibility_through_worker(
         result = pilot.submit_and_observe(client, root, body, seconds=10, interval=0.01)
     assert len(requests[0]["source_catalog"]["items"]) == 4
     assert len(requests[0]["targets"]) == 2
-    if mode == "unread_reference":
+    if mode == "unread_reference" or "_as_" in mode:
         assert result["status"]["status"] == "failed"
         assert result["status"]["error_code"] == "ACTION_PROTOCOL_ERROR"
-        assert len(calls) == 2
+        assert len(calls) == (2 if mode == "unread_reference" else 3)
         assert all("candidate_report" not in data for data in requests)
-        assert dispatched == before_projection == []
+        assert len(dispatched) == len(before_projection) == (0 if mode == "unread_reference" else 1)
         assert "report_json" not in result
     else:
         assert result["status"]["status"] == "completed_degraded"

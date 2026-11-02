@@ -37,7 +37,7 @@ BASELINE = "ef2c53af26f0a02f61b4e7c8fa07e1d767a17029"
 CASE = "CR02-F01"
 SOURCE_TRIAL = "TR02-F01-COMMON-01"
 SAMPLE = "SP02-F01-COMMON-01"
-PROFILE = "pilot-f01-deepseek-flash-v2"
+PROFILE = "pilot-f01-deepseek-flash-v3"
 MATERIALS = (
     ("contracts/v2.json", "contract", "contract-v2.json"),
     ("src/api.py", "implementation", "api-correct.py"),
@@ -176,6 +176,21 @@ def make_profile(adapter):
         "引用范围不得超过实际投影的片段。遇到 Referenced body was not projected 反馈时，"
         "移除未投影的引用，先读取所需正文，待观察进入后续请求再引用；"
         "添加其他引用不能使原有未读引用合法。\n"
+        "引用字段的身份域不同，不可按名称相似互换："
+        "reason.evidence_refs 是带 kind 的 MaterialRef；工具观察使用 "
+        '{"kind":"observation","observation_id":"宿主提供的观察ID"}。'
+        "findings[].observation_refs 和 check_results[].observation_refs 使用已投影工具观察的 "
+        "observation_id 列表；source_refs 使用 source_id 加 selector，指向实际已投影正文片段。"
+        "rule_refs 和 rule_uses[].adoption_id 引用 adoption_records 的规则采用身份，"
+        "不是外部核验身份。findings[].verification_evidence_refs 和 "
+        "acceptance_items[].evidence_refs 只接受当前 input 显式采用且已投影的外部核验 "
+        "evidence_id，分别对应 verification_evidence_adoptions 与 verification_evidence，"
+        "并须通过宿主的当前输入归属和目标适用性校验。工具 observation_id、规则 adoption_id "
+        "及 source_id 均不能填入这两个外部核验字段，也不能自行将工具观察升级为外部核验。"
+        "没有已采用且投影的外部核验记录时，这两个字段必须为 []；"
+        "不要为了填字段而要求新增外部证据或执行测试，执行状态仍为 NOT_RUN。"
+        "遇到 Unknown adopted evidence 时，检查这两个外部核验字段并移除错误身份；"
+        "工具观察仅放在其允许的观察引用字段，不通过追加观察ID或规则ID修复外部引用。\n"
     )
     return ExecutionProfile.model_validate(profile).frozen()
 
