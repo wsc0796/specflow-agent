@@ -1,0 +1,24 @@
+============================= test session starts =============================
+platform win32 -- Python 3.12.10, pytest-8.4.2, pluggy-1.6.0 -- C:\Users\50469\specflow-h04-f03-20261023\.venv\Scripts\python.exe
+rootdir: C:\Users\50469\specflow-h04-f03-20261023
+configfile: pyproject.toml
+plugins: anyio-4.14.1
+collecting ... collected 36 items / 35 deselected / 1 selected
+
+tests/contract_review/test_replay.py::test_delegation_requires_untampered_package_and_pre_terminal_parent_acceptance[child_predecessor] FAILED [100%]
+
+================================== FAILURES ===================================
+_ test_delegation_requires_untampered_package_and_pre_terminal_parent_acceptance[child_predecessor] _
+tests\contract_review\test_replay.py:475: in test_delegation_requires_untampered_package_and_pre_terminal_parent_acceptance
+    assert final["error_code"] == "REPLAY_PREFIX_UNAVAILABLE", final
+E   AssertionError: {'adopted_ruleset_version': None, 'budget': {'execution_seconds_charged': 0.8120000003837049, 'execution_seconds_reserved': 0.0, 'grant': {'execution_seconds': 900, 'model_calls': 36, 'tool_actions': 60}, 'input_tokens': None, ...}, 'check_manifest': [{'behavior': '��鱾��Ŀ����ϵİ汾������������Ӧ�ֶ��Ƿ����������Լ��v2 Ӧʹ�� job_id����ȷ���� v1 �� id ���ϱ���Ϊ��ʷ��', 'check_id': 'check_a15c6f448b144db8b7831046ef92a000', 'key': 'response_field', 'rule_source_refs': [], ...}, {'behavior': '��鱾��Ŀ����ϵİ汾������������Ӧ�ֶ��Ƿ����������Լ��v2 Ӧʹ�� job_id����ȷ���� v1 �� id ���ϱ���Ϊ��ʷ��', 'check_id': 'check_79fe0d312b1b45988b3765fcfffc2ff2', 'key': 'response_field', 'rule_source_refs': [], ...}], 'current_input_revision_id': 'ir_eb8840cf27e74ad2b94747adc808224b', ...}
+E   assert None == 'REPLAY_PREFIX_UNAVAILABLE'
+============================== warnings summary ===============================
+.venv\Lib\site-packages\fastapi\testclient.py:1
+  C:\Users\50469\specflow-h04-f03-20261023\.venv\Lib\site-packages\fastapi\testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+FAILED tests/contract_review/test_replay.py::test_delegation_requires_untampered_package_and_pre_terminal_parent_acceptance[child_predecessor]
+================= 1 failed, 35 deselected, 1 warning in 4.80s =================

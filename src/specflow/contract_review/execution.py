@@ -661,6 +661,20 @@ class ExecutionLedger:
                 )
 
     def record_result(self, context, call_id, result, *, accepted, reason):
+        if call_id.startswith("reuse_"):
+            self.service.replay_records.accept(
+                self.fence,
+                context,
+                call_id,
+                result,
+                accepted=accepted,
+                reason=reason,
+            )
+            if not accepted:
+                if reason == "ACTION_PERMISSION_DENIED":
+                    raise ReviewError(reason, "回放结果超出当前权限。")
+                context["replay_session"].boundary(reason, broken=True)
+            return
         with self.store.transaction() as conn:
             self.fence(conn, context)
             row = self.store.row(
@@ -702,6 +716,7 @@ class ExecutionLedger:
                 {"result": result, "acceptance": body["acceptance"]},
                 call_id=call_id,
             )
+            self.service.replay_records.complete(conn, context, row, body, result, accepted)
 
     def _fail(self, conn, row, code, interrupted=False):
         status = "interrupted" if interrupted else "failed"
@@ -852,6 +867,8 @@ class ExecutionLedger:
                 ],
                 "created_at": now(),
             }
+            if json.loads(row["body"]).get("retry_of_job_id"):
+                envelope["recovery"] = self.service.replay_records.summary(conn, context["job_id"])
             status = (
                 "awaiting_decision"
                 if any(q["blocking"] for q in report["questions"])

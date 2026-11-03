@@ -11,6 +11,7 @@ from specflow.contract_review.dynamic_context import RunState, append_unique
 from specflow.contract_review.inputs import match_effective_scope
 from specflow.contract_review.protocol import ReviewResult
 from specflow.contract_review.provider import ProviderFailure
+from specflow.contract_review.replay import RestartFresh
 from specflow.contract_review.report_validation import (
     keyed,
     require,
@@ -58,7 +59,17 @@ class DynamicRunner:
 
     def run(self):
         try:
-            self._parent()
+            while True:
+                try:
+                    self._parent()
+                    break
+                except RestartFresh:
+                    self.state = RunState(
+                        self.context,
+                        SnapshotTools(
+                            self.context["sources"], self.context["frozen"]["snapshot_id"]
+                        ),
+                    )
         except ReviewError as error:
             self.ledger.fail(
                 self.context, error.code, time.monotonic() - self.context["started_monotonic"]
@@ -73,6 +84,7 @@ class DynamicRunner:
     def _request(self, state, role):
         data, entries = state.build(role)
         call_id, result = self.worker.model_call(state.context, role, data, entries)
+        state.last_model_reused = call_id.startswith("reuse_")
         state.mark_projected(data, entries)
         try:
             raw = strict_json(result["content"])
@@ -170,6 +182,9 @@ class DynamicRunner:
                 state.feedback.pop("protocol_feedback", None)
             except (ValueError, ReviewError) as error:
                 code = error.code if isinstance(error, ReviewError) else "ACTION_SCHEMA_INVALID"
+                replay = self.context.get("replay_session")
+                if replay is not None and replay.active and code == "ACTION_PERMISSION_DENIED":
+                    raise
                 if route_id:
                     self.ledger.reject_action(self.context, call_id, result, route_id, code)
                 if code not in CORRECTABLE:
@@ -204,16 +219,25 @@ class DynamicRunner:
         before = state.operation_key(action)
         context = state.context
         payload = {"tool": action["tool"], "arguments": action["arguments"]}
-        call_id, instance = self.ledger.reserve_call(context, "tool", payload, [], kind="tool")
+        replay = context.get("replay_session")
+        reused = replay.take(context, "tool", payload, [], kind="tool") if replay else None
+        if reused is not None:
+            call_id, observation = reused
+            returned = {key: observation[key] for key in ToolResponse.model_fields}
+        else:
+            if getattr(state, "last_model_reused", False):
+                self.ledger.charge_replayed_tool(context)
+            call_id, instance = self.ledger.reserve_call(context, "tool", payload, [], kind="tool")
         try:
-            returned = self.worker.perform_io(
-                context,
-                call_id,
-                instance,
-                lambda: state.tools.execute(action["tool"], action["arguments"]),
-                context["frozen"]["execution_profile"]["tool_timeout_seconds"],
-                kind="tool",
-            )
+            if reused is None:
+                returned = self.worker.perform_io(
+                    context,
+                    call_id,
+                    instance,
+                    lambda: state.tools.execute(action["tool"], action["arguments"]),
+                    context["frozen"]["execution_profile"]["tool_timeout_seconds"],
+                    kind="tool",
+                )
         except ProviderFailure as failure:
             self.ledger.record_failure(context, call_id, failure)
             raise ReviewError(failure.code, "工具依赖失败。") from None
@@ -302,23 +326,24 @@ class DynamicRunner:
                 reason="TOOL_RESULT_INVALID",
             )
             raise ReviewError("TOOL_RESULT_INVALID", "工具没有返回完整观察。")
-        with self.worker.service.store.read() as conn:
-            row = self.worker.service.store.row(
-                conn, "SELECT body FROM contract_review_calls WHERE id=:id", id=call_id
-            )
-            logical = json.loads(row["body"])["logical_call_id"]
-        observation = {
-            "observation_id": identity("obs"),
-            "input_revision_id": context["input_id"],
-            "origin": "snapshot_tool",
-            "logical_call_id": logical,
-            "call_id": call_id,
-            "child_task_id": context.get("child_id"),
-            "tool": action["tool"],
-            "arguments": action["arguments"],
-            **returned,
-            "body_hash": digest(returned["body"]),
-        }
+        if reused is None:
+            with self.worker.service.store.read() as conn:
+                row = self.worker.service.store.row(
+                    conn, "SELECT body FROM contract_review_calls WHERE id=:id", id=call_id
+                )
+                logical = json.loads(row["body"])["logical_call_id"]
+            observation = {
+                "observation_id": identity("obs"),
+                "input_revision_id": context["input_id"],
+                "origin": "snapshot_tool",
+                "logical_call_id": logical,
+                "call_id": call_id,
+                "child_task_id": context.get("child_id"),
+                "tool": action["tool"],
+                "arguments": action["arguments"],
+                **returned,
+                "body_hash": digest(returned["body"]),
+            }
         self.ledger.record_result(
             context, call_id, observation, accepted=True, reason="TOOL_FORMAT_AND_SCOPE_VALID"
         )
@@ -389,6 +414,11 @@ class DynamicRunner:
         return grants, explicit_rules, initial, targets
 
     def _child(self, action, parent_call, specification):
+        replay = self.context.get("replay_session")
+        if replay is not None:
+            reused = replay.child(action, parent_call, specification)
+            if reused is not None:
+                return reused
         identifier, reference, deadline = self.ledger.start_child(self.context, parent_call, action)
         grants, rules, initial, targets = specification
         context = {

@@ -65,7 +65,7 @@ def test_v5_to_v6_preserves_old_checksums_input_and_backup(
             )
             assert conn.exec_driver_sql(
                 "SELECT max(version) FROM contract_review_schema_migrations"
-            ).scalar_one() == (5 if fail_upgrade else 6)
+            ).scalar_one() == (5 if fail_upgrade else store_module.MIGRATIONS[-1][0])
             tables = {
                 row[0]
                 for row in conn.exec_driver_sql("SELECT name FROM sqlite_master WHERE type='table'")

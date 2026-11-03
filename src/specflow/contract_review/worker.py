@@ -245,6 +245,11 @@ class ReviewWorker:
         }
         if isinstance(self.adapter, OpenAIReviewAdapter):
             payload = self.adapter.prepare(payload, profile)
+        replay = context.get("replay_session")
+        if replay is not None:
+            reused = replay.take(context, role, payload, material_entries)
+            if reused is not None:
+                return reused
         retries = profile.get("dependency_retry_limit", 0)
         retry_of = None
         for attempt in range(retries + 1):
@@ -378,7 +383,12 @@ class ReviewWorker:
         frozen = context["frozen"]
         if frozen["execution_profile"]["engine_version"] == "contract-review-engine.v2":
             from specflow.contract_review.dynamic_runner import DynamicRunner
+            from specflow.contract_review.replay import ReplaySession
 
+            if frozen["execution_profile"]["options"]["replay"]:
+                context["replay_session"] = ReplaySession(
+                    self.service.replay_records, self.ledger.fence, context
+                )
             DynamicRunner(self, context).run()
             return
         reads = [

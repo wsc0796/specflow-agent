@@ -18,6 +18,73 @@ from specflow.contract_review.store import DDL, SCHEMA_CHECKSUM, ReviewStore
 from specflow.db import Database, Project
 
 
+@pytest.mark.parametrize("fail_first", [False, True])
+def test_v6_to_replay_binding_migration_is_additive_and_transactional(
+    tmp_path, git_repo, test_profile, monkeypatch, fail_first
+):
+    root, _, body = git_repo
+    db = Database(f"sqlite:///{(tmp_path / 'before-replay.sqlite').as_posix()}")
+    try:
+        db.create_schema()
+        with db.factory() as session:
+            session.add(
+                Project(id=body["project_id"], name="Before replay", repository_path=str(root))
+            )
+            session.commit()
+        store = ReviewStore(db)
+        with monkeypatch.context() as old:
+            old.setattr(store_module, "MIGRATIONS", store_module.MIGRATIONS[:6])
+            store.migrate()
+        domain = ReviewService(
+            store, GitSnapshotReader(lambda path: path), {test_profile["profile_id"]: test_profile}
+        )
+        _, accepted = domain.create(CreateReview.model_validate(body), "before-replay")
+        before = domain.get(accepted["review_id"])
+        if fail_first:
+            with monkeypatch.context() as broken:
+                broken.setattr(
+                    store_module,
+                    "MIGRATIONS",
+                    (
+                        *store_module.MIGRATIONS[:6],
+                        (7, (*store_module.REPLAY_DDL, "INVALID SQL")),
+                    ),
+                )
+                with pytest.raises(ReviewError):
+                    store.migrate()
+            with store.read() as conn:
+                assert (
+                    conn.exec_driver_sql(
+                        "SELECT max(version) FROM contract_review_schema_migrations"
+                    ).scalar_one()
+                    == 6
+                )
+                assert (
+                    conn.exec_driver_sql(
+                        "SELECT name FROM sqlite_master "
+                        "WHERE name='contract_review_replay_bindings'"
+                    ).first()
+                    is None
+                )
+        store.migrate()
+        backup = store.migration_backup_path
+        assert backup.is_file()
+        store.migrate()
+        assert store.migration_backup_path == backup
+        after = domain.get(accepted["review_id"])
+        assert after["input_hash"] == before["input_hash"]
+        assert after["job_id"] == before["job_id"] and after["status"] == "queued"
+        with store.read() as conn:
+            assert (
+                conn.exec_driver_sql(
+                    "SELECT count(*) FROM contract_review_replay_bindings"
+                ).scalar_one()
+                == 0
+            )
+    finally:
+        db.engine.dispose()
+
+
 def test_migration_is_repeatable_and_legacy_reader_preserves_new_data(tmp_path):
     path = tmp_path / "migration.sqlite"
     db = Database(f"sqlite:///{path.as_posix()}")

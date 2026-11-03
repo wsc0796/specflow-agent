@@ -317,7 +317,7 @@ def test_cli_redirect_timeout_and_oversize_response_do_not_retry(
     assert code == 2 and len(calls) == 3
 
 
-def test_cli_has_no_retry_or_raw_credential_options_and_help_reads_no_credentials(
+def test_cli_has_explicit_retry_but_no_raw_credential_options_and_help_reads_no_credentials(
     monkeypatch, capsys
 ):
     original_get = review_cli.os.environ.get
@@ -333,7 +333,34 @@ def test_cli_has_no_retry_or_raw_credential_options_and_help_reads_no_credential
     assert result.value.code == 0
     help_text = capsys.readouterr().out
     assert "--api-key-env" in help_text and "--api-key " not in help_text
-    assert "retry" not in help_text
+    assert "retry" in help_text
+
+
+def test_cli_retry_is_one_authenticated_http_request_and_success_is_replayable(
+    review_client, invoke, tmp_path
+):
+    from test_retries import failed_review
+
+    client, _, accepted, _, request = failed_review(review_client)
+    args = [
+        "retry",
+        accepted["review_id"],
+        "--body-file",
+        write_body(tmp_path, request),
+        "--idempotency-key",
+        "retry-cli",
+    ]
+    code, output, error, calls = invoke(client, args)
+    assert code == 0, error
+    original = json.loads(output)
+    assert len(calls) == 1 and calls[0].method == "POST"
+    assert calls[0].url.path.endswith("/retries")
+    assert json.loads(calls[0].content) == request
+    assert original["input_revision_id"] == accepted["input_revision_id"]
+    assert original["retry_of_job_id"] == accepted["job_id"]
+    code, output, error, calls = invoke(client, args)
+    assert code == 0 and json.loads(output) == original, error
+    assert len(calls) == 2
 
 
 def test_cli_publishes_and_queries_project_decisions_with_explicit_version(

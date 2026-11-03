@@ -78,6 +78,7 @@ def configure_parser(subparsers):
     action("event", review=True).add_argument("event_id", type=identifier)
     action("resolve", review=True, post=True)
     action("revise", review=True, post=True)
+    action("retry", review=True, post=True)
     action("import-evidence", review=True, post=True)
     evidence = action("evidence", review=True, paged=True)
     evidence.add_argument("--evidence-id", type=identifier)
@@ -128,6 +129,7 @@ def request_spec(args):
         "event": "/events/" + quote(getattr(args, "event_id", ""), safe=""),
         "resolve": "/resolution-batches",
         "revise": "/revisions",
+        "retry": "/retries",
         "import-evidence": "/verification-evidence",
         "evidence": "/verification-evidence",
     }

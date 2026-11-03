@@ -11,6 +11,8 @@ from specflow.contract_review.common import ReviewError, canonical, digest, iden
 from specflow.contract_review.decisions import DecisionService
 from specflow.contract_review.inputs import freeze_input
 from specflow.contract_review.queries import ReviewQueries
+from specflow.contract_review.replay import ReplayRecords
+from specflow.contract_review.retries import RetryService
 from specflow.contract_review.schemas import ExecutionProfile
 from specflow.contract_review.store import ReviewStore
 from specflow.contract_review.verification import VerificationService
@@ -33,6 +35,8 @@ class ReviewService:
         self.checkpoints = CheckpointService(self)
         self.decisions = DecisionService(self)
         self.queries = ReviewQueries(self)
+        self.retries = RetryService(self)
+        self.replay_records = ReplayRecords(self.store)
         for name, value in (profiles or {}).items():
             try:
                 profile = ExecutionProfile.model_validate(value)
@@ -423,6 +427,7 @@ class ReviewService:
                 "job_id": job["id"],
                 "job_status": job["status"],
                 "error_code": job["error_code"],
+                "recovery": self.replay_records.summary(conn, job["id"]),
                 **self.queries.diagnostics(conn, job),
                 "check_manifest": frozen["check_manifest"],
                 "quality": quality,

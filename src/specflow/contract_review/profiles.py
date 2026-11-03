@@ -49,7 +49,13 @@ def grammar(schema):
 
 
 def dynamic_profile(
-    profile_id, model, *, execution_mode="test", delegation=True, provider_binding=None
+    profile_id,
+    model,
+    *,
+    execution_mode="test",
+    delegation=True,
+    replay=False,
+    provider_binding=None,
 ):
     tools = "\n".join(
         name + " arguments: " + grammar(model_type.model_json_schema())
@@ -109,7 +115,7 @@ def dynamic_profile(
             "write": False,
             "project_memory": False,
             "delegate": delegation,
-            "replay": False,
+            "replay": replay,
         },
         "completion_reserve": {"enabled": False},
         "mandatory_context_preflight": {"enabled": False},

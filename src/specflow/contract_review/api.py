@@ -12,6 +12,7 @@ from specflow.contract_review.checkpoints import ResolutionBatch, RevisionReques
 from specflow.contract_review.common import ReviewError, canonical
 from specflow.contract_review.decisions import DecisionRequest
 from specflow.contract_review.queries import event_view
+from specflow.contract_review.retries import RetryRequest
 from specflow.contract_review.schemas import CreateReview
 from specflow.contract_review.verification import VerificationImport
 
@@ -154,6 +155,18 @@ def revise_review(
 ):
     query_fields(request)
     status, response = service(request).checkpoints.revise(review_id, body, idempotency_key)
+    return JSONResponse(response, status_code=status)
+
+
+@router.post("/{review_id}/retries", status_code=202)
+def retry_review(
+    review_id: str,
+    body: RetryRequest,
+    request: Request,
+    idempotency_key: Annotated[str, Header(min_length=1, max_length=128)],
+):
+    query_fields(request)
+    status, response = service(request).retries.submit(review_id, body, idempotency_key)
     return JSONResponse(response, status_code=status)
 
 

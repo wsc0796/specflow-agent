@@ -195,7 +195,7 @@ class DeliveryOptions(StrictModel):
     write: Literal[False] = False
     project_memory: bool = False
     delegate: bool = False
-    replay: Literal[False] = False
+    replay: bool = False
 
 
 class ProviderBinding(StrictModel):
@@ -277,6 +277,8 @@ class ExecutionProfile(StrictModel):
 
     @model_validator(mode="after")
     def executable_options(self):
+        if self.options.replay and self.engine_version != "contract-review-engine.v2":
+            raise ValueError("Replay needs an explicit v2 profile")
         if (
             self.engine_version == "contract-review-engine.v1"
             and self.model_fields_set & V2_PROFILE_FIELDS

@@ -126,6 +126,7 @@ class DynamicLedger(ExecutionLedger):
                     role=role,
                     logical=logical,
                 )
+            self.service.replay_records.prepare(conn, context, step_id)
             projection = {
                 "projection_id": identity("projection"),
                 "logical_call_id": logical,
@@ -269,6 +270,11 @@ class DynamicLedger(ExecutionLedger):
             )
 
     def propose(self, context, call_id, raw):
+        if call_id.startswith("reuse_"):
+            with self.store.read() as conn:
+                self.fence(conn, context)
+                self.service.replay_records.binding(conn, context, call_id)
+            return call_id
         blocked = None
         with self.store.transaction() as conn:
             row = self.fence(conn, context)
@@ -363,6 +369,9 @@ class DynamicLedger(ExecutionLedger):
         return route_id
 
     def reject_action(self, context, call_id, result, route_id, code):
+        if call_id.startswith("reuse_"):
+            self.record_result(context, call_id, result, accepted=False, reason=code)
+            return
         self.record_result(context, call_id, result, accepted=False, reason=code)
         with self.store.transaction() as conn:
             self.fence(conn, context)
@@ -385,14 +394,14 @@ class DynamicLedger(ExecutionLedger):
             )
 
     def child_rows(self, conn, context):
-        return (
+        return list(
             conn.execute(
                 text("SELECT * FROM contract_review_child_tasks WHERE job_id=:job ORDER BY rowid"),
                 {"job": context["job_id"]},
             )
             .mappings()
             .all()
-        )
+        ) + self.service.replay_records.children(conn, context)
 
     def check_reviews(self, context, call_id, reviews):
         with self.store.read() as conn:
@@ -405,15 +414,8 @@ class DynamicLedger(ExecutionLedger):
             supplied = {item["child_result_ref"]: item for item in reviews}
             if len(supplied) != len(reviews) or not set(supplied) <= set(children):
                 raise ReviewError("ACTION_SCHEMA_INVALID", "父验收重复或引用了未知子结果。")
-            call = self.store.row(
-                conn,
-                "SELECT body FROM contract_review_calls WHERE id=:id AND job_id=:job",
-                id=call_id,
-                job=context["job_id"],
-            )
-            projected = json.loads(
-                json.loads(call["body"])["projection"]["payload"]["messages"][1]["content"]
-            )
+            call = self.service.replay_records.call_body(conn, context, call_id)
+            projected = json.loads(call["projection"]["payload"]["messages"][1]["content"])
             seen = {item["child_result_ref"] for item in projected.get("child_results", [])}
             projected_results = {
                 item["child_result_ref"]: item["result"]
@@ -445,6 +447,17 @@ class DynamicLedger(ExecutionLedger):
         latest = (
             self.check_reviews(context, call_id, reviews) if not context.get("child_id") else {}
         )
+        if call_id.startswith("reuse_"):
+            self.service.replay_records.accept(
+                self.fence,
+                context,
+                call_id,
+                result,
+                accepted=True,
+                reason="FORMAT_AND_SCOPE_VALID",
+                action=action,
+            )
+            return latest
         with self.store.transaction() as conn:
             self.fence(conn, context)
             row = self.store.row(
@@ -487,6 +500,13 @@ class DynamicLedger(ExecutionLedger):
                 id=row["step_id"],
                 body=canonical(
                     {
+                        **json.loads(
+                            self.store.row(
+                                conn,
+                                "SELECT body FROM contract_review_steps WHERE id=:id",
+                                id=row["step_id"],
+                            )["body"]
+                        ),
                         "parent_response": result,
                         "action": action,
                         "child_result_reviews": reviews,
@@ -513,6 +533,7 @@ class DynamicLedger(ExecutionLedger):
                     call_id=call_id,
                     route_decision_id=route_id,
                 )
+            self.service.replay_records.complete(conn, context, row, body, result, True, action)
             self.store.event(
                 conn,
                 context["review_id"],
@@ -525,6 +546,35 @@ class DynamicLedger(ExecutionLedger):
                 child_task_id=context.get("child_id"),
             )
         return latest
+
+    def charge_replayed_tool(self, context):
+        """A replayed tool proposal needs a new action charge only if its tool must run anew."""
+        with self.store.transaction() as conn:
+            row = self.fence(conn, context)
+            job, account = json.loads(row["body"]), self.account(conn, context["review_id"])
+            profile = context["frozen"]["execution_profile"]
+            if (
+                job["tool_actions"] >= profile["tool_action_limit"]
+                or account["tool_actions"] >= account["grant"]["tool_actions"]
+            ):
+                raise ReviewError("BUDGET_EXHAUSTED", "重读工具动作额度不足。")
+            job["tool_actions"] += 1
+            account["tool_actions"] += 1
+            self.save_account(conn, context["review_id"], account)
+            self.store.execute(
+                conn,
+                "UPDATE contract_review_jobs SET body=:body WHERE id=:id",
+                id=context["job_id"],
+                body=canonical(job),
+            )
+            self.store.execute(
+                conn,
+                "INSERT INTO contract_review_budget_entries VALUES (:id,:review,:job,NULL,:body)",
+                id=identity("tool_charge"),
+                review=context["review_id"],
+                job=context["job_id"],
+                body=canonical({"tool_actions": 1, "reason": "replayed_proposal_new_tool"}),
+            )
 
     def check_delegate(self, context):
         if not context["frozen"]["execution_profile"]["options"]["delegate"]:
@@ -598,6 +648,11 @@ class DynamicLedger(ExecutionLedger):
                 self.fence(conn, context)
             body = json.loads(row["body"])
             body.update(result=payload, evidence_trace=trace)
+            if context["frozen"]["execution_profile"]["options"]["replay"] and not failed:
+                body["replay_package_hash"] = digest(
+                    {"result": payload, "evidence_trace": trace, "action": body["action"]}
+                )
+                body["accepted_at"] = now()
             self.store.reserve_records(
                 conn,
                 len(canonical(payload).encode()) + len(canonical(trace).encode()),

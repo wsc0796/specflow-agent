@@ -112,6 +112,17 @@ DECISION_DDL = (
     "REFERENCES projects(id), introduced_version INTEGER NOT NULL CHECK(introduced_version>0), "
     "body TEXT NOT NULL, created_at TEXT NOT NULL, UNIQUE(project_id,introduced_version))",
 )
+REPLAY_DDL = (
+    "CREATE TABLE contract_review_replay_bindings (id TEXT PRIMARY KEY, "
+    "job_id TEXT NOT NULL REFERENCES contract_review_jobs(id), "
+    "step_id TEXT NOT NULL UNIQUE REFERENCES contract_review_steps(id), "
+    "source_job_id TEXT NOT NULL REFERENCES contract_review_jobs(id), "
+    "source_step_id TEXT NOT NULL REFERENCES contract_review_steps(id), "
+    "kind TEXT NOT NULL CHECK(kind IN ('model','tool','child')), "
+    "status TEXT NOT NULL CHECK(status IN ('pending','accepted','rejected','abandoned')), "
+    "body TEXT NOT NULL, created_at TEXT NOT NULL)",
+    "CREATE INDEX contract_review_replay_by_job ON contract_review_replay_bindings(job_id)",
+)
 MIGRATIONS = (
     (1, DDL),
     (2, EVIDENCE_DDL),
@@ -119,6 +130,7 @@ MIGRATIONS = (
     (4, RESOLUTION_DDL),
     (5, DECISION_DDL),
     (6, IMPACT_DDL),
+    (7, REPLAY_DDL),
 )
 
 
