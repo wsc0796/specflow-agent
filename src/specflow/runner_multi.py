@@ -399,10 +399,11 @@ def _run_multi_agent_owned(
                 raise RuntimeError("Coordinator did not initialize RevisionController")
             target_id = _revision_target(prior_outputs, plan.stages[3][0])
             target = registry.get(target_id)
+            review_output = prior_outputs[plan.stages[3][0]]["output"]
             revision_task = controller.create_revision_task(
                 target_id,
                 target.role,
-                "Review rejected the initial synthesis.",
+                "\n".join([review_output["summary"], *review_output.get("findings", [])]),
                 "Revise the output to address the recorded review finding.",
             )
             if revision_task is None:
@@ -811,6 +812,23 @@ def _validated_inputs(
             }
         else:
             raise ValueError("UNKNOWN_AGENT_ROLE")
+        revision = context.get("revision_task")
+        if revision is not None:
+            review = output.get("review-agent-v1", {})
+            if (
+                not isinstance(revision, Mapping)
+                or role not in {"design", "test_strategy", "risk_review"}
+                or revision.get("target_agent_id") != agent_id
+                or review.get("decision") != "REJECT"
+                or review.get("target_agent_id") != agent_id
+            ):
+                raise ValueError("REVISION_FEEDBACK_TARGET_MISMATCH")
+            payload["revision_feedback"] = {
+                "target_agent_id": agent_id,
+                "round_number": revision.get("round_number"),
+                "summary": review.get("summary"),
+                "findings": review.get("findings", []),
+            }
         model = schema_registry.get(registry.get(agent_id).identity.input_schema_id)
         inputs[agent_id] = model.model_validate(payload).model_dump()
     return inputs
@@ -866,6 +884,8 @@ def _stage_failure_diagnostics(
 ) -> list[dict[str, Any]]:
     """Project only recognized failure metadata; never copy a failed payload."""
     expected_phases = {
+        ErrorCode.PROVIDER_TIMEOUT.value: "provider_transport",
+        ErrorCode.PROVIDER_SERVER_ERROR.value: "provider_transport",
         ErrorCode.PROVIDER_EMPTY_CONTENT.value: "response_normalization",
         ErrorCode.PROVIDER_RESPONSE_INVALID.value: "response_normalization",
         ErrorCode.JSON_PARSE_FAILED.value: "json_parse",

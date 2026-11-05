@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-_FAILURE_PHASES = frozenset({"response_normalization", "json_parse", "schema_validation"})
+_FAILURE_PHASES = frozenset(
+    {"provider_transport", "response_normalization", "json_parse", "schema_validation"}
+)
 _FINISH_REASONS = frozenset(
     {
         "stop",

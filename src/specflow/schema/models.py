@@ -17,6 +17,15 @@ class StrictAgentInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+class RevisionFeedback(StrictAgentInput):
+    """Validated review data delivered only to the selected revision target."""
+
+    target_agent_id: str = Field(min_length=1, pattern=r"\S")
+    round_number: int = Field(ge=1)
+    summary: str = Field(min_length=1, pattern=r"\S")
+    findings: list[str] = Field(default_factory=list)
+
+
 # ── Repository Analyst ────────────────────────────────────────
 
 
@@ -38,6 +47,7 @@ class RepositoryAnalystOutput(BaseModel):
 class DesignInput(StrictAgentInput):
     requirement: str = ""
     repository_analysis: dict[str, Any] = Field(default_factory=dict)
+    revision_feedback: RevisionFeedback | None = None
 
 
 class DesignOutput(BaseModel):
@@ -52,6 +62,7 @@ class DesignOutput(BaseModel):
 class TestStrategyInput(StrictAgentInput):
     requirement: str = ""
     repository_analysis: dict[str, Any] = Field(default_factory=dict)
+    revision_feedback: RevisionFeedback | None = None
 
 
 class TestStrategyOutput(BaseModel):
@@ -66,6 +77,7 @@ class TestStrategyOutput(BaseModel):
 class RiskReviewInput(StrictAgentInput):
     requirement: str = ""
     repository_analysis: dict[str, Any] = Field(default_factory=dict)
+    revision_feedback: RevisionFeedback | None = None
 
 
 class RiskReviewOutput(BaseModel):

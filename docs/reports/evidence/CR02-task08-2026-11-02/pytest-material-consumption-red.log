@@ -1,0 +1,37 @@
+============================= test session starts =============================
+platform win32 -- Python 3.12.10, pytest-8.4.2, pluggy-1.6.0 -- C:\Users\50469\specflow-h04-f03-20261023\.venv\Scripts\python.exe
+rootdir: C:\Users\50469\specflow-h04-f03-20261023
+configfile: pyproject.toml
+plugins: anyio-4.14.1
+collecting ... collected 45 items / 43 deselected / 2 selected
+
+tests/contract_review/test_replay.py::test_replay_consumes_explicit_materials_without_expanding_child_tool_grants[rule_only] FAILED [ 50%]
+tests/contract_review/test_replay.py::test_replay_consumes_explicit_materials_without_expanding_child_tool_grants[observation_only] FAILED [100%]
+
+================================== FAILURES ===================================
+_ test_replay_consumes_explicit_materials_without_expanding_child_tool_grants[rule_only] _
+tests\contract_review\test_replay.py:520: in test_replay_consumes_explicit_materials_without_expanding_child_tool_grants
+    assert final["status"] == "completed_degraded", final
+E   AssertionError: {'adopted_ruleset_version': None, 'budget': {'execution_seconds_charged': 1.281000000424683, 'execution_seconds_reserved': 0.0, 'grant': {'execution_seconds': 900, 'model_calls': 36, 'tool_actions': 60}, 'input_tokens': None, ...}, 'check_manifest': [{'behavior': '��鱾��Ŀ����ϵİ汾������������Ӧ�ֶ��Ƿ����������Լ��v2 Ӧʹ�� job_id����ȷ���� v1 �� id ���ϱ���Ϊ��ʷ��', 'check_id': 'check_f95cbdbecf3a4738a8a0783a71ef6eac', 'key': 'response_field', 'rule_source_refs': [], ...}, {'behavior': '��鱾��Ŀ����ϵİ汾������������Ӧ�ֶ��Ƿ����������Լ��v2 Ӧʹ�� job_id����ȷ���� v1 �� id ���ϱ���Ϊ��ʷ��', 'check_id': 'check_57ba2bec2ec742c990ccd0908a3decdf', 'key': 'response_field', 'rule_source_refs': [], ...}], 'current_input_revision_id': 'ir_ba24420e9a6041008d506713e1156056', ...}
+E   assert 'failed' == 'completed_degraded'
+E
+E     - completed_degraded
+E     + failed
+_ test_replay_consumes_explicit_materials_without_expanding_child_tool_grants[observation_only] _
+tests\contract_review\test_replay.py:520: in test_replay_consumes_explicit_materials_without_expanding_child_tool_grants
+    assert final["status"] == "completed_degraded", final
+E   AssertionError: {'adopted_ruleset_version': None, 'budget': {'execution_seconds_charged': 1.796000000089407, 'execution_seconds_reserved': 0.0, 'grant': {'execution_seconds': 900, 'model_calls': 36, 'tool_actions': 60}, 'input_tokens': None, ...}, 'check_manifest': [{'behavior': '��鱾��Ŀ����ϵİ汾������������Ӧ�ֶ��Ƿ����������Լ��v2 Ӧʹ�� job_id����ȷ���� v1 �� id ���ϱ���Ϊ��ʷ��', 'check_id': 'check_dedda588b0b2421f9812b37bce2f41ee', 'key': 'response_field', 'rule_source_refs': [], ...}, {'behavior': '��鱾��Ŀ����ϵİ汾������������Ӧ�ֶ��Ƿ����������Լ��v2 Ӧʹ�� job_id����ȷ���� v1 �� id ���ϱ���Ϊ��ʷ��', 'check_id': 'check_227fbadcf70d4a08837dab047e8c502a', 'key': 'response_field', 'rule_source_refs': [], ...}], 'current_input_revision_id': 'ir_5d492b6ae1324b85a9862b3eb68fb053', ...}
+E   assert 'failed' == 'completed_degraded'
+E
+E     - completed_degraded
+E     + failed
+============================== warnings summary ===============================
+.venv\Lib\site-packages\fastapi\testclient.py:1
+  C:\Users\50469\specflow-h04-f03-20261023\.venv\Lib\site-packages\fastapi\testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+FAILED tests/contract_review/test_replay.py::test_replay_consumes_explicit_materials_without_expanding_child_tool_grants[rule_only]
+FAILED tests/contract_review/test_replay.py::test_replay_consumes_explicit_materials_without_expanding_child_tool_grants[observation_only]
+================ 2 failed, 43 deselected, 1 warning in 18.37s =================

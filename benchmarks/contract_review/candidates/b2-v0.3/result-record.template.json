@@ -1,0 +1,35 @@
+{
+  "schema_version": "cr02-b2-result-record.v0.3",
+  "record_kind": "TEMPLATE_NOT_A_RESULT",
+  "case_id": null,
+  "demo_label": null,
+  "planned_slot_ref": null,
+  "actual_trial_id": null,
+  "expected_slot_retained": true,
+  "mode": "offline_workflow",
+  "service_observations": [],
+  "evidence_status": "NOT_COLLECTED",
+  "workflow_verdict": "NOT_RUN",
+  "semantic_verdict": "NOT_RUN",
+  "business_judgments": [],
+  "criterion_results": [],
+  "evidence_refs": [],
+  "freeze_record_ref": null,
+  "blocking": {
+    "active": false,
+    "reason": null,
+    "affected_case_or_demo": null,
+    "phase": null,
+    "evidence_refs": [],
+    "local_defect_reference": null,
+    "resume_conditions": [],
+    "attempt_history": []
+  },
+  "notes": [
+    "本地报告元数据，不改变宿主API状态或数据库Schema。",
+    "blocked不删除计划槽位；既有FAIL/UNKNOWN/消耗保留；恢复记录追加新尝试。",
+    "demo只计工程门禁，不增语义case数；真实语义未运行保持NOT_RUN。",
+    "H03隔离与语义歧义分别记assessment_components；AC10一致/完整/无泄漏分别留证，不相互替代。"
+  ],
+  "assessment_components": []
+}

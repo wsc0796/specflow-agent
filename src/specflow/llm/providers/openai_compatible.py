@@ -128,7 +128,11 @@ class OpenAICompatibleLLMClient:
             transport_failure = "transport"
 
         if transport_failure == "timeout":
-            raise LLMTimeoutError("LLM provider request timed out", code=ErrorCode.PROVIDER_TIMEOUT)
+            raise LLMTimeoutError(
+                "LLM provider request timed out",
+                code=ErrorCode.PROVIDER_TIMEOUT,
+                diagnostics=LLMFailureDiagnostics(phase="provider_transport"),
+            )
         if transport_failure == "network":
             raise LLMResponseError(
                 "LLM provider network request failed", code=ErrorCode.PROVIDER_CONNECTION_ERROR
@@ -272,4 +276,12 @@ class OpenAICompatibleLLMClient:
             if 500 <= status_code < 600
             else None
         )
-        raise LLMResponseError(f"LLM provider is unavailable (HTTP {status_code})", code=code)
+        raise LLMResponseError(
+            f"LLM provider is unavailable (HTTP {status_code})",
+            code=code,
+            diagnostics=(
+                LLMFailureDiagnostics(phase="provider_transport")
+                if code == ErrorCode.PROVIDER_SERVER_ERROR
+                else None
+            ),
+        )

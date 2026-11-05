@@ -1,0 +1,222 @@
+{
+  "date": "2026-11-02",
+  "timezone": "Asia/Shanghai",
+  "product_baseline": "a7b6f64291d0ffdb4d15f59af9c5c6ed96fb73d2",
+  "candidate_runtime_build": "82df66ecb1fc32ede632ebecd309b46baf5843f2db099ff85ea89c020d10834c",
+  "runtime_build_matches_current_source": true,
+  "method": "Comparison JSON and final passing log copied byte-for-byte. Each pair clones one failed SQLite checkpoint into fresh/reuse arms; no new model execution during extraction. One red diagnostic log has trailing-space-only E marker lines normalized as recorded below; its original TEMP file remains unchanged.",
+  "records": [
+    {
+      "scenario": "direct-after-tool",
+      "artifact": "comparison-direct-after-tool.json",
+      "original_artifact": "C:\\Users\\50469\\AppData\\Local\\Temp\\pytest-of-50469\\pytest-229\\test_fresh_and_reuse_are_compa0\\comparison-after_tool.json",
+      "input_hash": "de8c8d25821fb588e890c132d54c9ddf0569654a8c35e5444a04db54aecf6f2f",
+      "source_job_id": "job_6b95dd44cf464a9b8746fc04045c4d24",
+      "runtime_compatibility": {
+        "build": "82df66ecb1fc32ede632ebecd309b46baf5843f2db099ff85ea89c020d10834c",
+        "protocol": "contract-review-replay.v1",
+        "python": [
+          3,
+          12
+        ]
+      },
+      "fresh_new_provider_requests": 3,
+      "reuse_new_provider_requests": 2,
+      "fresh_new_tool_executions": 1,
+      "reuse_new_tool_executions": 0,
+      "reused_steps": 2
+    },
+    {
+      "scenario": "direct-after-review",
+      "artifact": "comparison-direct-after-review.json",
+      "original_artifact": "C:\\Users\\50469\\AppData\\Local\\Temp\\pytest-of-50469\\pytest-229\\test_fresh_and_reuse_are_compa1\\comparison-after_review.json",
+      "input_hash": "2ab438176036dd526b0f10e884cb3f384a0faa0e548b905d45b69b80595d627b",
+      "source_job_id": "job_6ec2bc3d76644c6daa258434b0af4caa",
+      "runtime_compatibility": {
+        "build": "82df66ecb1fc32ede632ebecd309b46baf5843f2db099ff85ea89c020d10834c",
+        "protocol": "contract-review-replay.v1",
+        "python": [
+          3,
+          12
+        ]
+      },
+      "fresh_new_provider_requests": 3,
+      "reuse_new_provider_requests": 0,
+      "fresh_new_tool_executions": 1,
+      "reuse_new_tool_executions": 0,
+      "reused_steps": 4
+    },
+    {
+      "scenario": "delegate-adopted",
+      "artifact": "comparison-delegate-adopted.json",
+      "original_artifact": "C:\\Users\\50469\\AppData\\Local\\Temp\\pytest-of-50469\\pytest-229\\test_fresh_and_reuse_are_compa2\\comparison-after_review.json",
+      "input_hash": "84c7dbe3c8ee062e9f0e02e09067c7590a4a233335bf6927ecd2e66cd7c09efe",
+      "source_job_id": "job_7118b9cb47dc428484e96ce982ab8eec",
+      "runtime_compatibility": {
+        "build": "82df66ecb1fc32ede632ebecd309b46baf5843f2db099ff85ea89c020d10834c",
+        "protocol": "contract-review-replay.v1",
+        "python": [
+          3,
+          12
+        ]
+      },
+      "fresh_new_provider_requests": 5,
+      "reuse_new_provider_requests": 0,
+      "fresh_new_tool_executions": 1,
+      "reuse_new_tool_executions": 0,
+      "reused_steps": 4
+    },
+    {
+      "scenario": "delegate-partial",
+      "artifact": "comparison-delegate-partial.json",
+      "original_artifact": "C:\\Users\\50469\\AppData\\Local\\Temp\\pytest-of-50469\\pytest-229\\test_fresh_and_reuse_are_compa3\\comparison-after_review.json",
+      "input_hash": "ec6b3a29047b16b2a395de2133078932453d4733e8318310fd566848ecced64a",
+      "source_job_id": "job_8693057cfe024e12a32118fc34a9ff82",
+      "runtime_compatibility": {
+        "build": "82df66ecb1fc32ede632ebecd309b46baf5843f2db099ff85ea89c020d10834c",
+        "protocol": "contract-review-replay.v1",
+        "python": [
+          3,
+          12
+        ]
+      },
+      "fresh_new_provider_requests": 5,
+      "reuse_new_provider_requests": 0,
+      "fresh_new_tool_executions": 1,
+      "reuse_new_tool_executions": 0,
+      "reused_steps": 4
+    },
+    {
+      "scenario": "delegate-rejected",
+      "artifact": "comparison-delegate-rejected.json",
+      "original_artifact": "C:\\Users\\50469\\AppData\\Local\\Temp\\pytest-of-50469\\pytest-229\\test_fresh_and_reuse_are_compa4\\comparison-after_review.json",
+      "input_hash": "663fdfb7d3f7787bb76aa07d2fc05227e8d4b98378c0e6fc1a64a27b91b38ea8",
+      "source_job_id": "job_07929afd66f845ac9db7502bac051d68",
+      "runtime_compatibility": {
+        "build": "82df66ecb1fc32ede632ebecd309b46baf5843f2db099ff85ea89c020d10834c",
+        "protocol": "contract-review-replay.v1",
+        "python": [
+          3,
+          12
+        ]
+      },
+      "fresh_new_provider_requests": 5,
+      "reuse_new_provider_requests": 0,
+      "fresh_new_tool_executions": 1,
+      "reuse_new_tool_executions": 0,
+      "reused_steps": 4
+    },
+    {
+      "scenario": "delegate-no-parent-acceptance",
+      "artifact": "comparison-delegate-no-parent-acceptance.json",
+      "original_artifact": "C:\\Users\\50469\\AppData\\Local\\Temp\\pytest-of-50469\\pytest-229\\test_fresh_and_reuse_are_compa5\\comparison-before_parent_acceptance.json",
+      "input_hash": "f4515807a205eafb7d4d5730b316fedda6ad66212e074416d7a94aaeb05cfe89",
+      "source_job_id": "job_548389e5165f48fbbfdb0fa5d3792c78",
+      "runtime_compatibility": {
+        "build": "82df66ecb1fc32ede632ebecd309b46baf5843f2db099ff85ea89c020d10834c",
+        "protocol": "contract-review-replay.v1",
+        "python": [
+          3,
+          12
+        ]
+      },
+      "fresh_new_provider_requests": 5,
+      "reuse_new_provider_requests": 5,
+      "fresh_new_tool_executions": 1,
+      "reuse_new_tool_executions": 1,
+      "reused_steps": 0
+    }
+  ],
+  "log_sources": {
+    "pytest-four-modules.log": "C:\\Users\\50469\\AppData\\Local\\Temp\\task08-four-modules-0b32c0b3722544139159f12be7088687.log",
+    "pytest-b-focused.log": "C:\\Users\\50469\\AppData\\Local\\Temp\\task08-b-focused-9fac7f0d01004233b5c52dc2c1f9cabc.log",
+    "pytest-new-integrity-focused.log": "C:\\Users\\50469\\AppData\\Local\\Temp\\task08-final-focused-c5ea53e7f8fa4ee39e26c8a8497d489d.log",
+    "pytest-predecessor-red.log": "C:\\Users\\50469\\AppData\\Local\\Temp\\task08-child-predecessor-red-cd682074e241486fa2464a5d6f182559.log",
+    "pytest-predecessor-green.log": "C:\\Users\\50469\\AppData\\Local\\Temp\\task08-provenance-green-3e8a1985ef034f6fb2da87f8d67ebf61.log",
+    "pytest-full-before-migration-assert-fix.log": "C:\\Users\\50469\\AppData\\Local\\Temp\\task08-final-fixed-full-5a379a22b38548ecacf29a543407ab02.log",
+    "pytest-migration-assert-fixed.log": "C:\\Users\\50469\\AppData\\Local\\Temp\\task08-impact-migration-fixed-0623b6f073114263963a1aee8f531ef9.log",
+    "pytest-material-consumption-red.log": "C:\\Users\\50469\\AppData\\Local\\Temp\\task08-explicit-materials-red-e4cb00cc3203465da73b1cedb828f3cd.log",
+    "pytest-material-consumption-green.log": "C:\\Users\\50469\\AppData\\Local\\Temp\\task08-explicit-materials-green-bc6dc504a463493eafdff97e3d2bc311.log",
+    "pytest-final-full.log": "C:\\Users\\50469\\AppData\\Local\\Temp\\task08-material-final-full-eb622818b4954949900349e060d78351.log"
+  },
+  "semantic_status": "NOT_RUN",
+  "limits": [
+    "MockTransport only, not production or business-model semantic/cost evidence.",
+    "Within each scenario both arms share the same frozen input and fixed fault; different scenarios are not aggregated into an improvement rate.",
+    "Complete reports are degraded controlled reports. Payload comparison normalizes only child_result_ref in delegated arms; direct arms have identical report payloads.",
+    "Old usage and budget entries are retained; UNKNOWN reservations are not treated as zero."
+  ],
+  "pre_fix_runtime_build": "35bb64d8c81a319bbccf4239050a7abd472a9e364f1b8c1afc979eea7a264d47",
+  "review_fix": {
+    "finding": "T08-F01",
+    "red": "1 failed / 35 deselected / 1 warning, exit 1",
+    "green": "18 passed / 25 deselected / 1 warning, exit 0",
+    "status": "CLOSED by same independent Astra reviewer"
+  },
+  "aborted_non_final_gate": {
+    "status": "ABORTED, not a passing gate",
+    "log": "C:\\Users\\50469\\AppData\\Local\\Temp\\task08-final-full-40ae9fe30f7244f49107b1c0015b0970.log",
+    "reason": "Stopped once independent review found T08-F01; final fixed candidate has a separate complete gate."
+  },
+  "nonfinal_full_gate": {
+    "status": "FAILED, exit 1; not a passing gate",
+    "passed": 1680,
+    "failed": 1,
+    "skipped": 3,
+    "warnings": 3,
+    "seconds": 1248.71,
+    "sole_failure": "Old test_impact_migration successful branch expected schema6; isolated DB actual7. Rollback branch remained5.",
+    "artifact": "pytest-full-before-migration-assert-fix.log"
+  },
+  "migration_assert_fix": {
+    "product_source_changed": false,
+    "change": "Success expectation uses MIGRATIONS[-1][0]; rollback5/checksums/input/backup assertions preserved.",
+    "focused_result": "2 passed / 1 warning, 4.98s, exit 0",
+    "artifact": "pytest-migration-assert-fixed.log"
+  },
+  "pre_material_fix_runtime_build": "c6949f6736837053d4e691587faef902906894f275acde45b830ede2ed9a0525",
+  "material_consumption_fix": {
+    "red": "2 failed /43 deselected /1 warning,18.37s,exit1",
+    "green": "14 passed /31 deselected /1 warning,112.82s,exit0",
+    "same_astra_limited_review": "CLOSED; overall PASS; no tool grant expansion",
+    "scope": "Current explicit source-backed rules and actually projected initial observations are consumable fragments, not new tool read grants."
+  },
+  "additional_aborted_gate": {
+    "status": "ABORTED, not a passing final gate",
+    "log": "C:\\Users\\50469\\AppData\\Local\\Temp\\task08-final-gate-d510f4d78fe642debdbc6f1d919a8da6.log",
+    "reason": "Did not collect the two newly reproduced MaterialRef consumption cases; stopped before product fix."
+  },
+  "last_updated_date": "2026-11-03",
+  "final_gate": {
+    "status": "PASS",
+    "command": "uv run --offline --no-sync pytest -v -s --tb=short -p no:cacheprovider",
+    "exit_code": 0,
+    "passed": 1683,
+    "failed": 0,
+    "skipped": 3,
+    "warnings": 3,
+    "collected": 1686,
+    "seconds": 2110.23,
+    "artifact": "pytest-final-full.log",
+    "workdir": "C:\\Users\\50469\\specflow-h04-f03-20261023",
+    "environment": "Four SPECFLOW_LLM_* provider names removed without reading/printing values; PYTHONDONTWRITEBYTECODE=1; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1",
+    "skip_reason": "Windows symlink permissions (three pre-existing cases)",
+    "warning_reasons": [
+      "Starlette TestClient/httpx deprecation",
+      "TestStrategyAgent collection (__init__)",
+      "TestStrategyOutput collection (__init__)"
+    ],
+    "comparisons": "Six raw comparison JSON now come from this same complete passing run, pytest-229."
+  },
+  "archival_normalizations": [
+    {
+      "artifact": "pytest-material-consumption-red.log",
+      "lines": [
+        17,
+        25
+      ],
+      "change": "Only pytest blank diagnostic markers E plus spaces became E; original line endings and all other bytes preserved. Assertions, values and test counts unchanged.",
+      "original_unchanged": "C:\\Users\\50469\\AppData\\Local\\Temp\\task08-explicit-materials-red-e4cb00cc3203465da73b1cedb828f3cd.log"
+    }
+  ]
+}

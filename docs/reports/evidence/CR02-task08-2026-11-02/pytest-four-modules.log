@@ -1,0 +1,107 @@
+============================= test session starts =============================
+platform win32 -- Python 3.12.10, pytest-8.4.2, pluggy-1.6.0 -- C:\Users\50469\specflow-h04-f03-20261023\.venv\Scripts\python.exe
+rootdir: C:\Users\50469\specflow-h04-f03-20261023
+configfile: pyproject.toml
+plugins: anyio-4.14.1
+collecting ... collected 86 items
+
+tests/contract_review/test_replay.py::test_fresh_and_reuse_are_compared_from_the_same_frozen_checkpoint[after_tool-direct-adopted] T08_COMPARISON_JSON=C:\Users\50469\AppData\Local\Temp\pytest-of-50469\pytest-218\test_fresh_and_reuse_are_compa0\comparison-after_tool.json
+PASSED
+tests/contract_review/test_replay.py::test_fresh_and_reuse_are_compared_from_the_same_frozen_checkpoint[after_review-direct-adopted] T08_COMPARISON_JSON=C:\Users\50469\AppData\Local\Temp\pytest-of-50469\pytest-218\test_fresh_and_reuse_are_compa1\comparison-after_review.json
+PASSED
+tests/contract_review/test_replay.py::test_fresh_and_reuse_are_compared_from_the_same_frozen_checkpoint[after_review-delegate-adopted] T08_COMPARISON_JSON=C:\Users\50469\AppData\Local\Temp\pytest-of-50469\pytest-218\test_fresh_and_reuse_are_compa2\comparison-after_review.json
+PASSED
+tests/contract_review/test_replay.py::test_fresh_and_reuse_are_compared_from_the_same_frozen_checkpoint[after_review-delegate-partial] T08_COMPARISON_JSON=C:\Users\50469\AppData\Local\Temp\pytest-of-50469\pytest-218\test_fresh_and_reuse_are_compa3\comparison-after_review.json
+PASSED
+tests/contract_review/test_replay.py::test_fresh_and_reuse_are_compared_from_the_same_frozen_checkpoint[after_review-delegate-rejected] T08_COMPARISON_JSON=C:\Users\50469\AppData\Local\Temp\pytest-of-50469\pytest-218\test_fresh_and_reuse_are_compa4\comparison-after_review.json
+PASSED
+tests/contract_review/test_replay.py::test_fresh_and_reuse_are_compared_from_the_same_frozen_checkpoint[before_parent_acceptance-delegate-adopted] T08_COMPARISON_JSON=C:\Users\50469\AppData\Local\Temp\pytest-of-50469\pytest-218\test_fresh_and_reuse_are_compa5\comparison-before_parent_acceptance.json
+PASSED
+tests/contract_review/test_replay.py::test_broken_prefix_uses_only_the_explicit_fallback[result-stop] PASSED
+tests/contract_review/test_replay.py::test_broken_prefix_uses_only_the_explicit_fallback[result-restart_fresh] PASSED
+tests/contract_review/test_replay.py::test_broken_prefix_uses_only_the_explicit_fallback[projection-stop] PASSED
+tests/contract_review/test_replay.py::test_broken_prefix_uses_only_the_explicit_fallback[projection-restart_fresh] PASSED
+tests/contract_review/test_replay.py::test_broken_prefix_uses_only_the_explicit_fallback[compatibility-stop] PASSED
+tests/contract_review/test_replay.py::test_broken_prefix_uses_only_the_explicit_fallback[compatibility-restart_fresh] PASSED
+tests/contract_review/test_replay.py::test_broken_prefix_uses_only_the_explicit_fallback[predecessor-stop] PASSED
+tests/contract_review/test_replay.py::test_broken_prefix_uses_only_the_explicit_fallback[predecessor-restart_fresh] PASSED
+tests/contract_review/test_replay.py::test_broken_prefix_uses_only_the_explicit_fallback[missing_result-stop] PASSED
+tests/contract_review/test_replay.py::test_broken_prefix_uses_only_the_explicit_fallback[missing_result-restart_fresh] PASSED
+tests/contract_review/test_replay.py::test_broken_prefix_uses_only_the_explicit_fallback[request-stop] PASSED
+tests/contract_review/test_replay.py::test_broken_prefix_uses_only_the_explicit_fallback[request-restart_fresh] PASSED
+tests/contract_review/test_replay.py::test_broken_prefix_uses_only_the_explicit_fallback[middle_result-stop] PASSED
+tests/contract_review/test_replay.py::test_broken_prefix_uses_only_the_explicit_fallback[middle_result-restart_fresh] PASSED
+tests/contract_review/test_replay.py::test_broken_prefix_uses_only_the_explicit_fallback[missing_accepted_tail_step-stop] PASSED
+tests/contract_review/test_replay.py::test_broken_prefix_uses_only_the_explicit_fallback[missing_accepted_tail_step-restart_fresh] PASSED
+tests/contract_review/test_replay.py::test_fresh_attempt_gets_its_own_dependency_retry_domain_without_refunding_review PASSED
+tests/contract_review/test_replay.py::test_foreign_input_cannot_be_bypassed_by_restart_fresh PASSED
+tests/contract_review/test_replay.py::test_retry_of_replayed_attempt_preserves_transitive_provenance[direct] PASSED
+tests/contract_review/test_replay.py::test_retry_of_replayed_attempt_preserves_transitive_provenance[delegate] PASSED
+tests/contract_review/test_retries.py::test_fresh_retry_is_atomic_same_input_and_success_replay_precedes_cas PASSED
+tests/contract_review/test_retries.py::test_rejected_retry_preserves_every_record[patch0-VERSION_CONFLICT] PASSED
+tests/contract_review/test_retries.py::test_rejected_retry_preserves_every_record[patch1-RETRY_TARGET_NOT_CURRENT] PASSED
+tests/contract_review/test_retries.py::test_rejected_retry_preserves_every_record[patch2-RETRY_TARGET_NOT_CURRENT] PASSED
+tests/contract_review/test_retries.py::test_rejected_retry_preserves_every_record[patch3-OPTION_NOT_ENABLED] PASSED
+tests/contract_review/test_retries.py::test_retry_request_is_strict[patch0] PASSED
+tests/contract_review/test_retries.py::test_retry_request_is_strict[patch1] PASSED
+tests/contract_review/test_retries.py::test_retry_request_is_strict[patch2] PASSED
+tests/contract_review/test_retries.py::test_retry_request_is_strict[patch3] PASSED
+tests/contract_review/test_retries.py::test_retry_request_is_strict[patch4] PASSED
+tests/contract_review/test_retries.py::test_retry_request_is_strict[patch5] PASSED
+tests/contract_review/test_retries.py::test_retry_storage_failure_rolls_back_job_cas_budget_and_idempotency PASSED
+tests/contract_review/test_retries.py::test_retry_refuses_profile_drift_without_fallback_replacement PASSED
+tests/contract_review/test_retries.py::test_completed_review_cannot_use_failure_retry PASSED
+tests/contract_review/test_retries.py::test_retry_cannot_reset_exhausted_review_budget PASSED
+tests/contract_review/test_retries.py::test_retry_is_authenticated_and_rejects_undefined_query PASSED
+tests/contract_review/test_retries.py::test_retry_stays_queued_until_original_local_io_is_reliably_finished PASSED
+tests/contract_review/test_review_cli.py::test_cli_create_is_authenticated_http_and_success_replay_is_single_job PASSED
+tests/contract_review/test_review_cli.py::test_cli_status_list_report_and_event_queries_show_existing_authority PASSED
+tests/contract_review/test_review_cli.py::test_cli_answer_then_revision_share_existing_protocol PASSED
+tests/contract_review/test_review_cli.py::test_cli_three_import_conflicts_and_success_replay_keep_distinct_codes PASSED
+tests/contract_review/test_review_cli.py::test_cli_external_evidence_origin_and_current_applicability_are_separate[same-True] PASSED
+tests/contract_review/test_review_cli.py::test_cli_external_evidence_origin_and_current_applicability_are_separate[changed-False] PASSED
+tests/contract_review/test_review_cli.py::test_cli_external_evidence_origin_and_current_applicability_are_separate[missing_dimension-None] PASSED
+tests/contract_review/test_review_cli.py::test_cli_output_failure_never_erases_authority_or_overwrites_file PASSED
+tests/contract_review/test_review_cli.py::test_cli_preserves_current_history_boundary PASSED
+tests/contract_review/test_review_cli.py::test_invalid_or_oversize_cli_body_has_zero_requests[malformed] PASSED
+tests/contract_review/test_review_cli.py::test_invalid_or_oversize_cli_body_has_zero_requests[array] PASSED
+tests/contract_review/test_review_cli.py::test_invalid_or_oversize_cli_body_has_zero_requests[duplicate] PASSED
+tests/contract_review/test_review_cli.py::test_invalid_or_oversize_cli_body_has_zero_requests[nonfinite] PASSED
+tests/contract_review/test_review_cli.py::test_invalid_or_oversize_cli_body_has_zero_requests[oversize] PASSED
+tests/contract_review/test_review_cli.py::test_invalid_or_oversize_cli_body_has_zero_requests[deep] PASSED
+tests/contract_review/test_review_cli.py::test_invalid_server_addresses_do_not_send_credentials[https://secret:credential@example.invalid] PASSED
+tests/contract_review/test_review_cli.py::test_invalid_server_addresses_do_not_send_credentials[http://localhost/?key=hidden] PASSED
+tests/contract_review/test_review_cli.py::test_invalid_server_addresses_do_not_send_credentials[file:///tmp/file] PASSED
+tests/contract_review/test_review_cli.py::test_invalid_server_addresses_do_not_send_credentials[http://localhost/prefix] PASSED
+tests/contract_review/test_review_cli.py::test_invalid_server_addresses_do_not_send_credentials[http://localhost:notaport] PASSED
+tests/contract_review/test_review_cli.py::test_invalid_server_addresses_do_not_send_credentials[http://localhost:%] PASSED
+tests/contract_review/test_review_cli.py::test_invalid_server_addresses_do_not_send_credentials[http://localhost:65536] PASSED
+tests/contract_review/test_review_cli.py::test_cli_redirect_timeout_and_oversize_response_do_not_retry PASSED
+tests/contract_review/test_review_cli.py::test_cli_has_explicit_retry_but_no_raw_credential_options_and_help_reads_no_credentials PASSED
+tests/contract_review/test_review_cli.py::test_cli_retry_is_one_authenticated_http_request_and_success_is_replayable PASSED
+tests/contract_review/test_review_cli.py::test_cli_publishes_and_queries_project_decisions_with_explicit_version PASSED
+tests/contract_review/test_review_cli.py::test_cli_missing_fake_credential_fails_before_network PASSED
+tests/contract_review/test_review_cli.py::test_cli_post_output_failure_keeps_accepted_result_and_original_key_replays PASSED
+tests/contract_review/test_schema_migration.py::test_v6_to_replay_binding_migration_is_additive_and_transactional[False] PASSED
+tests/contract_review/test_schema_migration.py::test_v6_to_replay_binding_migration_is_additive_and_transactional[True] PASSED
+tests/contract_review/test_schema_migration.py::test_migration_is_repeatable_and_legacy_reader_preserves_new_data PASSED
+tests/contract_review/test_schema_migration.py::test_v2_to_v3_preserves_queued_data_steps_and_rolls_back_ddl[False] PASSED
+tests/contract_review/test_schema_migration.py::test_v2_to_v3_preserves_queued_data_steps_and_rolls_back_ddl[True] PASSED
+tests/contract_review/test_schema_migration.py::test_future_schema_rejected_without_rewriting_it PASSED
+tests/contract_review/test_schema_migration.py::test_v3_to_v4_preserves_input_and_rolls_back_resolution_table[False] PASSED
+tests/contract_review/test_schema_migration.py::test_v3_to_v4_preserves_input_and_rolls_back_resolution_table[True] PASSED
+tests/contract_review/test_schema_migration.py::test_v4_to_v5_preserves_frozen_bytes_backup_and_rollback[False] PASSED
+tests/contract_review/test_schema_migration.py::test_v4_to_v5_preserves_frozen_bytes_backup_and_rollback[True] PASSED
+tests/contract_review/test_schema_migration.py::test_database_enforces_one_active_job_and_compare_and_swap PASSED
+tests/contract_review/test_schema_migration.py::test_new_connection_can_reconstruct_input_after_process_local_objects_are_discarded PASSED
+tests/contract_review/test_schema_migration.py::test_instance_lock_cannot_be_acquired_twice_until_released PASSED
+tests/contract_review/test_schema_migration.py::test_v1_upgrade_preserves_queued_input_and_rolls_back_partial_v2[False] PASSED
+tests/contract_review/test_schema_migration.py::test_v1_upgrade_preserves_queued_input_and_rolls_back_partial_v2[True] PASSED
+
+============================== warnings summary ===============================
+.venv\Lib\site-packages\fastapi\testclient.py:1
+  C:\Users\50469\specflow-h04-f03-20261023\.venv\Lib\site-packages\fastapi\testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+================== 86 passed, 1 warning in 142.86s (0:02:22) ==================

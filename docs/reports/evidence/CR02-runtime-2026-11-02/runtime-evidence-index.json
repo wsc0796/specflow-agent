@@ -1,0 +1,313 @@
+{
+  "date": "2026-11-02",
+  "timezone": "Asia/Shanghai",
+  "repository": "C:\\Users\\50469\\specflow-h04-f03-20261023",
+  "delivery_baseline": "5d93e7b17bf65556f9c3e766472d9eb937c0f15e",
+  "prior_test_baseline": "14209183929dd19a566803e04897d246efdc3cd8",
+  "product_tree_compatibility": {
+    "method": "git diff --exit-code 14209183929dd19a566803e04897d246efdc3cd8 HEAD -- src tests benchmarks",
+    "exit_code": 0,
+    "scope": "Checked before evidence extraction; no source/test/benchmark difference between test and delivery baselines."
+  },
+  "original_log": "C:\\Users\\50469\\AppData\\Local\\Temp\\specflow-impact-final-fixed-pytest-20261102-152722-485.log",
+  "archived_excerpt": "reused-pytest-excerpt.log",
+  "new_test_execution": "NOT_RUN; existing actual execution log reused; no probe added",
+  "new_real_model_business_calls": 0,
+  "semantic_status": "NOT_RUN",
+  "scope_note": "11 reused PASS nodes, not 11 new semantic trials. v1, v2 and shared/impact scopes are listed per record. R1/R4 v1 evidence does not claim a separate v2-only run.",
+  "claims": {
+    "R1": [
+      "R1-v1",
+      "R1-shared-impact",
+      "R1-before-io"
+    ],
+    "R2": [
+      "R2-R3-v1",
+      "R2-R3-v2-child",
+      "R2-shared-impact",
+      "R2-shared-review"
+    ],
+    "R3": [
+      "R2-R3-v1",
+      "R2-R3-v2-child",
+      "R3-v2-storage"
+    ],
+    "R4": [
+      "R4-v1",
+      "R4-shared-impact",
+      "R4-state-separation"
+    ]
+  },
+  "records": [
+    {
+      "id": "R1-v1",
+      "test_node": "tests/contract_review/test_lifecycle_and_queue.py::test_failed_intent_persistence_dispatches_zero_requests",
+      "test_source": "tests/contract_review/test_lifecycle_and_queue.py",
+      "test_definition_line": 172,
+      "assertion_line_ranges": [
+        [
+          179,
+          189
+        ]
+      ],
+      "original_log_line": 359,
+      "exact_log_line": "tests/contract_review/test_lifecycle_and_queue.py::test_failed_intent_persistence_dispatches_zero_requests PASSED [ 21%]",
+      "excerpt_line": 5,
+      "status": "PASS",
+      "verification_method": [
+        "inspected_source",
+        "inspected_existing_execution_log"
+      ],
+      "rerun_for_this_goal": false,
+      "scope": "v1 controlled adapter; no business model",
+      "assertion_summary": "dispatch_intent 事件注入失败；error=EVIDENCE_PERSISTENCE_FAILED、adapter.requests=[]、model_calls=0。事务整体回滚由 store.transaction 源码支持；本用例未额外断言 calls 表行数。"
+    },
+    {
+      "id": "R1-shared-impact",
+      "test_node": "tests/contract_review/test_impact_discovery.py::test_failed_intent_persistence_dispatches_zero_requests",
+      "test_source": "tests/contract_review/test_impact_discovery.py",
+      "test_definition_line": 594,
+      "assertion_line_ranges": [
+        [
+          598,
+          610
+        ]
+      ],
+      "original_log_line": 326,
+      "exact_log_line": "tests/contract_review/test_impact_discovery.py::test_failed_intent_persistence_dispatches_zero_requests PASSED [ 19%]",
+      "excerpt_line": 6,
+      "status": "PASS",
+      "verification_method": [
+        "inspected_source",
+        "inspected_existing_execution_log"
+      ],
+      "rerun_for_this_goal": false,
+      "scope": "impact discovery via shared ledger; not a standalone v2 review-intent case",
+      "assertion_summary": "意图事件注入失败，model_calls=0、adapter.requests 为空，两个共享槽字段均为空。"
+    },
+    {
+      "id": "R2-R3-v1",
+      "test_node": "tests/contract_review/test_lifecycle_and_queue.py::test_timeout_holds_slot_then_late_cleanup_resumes_queue_without_accepting_old_body",
+      "test_source": "tests/contract_review/test_lifecycle_and_queue.py",
+      "test_definition_line": 124,
+      "assertion_line_ranges": [
+        [
+          131,
+          169
+        ]
+      ],
+      "original_log_line": 358,
+      "exact_log_line": "tests/contract_review/test_lifecycle_and_queue.py::test_timeout_holds_slot_then_late_cleanup_resumes_queue_without_accepting_old_body PASSED [ 21%]",
+      "excerpt_line": 7,
+      "status": "PASS",
+      "verification_method": [
+        "inspected_source",
+        "inspected_existing_execution_log"
+      ],
+      "rerun_for_this_goal": false,
+      "scope": "v1 controlled adapter lifecycle",
+      "assertion_summary": "首调用 CALL_RESULT_UNKNOWN 时第二作业 queued、请求数仍为1；放行首调用后第二调用进入；重复 settle 返回 False 且仍阻塞于第二调用；第二作业最终 completed_degraded；旧 call=UNKNOWN、result/acceptance=None、local_io_state=quiesced。"
+    },
+    {
+      "id": "R2-R3-v2-child",
+      "test_node": "tests/contract_review/test_dynamic_workflow.py::test_child_timeout_blocks_queue_and_late_body_is_not_accepted",
+      "test_source": "tests/contract_review/test_dynamic_workflow.py",
+      "test_definition_line": 598,
+      "assertion_line_ranges": [
+        [
+          603,
+          627
+        ]
+      ],
+      "original_log_line": 230,
+      "exact_log_line": "tests/contract_review/test_dynamic_workflow.py::test_child_timeout_blocks_queue_and_late_body_is_not_accepted PASSED [ 13%]",
+      "excerpt_line": 8,
+      "status": "PASS",
+      "verification_method": [
+        "inspected_source",
+        "inspected_existing_execution_log"
+      ],
+      "rerun_for_this_goal": false,
+      "scope": "v2 dynamic child branch; does not independently test repeated-settle behavior",
+      "assertion_summary": "子调用在途超时后第二作业 queued、请求数仍为2；释放子调用后第二作业 completed_degraded；旧调用 result/acceptance=None、quiesced，旧子任务 failed 且 latest_review=None。"
+    },
+    {
+      "id": "R3-v2-storage",
+      "test_node": "tests/contract_review/test_dynamic_workflow.py::test_storage_recovery_settles_original_call_then_resumes_queue",
+      "test_source": "tests/contract_review/test_dynamic_workflow.py",
+      "test_definition_line": 719,
+      "assertion_line_ranges": [
+        [
+          729,
+          755
+        ]
+      ],
+      "original_log_line": 238,
+      "exact_log_line": "tests/contract_review/test_dynamic_workflow.py::test_storage_recovery_settles_original_call_then_resumes_queue PASSED [ 14%]",
+      "excerpt_line": 9,
+      "status": "PASS",
+      "verification_method": [
+        "inspected_source",
+        "inspected_existing_execution_log"
+      ],
+      "rerun_for_this_goal": false,
+      "scope": "v2 storage failure/recovery in the same worker process",
+      "assertion_summary": "call_quiesced/usage_settled/job_failed 事件临时故障后 faulted、can_claim=False、integrity=incomplete、请求数2、第二作业 queued；存储恢复后首作业以 EVIDENCE_PERSISTENCE_FAILED 结束，第二作业 completed_degraded。不是首作业续跑。"
+    },
+    {
+      "id": "R2-shared-impact",
+      "test_node": "tests/contract_review/test_impact_discovery.py::test_timeout_holds_shared_slot_in_both_directions_and_late_result_is_not_accepted[impact]",
+      "test_source": "tests/contract_review/test_impact_discovery.py",
+      "test_definition_line": 556,
+      "assertion_line_ranges": [
+        [
+          566,
+          589
+        ]
+      ],
+      "original_log_line": 324,
+      "exact_log_line": "tests/contract_review/test_impact_discovery.py::test_timeout_holds_shared_slot_in_both_directions_and_late_result_is_not_accepted[impact] PASSED [ 19%]",
+      "excerpt_line": 10,
+      "status": "PASS",
+      "verification_method": [
+        "inspected_source",
+        "inspected_existing_execution_log"
+      ],
+      "rerun_for_this_goal": false,
+      "scope": "shared-slot blocking, pause_kind=impact",
+      "assertion_summary": "首影响发现超时后 review 保持 queued、请求数1、共享门禁阻断；释放后第二作业结束，第一作业仍 failed。"
+    },
+    {
+      "id": "R2-shared-review",
+      "test_node": "tests/contract_review/test_impact_discovery.py::test_timeout_holds_shared_slot_in_both_directions_and_late_result_is_not_accepted[review]",
+      "test_source": "tests/contract_review/test_impact_discovery.py",
+      "test_definition_line": 556,
+      "assertion_line_ranges": [
+        [
+          566,
+          589
+        ]
+      ],
+      "original_log_line": 325,
+      "exact_log_line": "tests/contract_review/test_impact_discovery.py::test_timeout_holds_shared_slot_in_both_directions_and_late_result_is_not_accepted[review] PASSED [ 19%]",
+      "excerpt_line": 11,
+      "status": "PASS",
+      "verification_method": [
+        "inspected_source",
+        "inspected_existing_execution_log"
+      ],
+      "rerun_for_this_goal": false,
+      "scope": "shared-slot blocking, pause_kind=review",
+      "assertion_summary": "首 review 超时后影响发现保持 queued、请求数1、共享门禁阻断；释放后第二作业结束，第一作业仍 failed。该测试未单独断言第二作业成功。"
+    },
+    {
+      "id": "R4-v1",
+      "test_node": "tests/contract_review/test_lifecycle_and_queue.py::test_restart_interrupts_running_preserves_queued_and_fences_old_host",
+      "test_source": "tests/contract_review/test_lifecycle_and_queue.py",
+      "test_definition_line": 202,
+      "assertion_line_ranges": [
+        [
+          204,
+          214
+        ]
+      ],
+      "original_log_line": 361,
+      "exact_log_line": "tests/contract_review/test_lifecycle_and_queue.py::test_restart_interrupts_running_preserves_queued_and_fences_old_host PASSED [ 21%]",
+      "excerpt_line": 12,
+      "status": "PASS",
+      "verification_method": [
+        "inspected_source",
+        "inspected_existing_execution_log"
+      ],
+      "rerun_for_this_goal": false,
+      "scope": "v1 ExecutionLedger owner rollover, no OS process-kill experiment",
+      "assertion_summary": "新 ledger.start 后旧 running job 为 interrupted；原 queued job 可由新宿主领取；旧宿主 fence 抛执行权错误。"
+    },
+    {
+      "id": "R4-shared-impact",
+      "test_node": "tests/contract_review/test_impact_discovery.py::test_restart_interrupts_discovery_fences_old_owner_and_reconciles_only_proven_exit",
+      "test_source": "tests/contract_review/test_impact_discovery.py",
+      "test_definition_line": 613,
+      "assertion_line_ranges": [
+        [
+          617,
+          645
+        ]
+      ],
+      "original_log_line": 327,
+      "exact_log_line": "tests/contract_review/test_impact_discovery.py::test_restart_interrupts_discovery_fences_old_owner_and_reconciles_only_proven_exit PASSED [ 19%]",
+      "excerpt_line": 13,
+      "status": "PASS",
+      "verification_method": [
+        "inspected_source",
+        "inspected_existing_execution_log"
+      ],
+      "rerun_for_this_goal": false,
+      "scope": "shared/impact owner rollover; original_process_exited is monkeypatched evidence, not a real crash trial",
+      "assertion_summary": "新 owner 将 discovery 分类 interrupted；未确认旧进程退出前不能领取；旧 owner.fail 被拒；注入已退出证据后清槽，但旧 call 仍 UNKNOWN、result=None，重复 settle=False。"
+    },
+    {
+      "id": "R1-before-io",
+      "test_node": "tests/contract_review/test_lifecycle_and_queue.py::test_intake_to_report_persists_calls_before_actual_adapter_and_returns_quality",
+      "test_source": "tests/contract_review/test_lifecycle_and_queue.py",
+      "test_definition_line": 80,
+      "assertion_line_ranges": [
+        [
+          86,
+          118
+        ]
+      ],
+      "original_log_line": 357,
+      "exact_log_line": "tests/contract_review/test_lifecycle_and_queue.py::test_intake_to_report_persists_calls_before_actual_adapter_and_returns_quality PASSED [ 21%]",
+      "excerpt_line": 14,
+      "status": "PASS",
+      "verification_method": [
+        "inspected_source",
+        "inspected_existing_execution_log"
+      ],
+      "rerun_for_this_goal": false,
+      "scope": "v1 durable-record-before-controlled-adapter observation",
+      "assertion_summary": "adapter 回调读取数据库，检查当前调用 dispatch_started 和累计 dispatch_intent；最终两调用 accepted、quiesced，预算状态 known。"
+    },
+    {
+      "id": "R4-state-separation",
+      "test_node": "tests/contract_review/test_lifecycle_and_queue.py::test_partial_unknown_usage_is_independent_of_local_slot_and_settlement_is_idempotent",
+      "test_source": "tests/contract_review/test_lifecycle_and_queue.py",
+      "test_definition_line": 272,
+      "assertion_line_ranges": [
+        [
+          286,
+          301
+        ]
+      ],
+      "original_log_line": 364,
+      "exact_log_line": "tests/contract_review/test_lifecycle_and_queue.py::test_partial_unknown_usage_is_independent_of_local_slot_and_settlement_is_idempotent PASSED [ 22%]",
+      "excerpt_line": 15,
+      "status": "PASS",
+      "verification_method": [
+        "inspected_source",
+        "inspected_existing_execution_log"
+      ],
+      "rerun_for_this_goal": false,
+      "scope": "v1 ledger state/usage separation",
+      "assertion_summary": "部分 usage 不释放本地槽，重复相同 settle=False；quiesced 后本地槽为空，output_tokens 仍可为 None。不能把本地收尾等同远端成功或用量完全已知。"
+    }
+  ],
+  "implementation_refs": {
+    "transaction": "src/specflow/contract_review/store.py:133",
+    "dynamic_call_intent": "src/specflow/contract_review/dynamic_ledger.py:38",
+    "dispatch_start_gate": "src/specflow/contract_review/worker.py:163",
+    "local_settlement": "src/specflow/contract_review/worker.py:112",
+    "slot_and_instance_guard": "src/specflow/contract_review/execution.py:483",
+    "startup_classification": "src/specflow/contract_review/execution.py:23",
+    "owner_and_attempt_fencing": "src/specflow/contract_review/execution.py:58",
+    "dynamic_inheritance": "src/specflow/contract_review/dynamic_ledger.py:12",
+    "shared_routing": "src/specflow/contract_review/shared_ledger.py:7"
+  },
+  "limits": [
+    "No business-model semantic acceptance or measured reliability improvement.",
+    "Queue continuation means a later queued job runs after reliable cleanup; the failed original job is not resumed.",
+    "UNKNOWN is distinct from local quiesced and from remote business success.",
+    "No complete TASK-08, prefix replay, OS crash recovery demonstration, exactly-once side effect, production deployment or independent personal leadership claim."
+  ]
+}

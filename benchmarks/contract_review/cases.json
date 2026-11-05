@@ -1,0 +1,452 @@
+[
+  {
+    "case_id": "CR02-F01",
+    "trial_id": "TR02-F01-COMMON-01",
+    "sample_id": "SP02-F01-COMMON-01",
+    "purpose": "known_regression",
+    "sources": [
+      {
+        "path": "contracts/v2.json",
+        "role": "contract",
+        "fixture": "contract-v2.json"
+      },
+      {
+        "path": "src/api.py",
+        "role": "implementation",
+        "fixture": "api-correct.py"
+      },
+      {
+        "path": "docs/api.md",
+        "role": "documentation",
+        "fixture": "docs-id.md"
+      },
+      {
+        "path": "examples/client.py",
+        "role": "example",
+        "fixture": "example-id.py"
+      }
+    ],
+    "request": {
+      "target_api_version": "v2",
+      "request": "按显式 v2 契约检查当前文档和示例的创建响应字段，给出可验证交接。",
+      "targets": [
+        {
+          "api_version": "v2",
+          "endpoint": {
+            "method": "POST",
+            "path": "/exports"
+          },
+          "source_path": "docs/api.md",
+          "checks": [
+            {
+              "key": "response_field",
+              "behavior": "检查本次目标材料的版本归属及创建响应字段是否符合适用契约；v2 应使用 job_id，明确属于 v1 的 id 材料保留为历史。"
+            }
+          ]
+        },
+        {
+          "api_version": "v2",
+          "endpoint": {
+            "method": "POST",
+            "path": "/exports"
+          },
+          "source_path": "examples/client.py",
+          "checks": [
+            {
+              "key": "response_field",
+              "behavior": "检查本次目标材料的版本归属及创建响应字段是否符合适用契约；v2 应使用 job_id，明确属于 v1 的 id 材料保留为历史。"
+            }
+          ]
+        }
+      ],
+      "authority_bindings": [
+        {
+          "path": "contracts/v2.json",
+          "selector": {
+            "kind": "full"
+          },
+          "purpose": "本次采用 v2 契约",
+          "scope": {
+            "api_versions": [
+              "v2"
+            ],
+            "endpoints": [
+              {
+                "method": "POST",
+                "path": "/exports"
+              }
+            ]
+          }
+        }
+      ],
+      "ruleset_usage": {
+        "mode": "none"
+      }
+    }
+  },
+  {
+    "case_id": "CR02-F02",
+    "trial_id": "TR02-F02-COMMON-01",
+    "sample_id": "SP02-F02-COMMON-01",
+    "purpose": "known_regression",
+    "sources": [
+      {
+        "path": "contracts/v2.json",
+        "role": "contract",
+        "fixture": "contract-v2.json"
+      },
+      {
+        "path": "src/api.py",
+        "role": "implementation",
+        "fixture": "api-correct.py"
+      },
+      {
+        "path": "docs/api.md",
+        "role": "documentation",
+        "fixture": "docs-job-id.md"
+      },
+      {
+        "path": "examples/client.py",
+        "role": "example",
+        "fixture": "example-job-id.py"
+      }
+    ],
+    "request": {
+      "target_api_version": "v2",
+      "request": "按显式 v2 契约检查当前文档和示例的创建响应字段，给出可验证交接。",
+      "targets": [
+        {
+          "api_version": "v2",
+          "endpoint": {
+            "method": "POST",
+            "path": "/exports"
+          },
+          "source_path": "docs/api.md",
+          "checks": [
+            {
+              "key": "response_field",
+              "behavior": "检查本次目标材料的版本归属及创建响应字段是否符合适用契约；v2 应使用 job_id，明确属于 v1 的 id 材料保留为历史。"
+            }
+          ]
+        },
+        {
+          "api_version": "v2",
+          "endpoint": {
+            "method": "POST",
+            "path": "/exports"
+          },
+          "source_path": "examples/client.py",
+          "checks": [
+            {
+              "key": "response_field",
+              "behavior": "检查本次目标材料的版本归属及创建响应字段是否符合适用契约；v2 应使用 job_id，明确属于 v1 的 id 材料保留为历史。"
+            }
+          ]
+        }
+      ],
+      "authority_bindings": [
+        {
+          "path": "contracts/v2.json",
+          "selector": {
+            "kind": "full"
+          },
+          "purpose": "本次采用 v2 契约",
+          "scope": {
+            "api_versions": [
+              "v2"
+            ],
+            "endpoints": [
+              {
+                "method": "POST",
+                "path": "/exports"
+              }
+            ]
+          }
+        }
+      ],
+      "ruleset_usage": {
+        "mode": "none"
+      }
+    }
+  },
+  {
+    "case_id": "CR02-C01",
+    "trial_id": "TR02-C01-COMMON-01",
+    "sample_id": "SP02-C01-COMMON-01",
+    "purpose": "known_regression",
+    "sources": [
+      {
+        "path": "contracts/v2.json",
+        "role": "contract",
+        "fixture": "contract-v2.json"
+      },
+      {
+        "path": "src/api.py",
+        "role": "implementation",
+        "fixture": "api-completed-allowed.py"
+      }
+    ],
+    "request": {
+      "target_api_version": "v2",
+      "request": "按显式 v2 契约检查取消行为，分别核对合法和非法状态，给出可验证交接。",
+      "targets": [
+        {
+          "api_version": "v2",
+          "endpoint": {
+            "method": "POST",
+            "path": "/exports/{job_id}/cancel"
+          },
+          "source_path": "src/api.py",
+          "checks": [
+            {
+              "key": "allowed_states",
+              "behavior": "queued 必须允许取消，running 和 completed 不得允许取消。"
+            },
+            {
+              "key": "rejection_code",
+              "behavior": "running 和 completed 取消返回 HTTP 409 与 JOB_NOT_CANCELLABLE。"
+            },
+            {
+              "key": "state_unchanged",
+              "behavior": "拒绝取消时不得修改原任务状态。"
+            }
+          ]
+        }
+      ],
+      "authority_bindings": [
+        {
+          "path": "contracts/v2.json",
+          "selector": {
+            "kind": "full"
+          },
+          "purpose": "本次采用 v2 契约",
+          "scope": {
+            "api_versions": [
+              "v2"
+            ],
+            "endpoints": [
+              {
+                "method": "POST",
+                "path": "/exports/{job_id}/cancel"
+              }
+            ]
+          }
+        }
+      ],
+      "ruleset_usage": {
+        "mode": "none"
+      }
+    }
+  },
+  {
+    "case_id": "CR02-C03",
+    "trial_id": "TR02-C03-COMMON-01",
+    "sample_id": "SP02-C03-COMMON-01",
+    "purpose": "known_regression",
+    "sources": [
+      {
+        "path": "contracts/v2.json",
+        "role": "contract",
+        "fixture": "contract-v2.json"
+      },
+      {
+        "path": "src/api.py",
+        "role": "implementation",
+        "fixture": "api-all-denied.py"
+      }
+    ],
+    "request": {
+      "target_api_version": "v2",
+      "request": "按显式 v2 契约检查取消行为，分别核对合法和非法状态，给出可验证交接。",
+      "targets": [
+        {
+          "api_version": "v2",
+          "endpoint": {
+            "method": "POST",
+            "path": "/exports/{job_id}/cancel"
+          },
+          "source_path": "src/api.py",
+          "checks": [
+            {
+              "key": "allowed_states",
+              "behavior": "queued 必须允许取消，running 和 completed 不得允许取消。"
+            },
+            {
+              "key": "rejection_code",
+              "behavior": "running 和 completed 取消返回 HTTP 409 与 JOB_NOT_CANCELLABLE。"
+            },
+            {
+              "key": "state_unchanged",
+              "behavior": "拒绝取消时不得修改原任务状态。"
+            }
+          ]
+        }
+      ],
+      "authority_bindings": [
+        {
+          "path": "contracts/v2.json",
+          "selector": {
+            "kind": "full"
+          },
+          "purpose": "本次采用 v2 契约",
+          "scope": {
+            "api_versions": [
+              "v2"
+            ],
+            "endpoints": [
+              {
+                "method": "POST",
+                "path": "/exports/{job_id}/cancel"
+              }
+            ]
+          }
+        }
+      ],
+      "ruleset_usage": {
+        "mode": "none"
+      }
+    }
+  },
+  {
+    "case_id": "CR02-H01",
+    "trial_id": "TR02-H01-COMMON-01",
+    "sample_id": "SP02-H01-COMMON-01",
+    "purpose": "known_regression",
+    "sources": [
+      {
+        "path": "contracts/v2.json",
+        "role": "contract",
+        "fixture": "contract-v2.json"
+      },
+      {
+        "path": "src/api.py",
+        "role": "implementation",
+        "fixture": "api-correct.py"
+      },
+      {
+        "path": "contracts/v1.json",
+        "role": "contract",
+        "fixture": "contract-v1.json"
+      },
+      {
+        "path": "examples/client.py",
+        "role": "example",
+        "fixture": "example-ambiguous.py"
+      }
+    ],
+    "request": {
+      "target_api_version": "v2",
+      "request": "核对示例的版本归属及字段用法；缺少版本事实时提出归属问题，保留历史版本。",
+      "targets": [
+        {
+          "api_version": "v2",
+          "endpoint": {
+            "method": "POST",
+            "path": "/exports"
+          },
+          "source_path": "examples/client.py",
+          "checks": [
+            {
+              "key": "response_field",
+              "behavior": "检查本次目标材料的版本归属及创建响应字段是否符合适用契约；v2 应使用 job_id，明确属于 v1 的 id 材料保留为历史。"
+            }
+          ]
+        }
+      ],
+      "authority_bindings": [
+        {
+          "path": "contracts/v2.json",
+          "selector": {
+            "kind": "full"
+          },
+          "purpose": "本次采用 v2 契约",
+          "scope": {
+            "api_versions": [
+              "v2"
+            ],
+            "endpoints": [
+              {
+                "method": "POST",
+                "path": "/exports"
+              }
+            ]
+          }
+        }
+      ],
+      "ruleset_usage": {
+        "mode": "none"
+      }
+    }
+  },
+  {
+    "case_id": "CR02-H02",
+    "trial_id": "TR02-H02-COMMON-01",
+    "sample_id": "SP02-H02-COMMON-01",
+    "purpose": "known_regression",
+    "sources": [
+      {
+        "path": "contracts/v2.json",
+        "role": "contract",
+        "fixture": "contract-v2.json"
+      },
+      {
+        "path": "src/api.py",
+        "role": "implementation",
+        "fixture": "api-correct.py"
+      },
+      {
+        "path": "contracts/v1.json",
+        "role": "contract",
+        "fixture": "contract-v1.json"
+      },
+      {
+        "path": "examples/client.py",
+        "role": "example",
+        "fixture": "example-ambiguous.py"
+      }
+    ],
+    "request": {
+      "target_api_version": "v2",
+      "request": "核对示例的版本归属及字段用法；缺少版本事实时提出归属问题，保留历史版本。",
+      "targets": [
+        {
+          "api_version": "v2",
+          "endpoint": {
+            "method": "POST",
+            "path": "/exports"
+          },
+          "source_path": "examples/client.py",
+          "checks": [
+            {
+              "key": "response_field",
+              "behavior": "检查本次目标材料的版本归属及创建响应字段是否符合适用契约；v2 应使用 job_id，明确属于 v1 的 id 材料保留为历史。"
+            }
+          ]
+        }
+      ],
+      "authority_bindings": [
+        {
+          "path": "contracts/v2.json",
+          "selector": {
+            "kind": "full"
+          },
+          "purpose": "本次采用 v2 契约",
+          "scope": {
+            "api_versions": [
+              "v2"
+            ],
+            "endpoints": [
+              {
+                "method": "POST",
+                "path": "/exports"
+              }
+            ]
+          }
+        }
+      ],
+      "ruleset_usage": {
+        "mode": "none"
+      }
+    }
+  }
+]

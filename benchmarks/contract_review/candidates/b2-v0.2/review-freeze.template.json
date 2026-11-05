@@ -1,0 +1,47 @@
+{
+  "schema_version": "cr02-b2-review-freeze-record.v0.2",
+  "record_kind": "TEMPLATE_NOT_APPROVAL",
+  "review_status": "PENDING_INDEPENDENT_REVIEW",
+  "freeze_id": null,
+  "reviewed_by_label": null,
+  "reviewed_at": null,
+  "approval_evidence_ref": null,
+  "reviewed_scope": {
+    "case_ids": [
+      "CR02-R02",
+      "CR02-R03",
+      "CR02-R04",
+      "CR02-R05",
+      "CR02-H03"
+    ],
+    "includes_demo_gate": true
+  },
+  "approved_binding": {
+    "candidate_version": null,
+    "candidate_snapshot_id": null,
+    "artifact_manifest_ref": null,
+    "approved_manifest_sha256": null,
+    "product_commit": null,
+    "working_tree_file_digests": {}
+  },
+  "execution_binding": {
+    "status": "NOT_BOUND",
+    "materialized_git_snapshots": {},
+    "profile_id": null,
+    "profile_digest": null,
+    "approved_trial_manifest_ref": null,
+    "approved_run_config_ref": null
+  },
+  "change_record": {
+    "supersedes_freeze_id": null,
+    "reason": null,
+    "diff_ref": null,
+    "affected_criteria": []
+  },
+  "rules": [
+    "所有None均表示待填，不能将此模板当已签收/已冻结。",
+    "人工复核证据必须明确对应内容指纹/版本；当前包的候选快照不是批准。",
+    "实际真实语义执行前必需的输入/版本/费用/窗口绑定完整；当前仅test候选不创建真实模式入口。",
+    "复制模板形成外部review-freeze.json；执行绑定另存execution-binding.json引用freeze_id，不回写已固定包或修改模板，避免自引用内容指纹。"
+  ]
+}

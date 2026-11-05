@@ -1,0 +1,112 @@
+{
+  "baseline": "14209183929dd19a566803e04897d246efdc3cd8",
+  "repository": "C:\\Users\\50469\\specflow-h04-f03-20261023",
+  "repository_access": "read_only; product source/tests/fixtures unchanged by probes",
+  "semantic_status": "NOT_RUN",
+  "model_correct_use": "NOT_RUN",
+  "formal_CR02_E01_E02_semantic_trials": "NOT_RUN",
+  "new_probe_results": {
+    "passed": 3,
+    "failed": 0,
+    "skipped": 0,
+    "warnings": 0,
+    "pytest_seconds": 5.16,
+    "exit_code": 0,
+    "final_log": "C:\\Users\\50469\\AppData\\Local\\Temp\\specflow-context-evidence-20261102-160602-310\\pytest-probes-02.log",
+    "prior_harness_log": "C:\\Users\\50469\\AppData\\Local\\Temp\\specflow-context-evidence-20261102-160602-310\\pytest-probes-01.log",
+    "prior_harness_result": "3 failed in 3.47s; TEMP-only CRLF comparison and dual-profile/provider-timeout mismatch, corrected in TEMP"
+  },
+  "actual_wire_model_requests": 15,
+  "detailed_checks_passed": 27,
+  "evidence_layers": {
+    "source_exists": "PASS for ordinary E01 source; exact sealed bytes checked",
+    "material_entries_recorded": "PASS for ordinary E01 observations; exact observation body checked",
+    "actual_payload_contains_original": "PASS; exported complete wire payload.messages plus DB projections",
+    "model_correctly_uses_conditions": "NOT_RUN; scripted actors, no real semantic judge/provider"
+  },
+  "E01": {
+    "program_status": "PASS",
+    "semantic_status": "NOT_RUN",
+    "evidence": "C:\\Users\\50469\\AppData\\Local\\Temp\\specflow-context-evidence-20261102-160602-310\\E01-ordinary-tool-tail.json",
+    "observation_characters": 900,
+    "critical_tail_offset_in_observation_body_zero_based": 841,
+    "actual_wire_field": "wire_payloads[1].messages[1].content JSON -> observations[0].body.text; also present in fixed review request index 2",
+    "key_condition": "API v2: only queued jobs may cancel",
+    "statement": "Associated ordinary previous tool observation fixture; not the old mandatory-rule-tail test and not a formal CR02-E01 semantic trial"
+  },
+  "E02": {
+    "program_status": "PASS",
+    "semantic_status": "NOT_RUN",
+    "variants": [
+      {
+        "version": "v1",
+        "evidence": "C:\\Users\\50469\\AppData\\Local\\Temp\\specflow-context-evidence-20261102-160602-310\\E02-human-v1-internal-feedback.json",
+        "actual_model_requests": 6,
+        "coexisting_request_indices": [
+          4,
+          5
+        ],
+        "db_resolution_count": 2
+      },
+      {
+        "version": "v2",
+        "evidence": "C:\\Users\\50469\\AppData\\Local\\Temp\\specflow-context-evidence-20261102-160602-310\\E02-human-v2-internal-feedback.json",
+        "actual_model_requests": 6,
+        "coexisting_request_indices": [
+          4,
+          5
+        ],
+        "db_resolution_count": 2
+      }
+    ],
+    "statement": "Distinct this_review human original answers and internal fixed-review feedback coexist in the same analysis and final-review requests; DB resolutions remain human-only"
+  },
+  "E03": {
+    "program_status": "MISSING_EVIDENCE",
+    "semantic_status": "NOT_RUN",
+    "supporting_program_boundaries": "PASS from prior log; retained separately from original E03 scenario",
+    "mandatory_failure_behavior": [
+      "oversize -> BUDGET_EXHAUSTED",
+      "hash mismatch -> SOURCE_INTEGRITY_FAILED"
+    ],
+    "target_gap_guard_source": "src/specflow/contract_review/report_validation.py:296-303: gap check cannot support no_deviation",
+    "unsupported_positive_rejection_direct_targeted_case": "MISSING_EVIDENCE: no separate old targeted case was identified; do not upgrade source guard or unrelated unsupported-tool tests into such a test",
+    "original_scenario": "Required rule fragment not delivered and unavailable to retrieve; other materials look consistent; output must list target-level missing evidence and must not assert no_deviation",
+    "missing_evidence": [
+      "No actual-request plus final target-level report artifact for that complete original scenario",
+      "No real semantic trial; hard failure does not prove a business missing-evidence report was produced"
+    ],
+    "conclusion": "Do not mark original E03 PASS; hard-failure safety boundaries and complete business gap report are distinct"
+  },
+  "reused_program_evidence": "C:\\Users\\50469\\AppData\\Local\\Temp\\specflow-context-evidence-20261102-160602-310\\reused-prior-program-evidence.json",
+  "reused_original_ten_count": 10,
+  "reused_E03_supporting_boundary_count": 6,
+  "C_section_6_5_AC10_status": "PARTIAL_PROGRAM_EVIDENCE; no overall semantic acceptance claim",
+  "exact_execution": {
+    "workdir": "C:\\Users\\50469\\specflow-h04-f03-20261023",
+    "command": "uv run --no-project --offline --python \"C:\\Users\\50469\\AppData\\Local\\Programs\\Python\\Python312\\python.exe\" python -B -X utf8 \"C:\\Users\\50469\\AppData\\Local\\Temp\\specflow-context-evidence-20261102-160602-310\\run-probes.py\"",
+    "PYTHONPATH": "C:\\Users\\50469\\specflow-h04-f03-20261023\\src;C:\\Users\\50469\\AppData\\Local\\Temp\\specflow-impact-final-build-20261102-152630\\specflow_agent-1.1.1-py3-none-any.whl",
+    "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "provider_configuration": "four SPECFLOW_LLM_* names removed in child without reading/printing values",
+    "pytest_arguments": [
+      "-v",
+      "--tb=short",
+      "-p",
+      "no:cacheprovider",
+      "--confcutdir",
+      "C:\\Users\\50469\\AppData\\Local\\Temp\\specflow-context-evidence-20261102-160602-310",
+      "C:\\Users\\50469\\AppData\\Local\\Temp\\specflow-context-evidence-20261102-160602-310\\test_context_evidence_probe.py"
+    ]
+  },
+  "safety": {
+    "real_http": "blocked by autouse HTTPTransport/AsyncHTTPTransport fixture",
+    "adapter_transport": "httpx.MockTransport",
+    "headers_exported": false,
+    "credentials_read": false,
+    "holdout_read": false,
+    "dependency_install": false,
+    "product_files_edited": false,
+    "full_suite_rerun": false
+  }
+}

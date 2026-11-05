@@ -1,0 +1,393 @@
+{
+  "schema_version": "cr02-b2-oracle-candidate.v0.2",
+  "authorship": "依据原合同与固定业务材料草拟；待用户独立复核，未见本批被测模型输出。",
+  "review_status": "PENDING_INDEPENDENT_REVIEW",
+  "separation": {
+    "workflow_tests": "受控替身只证明API/状态/送达，不能签发语义正确。",
+    "model_semantics": "真实模型试验未运行，保持NOT_RUN；固定Reviewer是被测系统。",
+    "application_execution": "只静态读取API源码，不运行被查业务应用，execution_verification仍为NOT_RUN。"
+  },
+  "common_rules": [
+    "判分依据原文含义和逐目标证据，不凭关键词或固定措辞自动判PASS。",
+    "判分oracle、答案脚本及步骤中的预期状态不进入模型输入/source groups。正式规则原文和已提交合法答案是允许的业务事实。",
+    "原始失败/未知/缺采不删除，report/exit/Reviewer accept不单独等于语义PASS。",
+    "决定性判断及固定复核必须收到所需规范原文与目标正文；目录/ID/hash不替代正文。",
+    "不同review/input/job和复合演示不增加独立case数；每个正式case逐项单独判定。"
+  ],
+  "cases": [
+    {
+      "case_id": "CR02-R02",
+      "required_source_paths": [
+        "src/api.py"
+      ],
+      "required_rule_aliases": [
+        "allow",
+        "deny"
+      ],
+      "expected_initial_state": "awaiting_decision",
+      "criteria": [
+        {
+          "criterion_id": "R02-1",
+          "expected": "两条正式规则对同一API v2、取消接口、src/api.py及queued条件分别要求允许与拒绝；无例外/优先/替代依据，两者不能同时成立。",
+          "targets": [
+            "cancel_impl"
+          ],
+          "verdict": "NOT_ASSESSED"
+        },
+        {
+          "criterion_id": "R02-2",
+          "expected": "报告rule_uses对两条当前输入采用记录标明conflict，有合法blocking rule_conflict问题及支持矛盾的原文引用。",
+          "targets": [
+            "cancel_impl"
+          ],
+          "verdict": "NOT_ASSESSED"
+        },
+        {
+          "criterion_id": "R02-3",
+          "expected": "静态实现允许queued不是裁定规范效力的依据；未答前保持needs_decision，不给确定符合/偏离结论。",
+          "targets": [
+            "cancel_impl"
+          ],
+          "verdict": "NOT_ASSESSED"
+        }
+      ],
+      "forbidden": [
+        "较新/测试绿灯/实现现状自动获胜",
+        "把id与job_id可兼容共存当本例冲突",
+        "无问题时伪造question或人工答案"
+      ],
+      "allowed_uncertainty": [
+        "当前互斥规范未裁决"
+      ],
+      "semantic_status": "NOT_RUN",
+      "evidence_gate": "evidence_contract与多轴结果；缺证不能自动PASS，已知硬失败保留FAIL。",
+      "conflict_domain_ref": "semantic_definitions.conflict_domain"
+    },
+    {
+      "case_id": "CR02-R03",
+      "required_source_paths": [
+        "src/api.py"
+      ],
+      "required_rule_aliases": [
+        "allow"
+      ],
+      "expected_initial_state": "formal_report_without_blocking_reapproval",
+      "criteria": [
+        {
+          "criterion_id": "R03-1",
+          "expected": "A/B是同project的独立review，均冻结规则集1并采用同一正式决定及原文；每个adoption绑定各自input/target，不能复用别的input采用ID。",
+          "targets": [
+            "cancel_impl"
+          ],
+          "verdict": "NOT_ASSESSED"
+        },
+        {
+          "criterion_id": "R03-2",
+          "expected": "queued允许且返回200/cancelled，running/completed在改状态前409/JOB_NOT_CANCELLABLE，三个check都有静态证据；本次范围no_deviation。",
+          "targets": [
+            "cancel_impl"
+          ],
+          "verdict": "NOT_ASSESSED"
+        },
+        {
+          "criterion_id": "R03-3",
+          "expected": "规则仍有效且本例无冲突，不重复索要规则批准；不得声称已执行业务测试或泛化整个API。",
+          "targets": [
+            "cancel_impl"
+          ],
+          "verdict": "NOT_ASSESSED"
+        }
+      ],
+      "forbidden": [
+        "无依据的阻塞批准问题",
+        "把公开回归当Holdout",
+        "缺正文仍声称检查完成"
+      ],
+      "allowed_uncertainty": [],
+      "semantic_status": "NOT_RUN",
+      "evidence_gate": "evidence_contract与多轴结果；缺证不能自动PASS，已知硬失败保留FAIL。"
+    },
+    {
+      "case_id": "CR02-R04",
+      "required_source_paths": [
+        "contracts/create-only.json",
+        "src/api.py"
+      ],
+      "required_rule_aliases": [
+        "joint_old",
+        "cancel_new"
+      ],
+      "expected_initial_state": "old_and_new_formal_reports",
+      "criteria": [
+        {
+          "criterion_id": "R04-1",
+          "expected": "旧决定规则集1同时覆盖创建/取消；仅取消切片被正式supersede后，规则集2的创建仍采用旧决定，取消采用新决定；旧全文与旧视图保留。",
+          "targets": [
+            "create_impl",
+            "cancel_impl"
+          ],
+          "verdict": "NOT_ASSESSED"
+        },
+        {
+          "criterion_id": "R04-2",
+          "expected": "创建仍201/job_id，应限定无偏离；取消实现实际放行queued并改为cancelled，而新规则要求409且不改状态，必须指出取消目标偏离及正确处理方向。",
+          "targets": [
+            "create_impl",
+            "cancel_impl"
+          ],
+          "verdict": "NOT_ASSESSED"
+        },
+        {
+          "criterion_id": "R04-3",
+          "expected": "历史报告和规则集1保持旧判断/原文；新规则的scope不扩张到创建或其他文件。",
+          "targets": [
+            "create_impl",
+            "cancel_impl"
+          ],
+          "verdict": "NOT_ASSESSED"
+        }
+      ],
+      "forbidden": [
+        "整条停用旧决定导致创建失去效力",
+        "取消新规则扩权到创建",
+        "改旧报告或规则文本追认新结果",
+        "建议把新规范改回实现以制造通过"
+      ],
+      "allowed_uncertainty": [],
+      "semantic_status": "NOT_RUN",
+      "evidence_gate": "evidence_contract与多轴结果；缺证不能自动PASS，已知硬失败保留FAIL。",
+      "effect_model_ref": "semantic_definitions.effect_model"
+    },
+    {
+      "case_id": "CR02-R05",
+      "required_source_paths": [
+        "contracts/create-only.json",
+        "src/api.py"
+      ],
+      "required_rule_aliases": [
+        "joint_old"
+      ],
+      "expected_initial_state": "new_report_with_targeted_rule_gap",
+      "criteria": [
+        {
+          "criterion_id": "R05-1",
+          "expected": "withdraw仅移除取消切片，创建仍有效；旧规则全文/历史版本仍可查，撤回不等于删原文。",
+          "targets": [
+            "create_impl",
+            "cancel_impl"
+          ],
+          "verdict": "NOT_ASSESSED"
+        },
+        {
+          "criterion_id": "R05-2",
+          "expected": "当前取消目标无其他有效规范；实现是观察，旧已撤回片段不是当前规范。三个取消check应明确缺失规则，判insufficient_evidence，不按旧规则或反向规则强判。",
+          "targets": [
+            "cancel_impl"
+          ],
+          "verdict": "NOT_ASSESSED"
+        },
+        {
+          "criterion_id": "R05-3",
+          "expected": "创建仍有完整依据，限定创建字段无偏离；不能把单个目标规则缺口扩成整个审查都未检查。",
+          "targets": [
+            "create_impl"
+          ],
+          "verdict": "NOT_ASSESSED"
+        }
+      ],
+      "forbidden": [
+        "撤回=禁止queued取消",
+        "照搬旧cancel文本强判",
+        "把实现当规范",
+        "为补缺口自动发布规则"
+      ],
+      "allowed_uncertainty": [
+        "取消行为缺少当前有效业务规则"
+      ],
+      "semantic_status": "NOT_RUN",
+      "evidence_gate": "evidence_contract与多轴结果；缺证不能自动PASS，已知硬失败保留FAIL。",
+      "effect_model_ref": "semantic_definitions.effect_model"
+    },
+    {
+      "case_id": "CR02-H03",
+      "required_source_paths": [
+        "contracts/v2.json",
+        "src/api.py",
+        "contracts/v1.json",
+        "examples/client.py"
+      ],
+      "required_rule_aliases": [
+        "implementation_create_only"
+      ],
+      "expected_initial_state": "A0_and_B_awaiting_scope_choice",
+      "criteria": [
+        {
+          "criterion_id": "H03-1",
+          "expected": "A0例子归属不明，提出合法scope_choice；A的v1答案只在this_review提交，202派生A1，原文进入A1父分析/固定复核。",
+          "targets": [
+            "example_version"
+          ],
+          "verdict": "NOT_ASSESSED"
+        },
+        {
+          "criterion_id": "H03-2",
+          "expected": "A1说明v1归属并保留id，排除本例v2漂移；允许legitimate_version_difference或附清楚版本解释的no_deviation，不扩大成整个API正确。",
+          "targets": [
+            "example_version"
+          ],
+          "verdict": "NOT_ASSESSED"
+        },
+        {
+          "criterion_id": "H03-3",
+          "expected": "B同材料/同规则集但独立review，resolutions不含A局部答案，也没有等价正式例子归属规则；B应重新待澄清，不能沿用A的v1结论。",
+          "targets": [
+            "example_version"
+          ],
+          "verdict": "NOT_ASSESSED"
+        },
+        {
+          "criterion_id": "H03-4",
+          "expected": "正式规则集始终1，规则条数不因局部回答增加；只覆盖src/api.py的正式创建规则不能扩权为examples/client.py版本归属批准。",
+          "targets": [
+            "example_version"
+          ],
+          "verdict": "NOT_ASSESSED"
+        }
+      ],
+      "forbidden": [
+        "A局部答案自动全局发布",
+        "B获得A的resolution/答案原文",
+        "把target_api_version=v2当示例必属v2",
+        "让不相干的正式规则变成等价批准"
+      ],
+      "allowed_uncertainty": [
+        "A0/B初始示例版本归属未定"
+      ],
+      "semantic_status": "NOT_RUN",
+      "evidence_gate": "evidence_contract与多轴结果；缺证不能自动PASS，已知硬失败保留FAIL。",
+      "isolation_gate_ref": "evidence_contract.isolation_gate"
+    }
+  ],
+  "candidate_version": "0.2",
+  "semantic_definitions": {
+    "conflict_domain": {
+      "unit": [
+        "input_revision_id",
+        "adopted_ruleset_version",
+        "same_target",
+        "same_business_condition"
+      ],
+      "rule": "同一冻结采用视图中，两条仍有效且命中同一目标/条件的规范要求不可同时满足，并且无明确优先/替代依据。",
+      "adopted_is_selection_not_compatibility": true,
+      "historical_difference_is_not_automatically_conflict": true,
+      "time_basis": "本阶段按introduced/removal版本和冻结采用视图确定效力，不新增effective_from/to日历窗口。"
+    },
+    "effect_model": {
+      "supersede": "新决定引入新文本及其scope，同时仅移除旧决定的指定effective_scope；旧正文、其他切片和历史版本保留。",
+      "withdraw": "只移除指定旧切片，不生成替代规则或反向禁止，也不删除旧正文；无其他规范时报告规则缺口。",
+      "matching": "同一目标上同维OR、跨维AND；缺必需维度保留scope_unresolved。",
+      "effective_scope": "先匹配base；base非match直接保留结果。base=match时，任一removal=match则no_match；无命中但有unresolved则scope_unresolved；其余match。",
+      "source_functions": [
+        "src/specflow/contract_review/inputs.py:match_scope",
+        "src/specflow/contract_review/inputs.py:match_effective_scope",
+        "src/specflow/contract_review/decisions.py:views/adopt"
+      ]
+    },
+    "local_answer_boundary": {
+      "persistence": "答案应持久保存在A的review/report下，进入A的合法后继input；持久保存不等于跨review共享。",
+      "isolation": "新review B不得自动注入/采用A的局部resolution/原文，不能将其自动发布为正式项目规则。",
+      "not_an_acl_claim": "同一服务的授权操作者仍可查询A历史；本例不承诺多用户或跨租户访问控制。"
+    }
+  },
+  "evidence_contract": {
+    "isolation_gate": {
+      "positive_controls": [
+        "同次H03测试确认A答案记录真实存在且归属A/reportA",
+        "A1完整冻结输入及实际父分析/复核payload含准确答案"
+      ],
+      "negative_controls": [
+        "测试内部Store读取同次B冻结输入，确认无A的resolution/局部答案；不得让runner直连产品DB",
+        "B所有相关实际调用payload均完整采集，含纠错/重试；与已实际派发的物理调用一一对应，不能只检查采到的一部分"
+      ],
+      "public_api_limit": "无完整历史InputRevision GET不构成产品缺陷；runner保存各轮状态/ID/hash/profile/请求/报告，完整存储归属由测试内Store证明。",
+      "insufficient_evidence": "缺正控制、B输入检查或完整实际调用时，AC06不可PASS；标明缺口，无法判定的判据UNDETERMINED，已知硬失败仍FAIL。"
+    },
+    "payload_comparison": {
+      "unit": "同一次实际派发调用；通过review/input/job及账本调用标识或已核对的角色/物理顺序配对。",
+      "left": "request_projected事件中projection.payload（adapter.prepare之后的完整模型请求体）",
+      "right": "受控adapter.complete实际收到的完整payload",
+      "comparison": "完整JSON字段集合、类型、值、数组顺序和原文一致；仅对象成员顺序可规范化。",
+      "ignored_payload_fields": [],
+      "outside_comparison": [
+        "投影外层projection_id",
+        "投影外层created_at",
+        "事件外层元数据/采集时间"
+      ],
+      "dynamic_values": "动态值若属于payload，同次调用也必须一致，不按字段名删除。",
+      "not_dispatched": "未派发意图、拒绝、超时、UNKNOWN分别记录，不能冒充已送达；不跨review/attempt比较不同请求体。",
+      "claim_limit": "相等只证明本次调用送达，不证明规则语义或模型判断正确。"
+    }
+  },
+  "governance_contract": {
+    "oracle_freeze": {
+      "reviewer": "用户本人或用户指定的独立复核者；尚未指定/确认时保持PENDING_INDEPENDENT_REVIEW，不由生成者自签完成。",
+      "record": "review-freeze.template.json；独立记录实际复核人、时间、范围、批准依据与明确内容绑定。",
+      "two_stages": [
+        "先复核候选case/oracle/材料内容，批准对应版本/文件指纹",
+        "实际执行前再绑定真实材料Git快照、产品/工作树版本、profile和获准trial；任一必需绑定缺失不开始真实语义试验"
+      ],
+      "snapshot_limit": "内容指纹用于检测版本变化，不单独证明人工复核发生，也不承诺防御有写权限者蓄意重写；不新增签名服务。",
+      "change_control": [
+        "保留旧版本/冻结记录/原始输出，记录差异、原因、受影响criterion与重新复核人",
+        "新oracle必须新版本/新freeze_id；不能覆盖旧版本追认PASS",
+        "仅判据纠错时可对已固定产物建立新eval_run重新判定，旧结论保留；不因此自动重跑模型或新增独立样本",
+        "产品/材料/profile变化需重新绑定；真实重试/新trial按事先批准计划执行"
+      ]
+    },
+    "result_axes": {
+      "service_observations": "原样保存status/job_status/error_code/remote_outcome/usage等现有字段，不新增产品状态枚举。",
+      "evidence_status": [
+        "NOT_COLLECTED",
+        "COMPLETE",
+        "INCOMPLETE"
+      ],
+      "workflow_verdict": [
+        "NOT_RUN",
+        "PASS",
+        "FAIL",
+        "UNDETERMINED"
+      ],
+      "semantic_verdict": [
+        "NOT_RUN",
+        "PASS",
+        "FAIL",
+        "UNDETERMINED"
+      ],
+      "business_judgment": "原样保留needs_decision/insufficient_evidence/no_deviation等产品判断，不把它与采集缺证混为同一UNKNOWN。",
+      "r05_example": "采集完整且模型正确说明取消缺当前规范，可以满足R05；单纯缺事件/旧报告无法证明行为则不能PASS。",
+      "failure_precedence": "缺采不抹掉已证实硬失败；未运行不伪装已调用后的UNKNOWN；多轴分别保留。"
+    },
+    "demo_gate": {
+      "included_in_offline_gate": "B2-AC-07为当前B2工程门禁必需项；其失败/未完成阻止整体B2离线完成。",
+      "semantic_count": "demo aggregate_include=false，不增加五例分母或业务独立trial数。",
+      "reuse_limit": "可支持共享编排/采集机制证据，不代替任一正式case独有的业务判据。"
+    },
+    "blocking_and_retest": {
+      "record": "result-record.template.json的blocking；仅本地结果清单，不新增数据库状态机。",
+      "required_fields": [
+        "reason",
+        "affected_case_or_demo",
+        "phase",
+        "evidence_refs",
+        "local_defect_reference",
+        "resume_conditions",
+        "attempt_history"
+      ],
+      "retention": "保留冻结计划槽位及已有失败/费用/未知，不删case美化分母；未批准真实批次不计算真实成功率。",
+      "resume": "满足修复/输入/oracle/profile与授权条件后记录新尝试；版本变化须显式重新绑定，旧证据/结果不覆盖。",
+      "retry_kind": "纯离线测试重跑只新增测试运行记录；重新评判固定输出使用新eval_run；真实重跑身份和额度按获准计划，不自动重抽至PASS。"
+    }
+  },
+  "review_record_template": "review-freeze.template.json",
+  "result_record_template": "result-record.template.json"
+}

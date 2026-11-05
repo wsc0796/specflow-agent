@@ -1,0 +1,17 @@
+============================= test session starts =============================
+platform win32 -- Python 3.12.10, pytest-8.4.2, pluggy-1.6.0 -- C:\Users\50469\specflow-h04-f03-20261023\.venv\Scripts\python.exe
+rootdir: C:\Users\50469\specflow-h04-f03-20261023
+configfile: pyproject.toml
+plugins: anyio-4.14.1
+collecting ... collected 2 items
+
+tests/contract_review/test_impact_migration.py::test_v5_to_v6_preserves_old_checksums_input_and_backup[False] PASSED [ 50%]
+tests/contract_review/test_impact_migration.py::test_v5_to_v6_preserves_old_checksums_input_and_backup[True] PASSED [100%]
+
+============================== warnings summary ===============================
+.venv\Lib\site-packages\fastapi\testclient.py:1
+  C:\Users\50469\specflow-h04-f03-20261023\.venv\Lib\site-packages\fastapi\testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+======================== 2 passed, 1 warning in 4.98s =========================

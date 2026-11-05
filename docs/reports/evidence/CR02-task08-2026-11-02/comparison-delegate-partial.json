@@ -1,0 +1,325 @@
+{
+  "fault": "after_review",
+  "actor_mode": "delegate",
+  "disposition": "partial",
+  "frozen_input_hash": "ec6b3a29047b16b2a395de2133078932453d4733e8318310fd566848ecced64a",
+  "source_job_id": "job_8693057cfe024e12a32118fc34a9ff82",
+  "arms": {
+    "fresh": {
+      "new_provider_requests": 5,
+      "new_tool_executions": 1,
+      "new_physical_calls": 6,
+      "reused_steps": [],
+      "final_status": "completed_degraded",
+      "report_revision_id": "report_341cd65f194c4a5a9c7372b0e62b9898",
+      "final_report_payload": {
+        "acceptance_items": [],
+        "adopted_child_result_refs": [
+          {
+            "child_result_ref": "child_result_414d7dee7c9a44ff9f48c8b917013aec",
+            "disposition": "partial",
+            "reason": "采用已读取的证据片段；排除业务正确性推断，仍保留未完成项。"
+          }
+        ],
+        "check_results": [
+          {
+            "check_id": "check_49c9d2aba6e54ca5b9eb011b93514b4d",
+            "finding_ids": [
+              "f0"
+            ],
+            "missing_information": [
+              "受控替身仅验证程序链，不提供业务语义判断。"
+            ],
+            "observation_refs": [],
+            "source_refs": [],
+            "status": "not_checked"
+          },
+          {
+            "check_id": "check_de6a0aea7bee4e0c8f27f97f20261631",
+            "finding_ids": [
+              "f1"
+            ],
+            "missing_information": [
+              "受控替身仅验证程序链，不提供业务语义判断。"
+            ],
+            "observation_refs": [],
+            "source_refs": [],
+            "status": "not_checked"
+          }
+        ],
+        "coverage": [
+          {
+            "missing_information": [
+              "受控替身仅验证程序链，不提供业务语义判断。"
+            ],
+            "source_refs": [],
+            "status": "partial",
+            "target_id": "target_bd8a9be488324d0188e42bb1893d066d"
+          },
+          {
+            "missing_information": [
+              "受控替身仅验证程序链，不提供业务语义判断。"
+            ],
+            "source_refs": [],
+            "status": "partial",
+            "target_id": "target_0973a8a6520046f29d29caddb3f25abd"
+          }
+        ],
+        "findings": [
+          {
+            "affected_artifacts": [
+              "documentation"
+            ],
+            "claim": "受控替身仅验证程序链，不提供业务语义判断。",
+            "execution_verification": "NOT_RUN",
+            "id": "f0",
+            "judgment_status": "insufficient_evidence",
+            "labels": [],
+            "limitations": [
+              "受控替身仅验证程序链，不提供业务语义判断。"
+            ],
+            "observation_refs": [],
+            "related_findings": [],
+            "rule_refs": [],
+            "source_refs": [],
+            "target_ids": [
+              "target_bd8a9be488324d0188e42bb1893d066d"
+            ],
+            "verification_evidence_refs": []
+          },
+          {
+            "affected_artifacts": [
+              "documentation"
+            ],
+            "claim": "受控替身仅验证程序链，不提供业务语义判断。",
+            "execution_verification": "NOT_RUN",
+            "id": "f1",
+            "judgment_status": "insufficient_evidence",
+            "labels": [],
+            "limitations": [
+              "受控替身仅验证程序链，不提供业务语义判断。"
+            ],
+            "observation_refs": [],
+            "related_findings": [],
+            "rule_refs": [],
+            "source_refs": [],
+            "target_ids": [
+              "target_0973a8a6520046f29d29caddb3f25abd"
+            ],
+            "verification_evidence_refs": []
+          }
+        ],
+        "limitations": [
+          "受控替身仅验证程序链，不提供业务语义判断。"
+        ],
+        "questions": [],
+        "rule_uses": [],
+        "schema_version": "contract-review-report-payload.v2.1",
+        "summary": "受控替身仅验证程序链，不提供业务语义判断。",
+        "work_items": []
+      },
+      "cumulative_budget": {
+        "execution_seconds_charged": 3.125,
+        "execution_seconds_reserved": 0.0,
+        "grant": {
+          "execution_seconds": 900,
+          "model_calls": 36,
+          "tool_actions": 60
+        },
+        "input_tokens": null,
+        "model_calls": 10,
+        "output_tokens": null,
+        "token_ledger": {
+          "input_tokens": {
+            "known": 0,
+            "reserved": 116298,
+            "unknown_calls": 10
+          },
+          "output_tokens": {
+            "known": 0,
+            "reserved": 80000,
+            "unknown_calls": 10
+          }
+        },
+        "tool_actions": 2,
+        "usage_status": "unknown"
+      },
+      "old_call_usage_and_budget_entries_unchanged": true
+    },
+    "reuse_completed": {
+      "new_provider_requests": 0,
+      "new_tool_executions": 0,
+      "new_physical_calls": 0,
+      "reused_steps": [
+        {
+          "step_id": "step_938df35ef57641c8aae5531d6ecd28c7",
+          "source_job_id": "job_8693057cfe024e12a32118fc34a9ff82",
+          "source_step_id": "step_2c487dd7fa41492eb5bc1e6ab2d9b501",
+          "kind": "model",
+          "status": "accepted",
+          "source_call_id": "call_a467b2fc9b0a4832bb148e12ee1984fb"
+        },
+        {
+          "step_id": "step_1c5c312d06df4ee8a26599e7cfe4368d",
+          "source_job_id": "job_8693057cfe024e12a32118fc34a9ff82",
+          "source_step_id": "step_2c487dd7fa41492eb5bc1e6ab2d9b501",
+          "kind": "child",
+          "status": "accepted",
+          "source_call_id": "call_a467b2fc9b0a4832bb148e12ee1984fb"
+        },
+        {
+          "step_id": "step_a9c20f134beb4bb1b54d2cc967443490",
+          "source_job_id": "job_8693057cfe024e12a32118fc34a9ff82",
+          "source_step_id": "step_4f06c78f20a74019b8e6a30572cac78c",
+          "kind": "model",
+          "status": "accepted",
+          "source_call_id": "call_ab9ab709adc842c4889d1e49ee13178b"
+        },
+        {
+          "step_id": "step_4ae342c1078f4203a5e9859dd4c9d755",
+          "source_job_id": "job_8693057cfe024e12a32118fc34a9ff82",
+          "source_step_id": "step_31870328a75c4300bba503a1dadc8c2a",
+          "kind": "model",
+          "status": "accepted",
+          "source_call_id": "call_f348ec0c1909484995f8d66fe1060729"
+        }
+      ],
+      "final_status": "completed_degraded",
+      "report_revision_id": "report_ea3ddfdd456a48c6a97296f3583cf0b8",
+      "final_report_payload": {
+        "acceptance_items": [],
+        "adopted_child_result_refs": [
+          {
+            "child_result_ref": "child_result_56d89a26333241879829b3a0a9b123b0",
+            "disposition": "partial",
+            "reason": "采用已读取的证据片段；排除业务正确性推断，仍保留未完成项。"
+          }
+        ],
+        "check_results": [
+          {
+            "check_id": "check_49c9d2aba6e54ca5b9eb011b93514b4d",
+            "finding_ids": [
+              "f0"
+            ],
+            "missing_information": [
+              "受控替身仅验证程序链，不提供业务语义判断。"
+            ],
+            "observation_refs": [],
+            "source_refs": [],
+            "status": "not_checked"
+          },
+          {
+            "check_id": "check_de6a0aea7bee4e0c8f27f97f20261631",
+            "finding_ids": [
+              "f1"
+            ],
+            "missing_information": [
+              "受控替身仅验证程序链，不提供业务语义判断。"
+            ],
+            "observation_refs": [],
+            "source_refs": [],
+            "status": "not_checked"
+          }
+        ],
+        "coverage": [
+          {
+            "missing_information": [
+              "受控替身仅验证程序链，不提供业务语义判断。"
+            ],
+            "source_refs": [],
+            "status": "partial",
+            "target_id": "target_bd8a9be488324d0188e42bb1893d066d"
+          },
+          {
+            "missing_information": [
+              "受控替身仅验证程序链，不提供业务语义判断。"
+            ],
+            "source_refs": [],
+            "status": "partial",
+            "target_id": "target_0973a8a6520046f29d29caddb3f25abd"
+          }
+        ],
+        "findings": [
+          {
+            "affected_artifacts": [
+              "documentation"
+            ],
+            "claim": "受控替身仅验证程序链，不提供业务语义判断。",
+            "execution_verification": "NOT_RUN",
+            "id": "f0",
+            "judgment_status": "insufficient_evidence",
+            "labels": [],
+            "limitations": [
+              "受控替身仅验证程序链，不提供业务语义判断。"
+            ],
+            "observation_refs": [],
+            "related_findings": [],
+            "rule_refs": [],
+            "source_refs": [],
+            "target_ids": [
+              "target_bd8a9be488324d0188e42bb1893d066d"
+            ],
+            "verification_evidence_refs": []
+          },
+          {
+            "affected_artifacts": [
+              "documentation"
+            ],
+            "claim": "受控替身仅验证程序链，不提供业务语义判断。",
+            "execution_verification": "NOT_RUN",
+            "id": "f1",
+            "judgment_status": "insufficient_evidence",
+            "labels": [],
+            "limitations": [
+              "受控替身仅验证程序链，不提供业务语义判断。"
+            ],
+            "observation_refs": [],
+            "related_findings": [],
+            "rule_refs": [],
+            "source_refs": [],
+            "target_ids": [
+              "target_0973a8a6520046f29d29caddb3f25abd"
+            ],
+            "verification_evidence_refs": []
+          }
+        ],
+        "limitations": [
+          "受控替身仅验证程序链，不提供业务语义判断。"
+        ],
+        "questions": [],
+        "rule_uses": [],
+        "schema_version": "contract-review-report-payload.v2.1",
+        "summary": "受控替身仅验证程序链，不提供业务语义判断。",
+        "work_items": []
+      },
+      "cumulative_budget": {
+        "execution_seconds_charged": 2.75,
+        "execution_seconds_reserved": 0.0,
+        "grant": {
+          "execution_seconds": 900,
+          "model_calls": 36,
+          "tool_actions": 60
+        },
+        "input_tokens": null,
+        "model_calls": 5,
+        "output_tokens": null,
+        "token_ledger": {
+          "input_tokens": {
+            "known": 0,
+            "reserved": 58149,
+            "unknown_calls": 5
+          },
+          "output_tokens": {
+            "known": 0,
+            "reserved": 40000,
+            "unknown_calls": 5
+          }
+        },
+        "tool_actions": 1,
+        "usage_status": "unknown"
+      },
+      "old_call_usage_and_budget_entries_unchanged": true
+    }
+  },
+  "semantic_status": "NOT_RUN"
+}

@@ -2,6 +2,7 @@
 
 import importlib
 import json
+import logging
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict, replace
 from hashlib import sha256
@@ -407,24 +408,48 @@ def test_registry_keeps_failed_or_active_entries_and_recycles_only_healthy_idle(
     assert _snapshot(guard, other).state == "OPEN"
 
 
-def test_key_is_bounded_private_and_public_snapshot_does_not_publish_fingerprints(caplog):
+@pytest.mark.parametrize("log_level", [logging.WARNING, logging.INFO])
+def test_key_is_bounded_private_and_public_snapshot_does_not_publish_fingerprints(
+    caplog, capsys, log_level
+):
+    caplog.set_level(log_level)
     config = _config()
     key = _module().resource_identity(config)
     assert all(len(value) == 64 for value in asdict(key).values())
     guard = _guard(failure_threshold=1)
+    private_body = "PRIVATE_RESILIENCE_BODY Authorization: Bearer " + config.api_key
     with pytest.raises(LLMResponseError):
-        _client(guard, lambda _: _response(429)).complete(_request())
+        _client(guard, lambda _: httpx.Response(429, text=private_body)).complete(_request())
     with pytest.raises(_circuit_error()) as error:
         _client(guard, lambda _: _response()).complete(_request())
-    public = json.dumps(asdict(_snapshot(guard))) + repr(key) + str(error.value) + caplog.text
+    captured = capsys.readouterr()
+    public = (
+        json.dumps(asdict(_snapshot(guard)))
+        + repr(key)
+        + str(error.value)
+        + captured.out
+        + captured.err
+    )
+    owned_logs = "\n".join(
+        record.getMessage()
+        for record in caplog.records
+        if record.name == "specflow" or record.name.startswith("specflow.")
+    )
+    # Configured endpoints may appear in third-party request logs, never owned outputs.
+    assert config.base_url not in public + owned_logs
     for secret in (
         config.api_key,
         sha256(config.api_key.encode()).hexdigest(),
-        config.base_url,
         config.model,
         *asdict(key).values(),
+        "PRIVATE_RESILIENCE_BODY",
     ):
-        assert secret not in public
+        assert secret not in public + caplog.text
+    if log_level == logging.INFO:
+        assert any(
+            record.name == "httpx" and config.base_url in record.getMessage()
+            for record in caplog.records
+        )
 
 
 @pytest.mark.parametrize(
@@ -592,13 +617,15 @@ def test_mock_cli_never_constructs_or_consults_live_guard(mode, tmp_path, monkey
     assert result.value.code == 0
 
 
+@pytest.mark.parametrize("log_level", [logging.WARNING, logging.INFO])
 def test_both_live_cli_pipelines_share_guard_and_never_publish_internal_identity(
-    tmp_path, monkeypatch, caplog
+    tmp_path, monkeypatch, caplog, capsys, log_level
 ):
     import specflow.fallback.strategies as fallback
     import specflow.llm.providers.openai_compatible as provider
     from specflow.cli import main
 
+    caplog.set_level(log_level)
     guard = _guard(failure_threshold=1)
     config = _config()
     monkeypatch.setenv("SPECFLOW_LLM_BASE_URL", config.base_url)
@@ -607,10 +634,11 @@ def test_both_live_cli_pipelines_share_guard_and_never_publish_internal_identity
     monkeypatch.setattr(provider, "DEFAULT_RESILIENCE_GUARD", guard)
     monkeypatch.setattr(fallback.time, "sleep", lambda _: None)
     calls = []
+    private_body = "PRIVATE_RESILIENCE_BODY Authorization: Bearer " + config.api_key
 
     def transport(_):
         calls.append(1)
-        return _response(429)
+        return httpx.Response(429, text=private_body)
 
     original_client = httpx.Client
 
@@ -656,9 +684,23 @@ def test_both_live_cli_pipelines_share_guard_and_never_publish_internal_identity
     )
     assert "LLMCircuitError" in artifacts
     assert "PROVIDER_CIRCUIT_REJECTED" in artifacts
+    captured = capsys.readouterr()
+    public = artifacts + captured.out + captured.err
+    owned_logs = "\n".join(
+        record.getMessage()
+        for record in caplog.records
+        if record.name == "specflow" or record.name.startswith("specflow.")
+    )
+    assert config.base_url not in public + owned_logs
     for secret in (
         config.api_key,
-        config.base_url,
+        sha256(config.api_key.encode()).hexdigest(),
         *asdict(_module().resource_identity(config)).values(),
+        "PRIVATE_RESILIENCE_BODY",
     ):
-        assert secret not in artifacts + caplog.text
+        assert secret not in public + caplog.text
+    if log_level == logging.INFO:
+        assert any(
+            record.name == "httpx" and config.base_url in record.getMessage()
+            for record in caplog.records
+        )

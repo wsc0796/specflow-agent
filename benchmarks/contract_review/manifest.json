@@ -1,0 +1,239 @@
+{
+  "plan_id": "PLAN-CR-V02-PUBLIC-01",
+  "version": "early-slice.v1",
+  "date": "2026-10-30",
+  "scope": {
+    "D1": "A",
+    "D2": "A",
+    "D3": "B",
+    "D4": "A",
+    "D5": "A",
+    "observability": true
+  },
+  "live_configuration": {
+    "authorized": false,
+    "provider": null,
+    "model": null,
+    "profile": null,
+    "call_budget": null,
+    "implementation_commit": null
+  },
+  "cases": [
+    {
+      "case_id": "CR02-F01",
+      "trial_id": "TR02-F01-COMMON-01",
+      "sample_id": "SP02-F01-COMMON-01",
+      "scope": "COMMON",
+      "selection": "early_slice",
+      "fixture_status": "READY",
+      "semantic_status": "NOT_RUN"
+    },
+    {
+      "case_id": "CR02-F02",
+      "trial_id": "TR02-F02-COMMON-01",
+      "sample_id": "SP02-F02-COMMON-01",
+      "scope": "COMMON",
+      "selection": "early_slice",
+      "fixture_status": "READY",
+      "semantic_status": "NOT_RUN"
+    },
+    {
+      "case_id": "CR02-C01",
+      "trial_id": "TR02-C01-COMMON-01",
+      "sample_id": "SP02-C01-COMMON-01",
+      "scope": "COMMON",
+      "selection": "early_slice",
+      "fixture_status": "READY",
+      "semantic_status": "NOT_RUN"
+    },
+    {
+      "case_id": "CR02-C02",
+      "trial_id": "TR02-C02-COMMON-01",
+      "sample_id": "SP02-C02-COMMON-01",
+      "scope": "COMMON",
+      "selection": "later_common",
+      "fixture_status": "NOT_PREPARED",
+      "semantic_status": "NOT_RUN"
+    },
+    {
+      "case_id": "CR02-C03",
+      "trial_id": "TR02-C03-COMMON-01",
+      "sample_id": "SP02-C03-COMMON-01",
+      "scope": "COMMON",
+      "selection": "early_slice",
+      "fixture_status": "READY",
+      "semantic_status": "NOT_RUN"
+    },
+    {
+      "case_id": "CR02-C04",
+      "trial_id": "TR02-C04-COMMON-01",
+      "sample_id": "SP02-C04-COMMON-01",
+      "scope": "COMMON",
+      "selection": "later_common",
+      "fixture_status": "NOT_PREPARED",
+      "semantic_status": "NOT_RUN"
+    },
+    {
+      "case_id": "CR02-C05",
+      "trial_id": "TR02-C05-COMMON-01",
+      "sample_id": "SP02-C05-COMMON-01",
+      "scope": "COMMON",
+      "selection": "later_common",
+      "fixture_status": "NOT_PREPARED",
+      "semantic_status": "NOT_RUN"
+    },
+    {
+      "case_id": "CR02-V01",
+      "trial_id": "TR02-V01-COMMON-01",
+      "sample_id": "SP02-V01-COMMON-01",
+      "scope": "COMMON",
+      "selection": "later_common",
+      "fixture_status": "NOT_PREPARED",
+      "semantic_status": "NOT_RUN"
+    },
+    {
+      "case_id": "CR02-V02",
+      "trial_id": "TR02-V02-COMMON-01",
+      "sample_id": "SP02-V02-COMMON-01",
+      "scope": "COMMON",
+      "selection": "later_common",
+      "fixture_status": "NOT_PREPARED",
+      "semantic_status": "NOT_RUN"
+    },
+    {
+      "case_id": "CR02-R01",
+      "trial_id": "TR02-R01-COMMON-01",
+      "sample_id": "SP02-R01-COMMON-01",
+      "scope": "COMMON",
+      "selection": "later_common",
+      "fixture_status": "NOT_PREPARED",
+      "semantic_status": "NOT_RUN"
+    },
+    {
+      "case_id": "CR02-R02",
+      "trial_id": "TR02-R02-COMMON-01",
+      "sample_id": "SP02-R02-COMMON-01",
+      "scope": "COMMON",
+      "selection": "later_common",
+      "fixture_status": "NOT_PREPARED",
+      "semantic_status": "NOT_RUN"
+    },
+    {
+      "case_id": "CR02-R03",
+      "trial_id": "TR02-R03-MEMORY-01",
+      "sample_id": "SP02-R03-MEMORY-01",
+      "scope": "OPT-PROJECT-MEMORY",
+      "selection": "excluded_option_not_selected",
+      "fixture_status": "NOT_PREPARED",
+      "semantic_status": "NOT_RUN"
+    },
+    {
+      "case_id": "CR02-R04",
+      "trial_id": "TR02-R04-COMMON-01",
+      "sample_id": "SP02-R04-COMMON-01",
+      "scope": "COMMON",
+      "selection": "later_common",
+      "fixture_status": "NOT_PREPARED",
+      "semantic_status": "NOT_RUN"
+    },
+    {
+      "case_id": "CR02-R05",
+      "trial_id": "TR02-R05-MEMORY-01",
+      "sample_id": "SP02-R05-MEMORY-01",
+      "scope": "OPT-PROJECT-MEMORY",
+      "selection": "excluded_option_not_selected",
+      "fixture_status": "NOT_PREPARED",
+      "semantic_status": "NOT_RUN"
+    },
+    {
+      "case_id": "CR02-H01",
+      "trial_id": "TR02-H01-COMMON-01",
+      "sample_id": "SP02-H01-COMMON-01",
+      "scope": "COMMON",
+      "selection": "early_slice",
+      "fixture_status": "READY",
+      "semantic_status": "NOT_RUN"
+    },
+    {
+      "case_id": "CR02-H02",
+      "trial_id": "TR02-H02-COMMON-01",
+      "sample_id": "SP02-H02-COMMON-01",
+      "scope": "COMMON",
+      "selection": "early_slice",
+      "fixture_status": "READY",
+      "semantic_status": "NOT_RUN"
+    },
+    {
+      "case_id": "CR02-H03",
+      "trial_id": "TR02-H03-COMMON-01",
+      "sample_id": "SP02-H03-COMMON-01",
+      "scope": "COMMON",
+      "selection": "later_common",
+      "fixture_status": "NOT_PREPARED",
+      "semantic_status": "NOT_RUN"
+    },
+    {
+      "case_id": "CR02-E01",
+      "trial_id": "TR02-E01-COMMON-01",
+      "sample_id": "SP02-E01-COMMON-01",
+      "scope": "COMMON",
+      "selection": "later_common",
+      "fixture_status": "NOT_PREPARED",
+      "semantic_status": "NOT_RUN"
+    },
+    {
+      "case_id": "CR02-E02",
+      "trial_id": "TR02-E02-COMMON-01",
+      "sample_id": "SP02-E02-COMMON-01",
+      "scope": "COMMON",
+      "selection": "later_common",
+      "fixture_status": "NOT_PREPARED",
+      "semantic_status": "NOT_RUN"
+    },
+    {
+      "case_id": "CR02-E03",
+      "trial_id": "TR02-E03-COMMON-01",
+      "sample_id": "SP02-E03-COMMON-01",
+      "scope": "COMMON",
+      "selection": "later_common",
+      "fixture_status": "NOT_PREPARED",
+      "semantic_status": "NOT_RUN"
+    },
+    {
+      "case_id": "CR02-E04",
+      "trial_id": "TR02-E04-COMMON-01",
+      "sample_id": "SP02-E04-COMMON-01",
+      "scope": "COMMON",
+      "selection": "later_common",
+      "fixture_status": "NOT_PREPARED",
+      "semantic_status": "NOT_RUN"
+    },
+    {
+      "case_id": "CR02-E05",
+      "trial_id": "TR02-E05-COMMON-01",
+      "sample_id": "SP02-E05-COMMON-01",
+      "scope": "COMMON",
+      "selection": "later_common",
+      "fixture_status": "NOT_PREPARED",
+      "semantic_status": "NOT_RUN"
+    },
+    {
+      "case_id": "CR02-E06",
+      "trial_id": "TR02-E06-COMMON-01",
+      "sample_id": "SP02-E06-COMMON-01",
+      "scope": "COMMON",
+      "selection": "later_common",
+      "fixture_status": "NOT_PREPARED",
+      "semantic_status": "NOT_RUN"
+    },
+    {
+      "case_id": "CR02-E07",
+      "trial_id": "TR02-E07-COMMON-01",
+      "sample_id": "SP02-E07-COMMON-01",
+      "scope": "COMMON",
+      "selection": "later_common",
+      "fixture_status": "NOT_PREPARED",
+      "semantic_status": "NOT_RUN"
+    }
+  ]
+}
