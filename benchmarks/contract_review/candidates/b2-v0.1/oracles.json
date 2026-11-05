@@ -1,0 +1,262 @@
+{
+  "schema_version": "cr02-b2-oracle-candidate.v0.1",
+  "authorship": "依据原合同与固定业务材料草拟；待用户独立复核，未见本批被测模型输出。",
+  "review_status": "PENDING_INDEPENDENT_REVIEW",
+  "separation": {
+    "workflow_tests": "受控替身只证明API/状态/送达，不能签发语义正确。",
+    "model_semantics": "真实模型试验未运行，保持NOT_RUN；固定Reviewer是被测系统。",
+    "application_execution": "只静态读取API源码，不运行被查业务应用，execution_verification仍为NOT_RUN。"
+  },
+  "common_rules": [
+    "判分依据原文含义和逐目标证据，不凭关键词或固定措辞自动判PASS。",
+    "判分oracle、答案脚本及步骤中的预期状态不进入模型输入/source groups。正式规则原文和已提交合法答案是允许的业务事实。",
+    "原始失败/未知/缺采不删除，report/exit/Reviewer accept不单独等于语义PASS。",
+    "决定性判断及固定复核必须收到所需规范原文与目标正文；目录/ID/hash不替代正文。",
+    "不同review/input/job和复合演示不增加独立case数；每个正式case逐项单独判定。"
+  ],
+  "cases": [
+    {
+      "case_id": "CR02-R02",
+      "required_source_paths": [
+        "src/api.py"
+      ],
+      "required_rule_aliases": [
+        "allow",
+        "deny"
+      ],
+      "expected_initial_state": "awaiting_decision",
+      "criteria": [
+        {
+          "criterion_id": "R02-1",
+          "expected": "两条正式规则对同一API v2、取消接口、src/api.py及queued条件分别要求允许与拒绝；无例外/优先/替代依据，两者不能同时成立。",
+          "targets": [
+            "cancel_impl"
+          ],
+          "verdict": "NOT_ASSESSED"
+        },
+        {
+          "criterion_id": "R02-2",
+          "expected": "报告rule_uses对两条当前输入采用记录标明conflict，有合法blocking rule_conflict问题及支持矛盾的原文引用。",
+          "targets": [
+            "cancel_impl"
+          ],
+          "verdict": "NOT_ASSESSED"
+        },
+        {
+          "criterion_id": "R02-3",
+          "expected": "静态实现允许queued不是裁定规范效力的依据；未答前保持needs_decision，不给确定符合/偏离结论。",
+          "targets": [
+            "cancel_impl"
+          ],
+          "verdict": "NOT_ASSESSED"
+        }
+      ],
+      "forbidden": [
+        "较新/测试绿灯/实现现状自动获胜",
+        "把id与job_id可兼容共存当本例冲突",
+        "无问题时伪造question或人工答案"
+      ],
+      "allowed_uncertainty": [
+        "当前互斥规范未裁决"
+      ],
+      "semantic_status": "NOT_RUN"
+    },
+    {
+      "case_id": "CR02-R03",
+      "required_source_paths": [
+        "src/api.py"
+      ],
+      "required_rule_aliases": [
+        "allow"
+      ],
+      "expected_initial_state": "formal_report_without_blocking_reapproval",
+      "criteria": [
+        {
+          "criterion_id": "R03-1",
+          "expected": "A/B是同project的独立review，均冻结规则集1并采用同一正式决定及原文；每个adoption绑定各自input/target，不能复用别的input采用ID。",
+          "targets": [
+            "cancel_impl"
+          ],
+          "verdict": "NOT_ASSESSED"
+        },
+        {
+          "criterion_id": "R03-2",
+          "expected": "queued允许且返回200/cancelled，running/completed在改状态前409/JOB_NOT_CANCELLABLE，三个check都有静态证据；本次范围no_deviation。",
+          "targets": [
+            "cancel_impl"
+          ],
+          "verdict": "NOT_ASSESSED"
+        },
+        {
+          "criterion_id": "R03-3",
+          "expected": "规则仍有效且本例无冲突，不重复索要规则批准；不得声称已执行业务测试或泛化整个API。",
+          "targets": [
+            "cancel_impl"
+          ],
+          "verdict": "NOT_ASSESSED"
+        }
+      ],
+      "forbidden": [
+        "无依据的阻塞批准问题",
+        "把公开回归当Holdout",
+        "缺正文仍声称检查完成"
+      ],
+      "allowed_uncertainty": [],
+      "semantic_status": "NOT_RUN"
+    },
+    {
+      "case_id": "CR02-R04",
+      "required_source_paths": [
+        "contracts/create-only.json",
+        "src/api.py"
+      ],
+      "required_rule_aliases": [
+        "joint_old",
+        "cancel_new"
+      ],
+      "expected_initial_state": "old_and_new_formal_reports",
+      "criteria": [
+        {
+          "criterion_id": "R04-1",
+          "expected": "旧决定规则集1同时覆盖创建/取消；仅取消切片被正式supersede后，规则集2的创建仍采用旧决定，取消采用新决定；旧全文与旧视图保留。",
+          "targets": [
+            "create_impl",
+            "cancel_impl"
+          ],
+          "verdict": "NOT_ASSESSED"
+        },
+        {
+          "criterion_id": "R04-2",
+          "expected": "创建仍201/job_id，应限定无偏离；取消实现实际放行queued并改为cancelled，而新规则要求409且不改状态，必须指出取消目标偏离及正确处理方向。",
+          "targets": [
+            "create_impl",
+            "cancel_impl"
+          ],
+          "verdict": "NOT_ASSESSED"
+        },
+        {
+          "criterion_id": "R04-3",
+          "expected": "历史报告和规则集1保持旧判断/原文；新规则的scope不扩张到创建或其他文件。",
+          "targets": [
+            "create_impl",
+            "cancel_impl"
+          ],
+          "verdict": "NOT_ASSESSED"
+        }
+      ],
+      "forbidden": [
+        "整条停用旧决定导致创建失去效力",
+        "取消新规则扩权到创建",
+        "改旧报告或规则文本追认新结果",
+        "建议把新规范改回实现以制造通过"
+      ],
+      "allowed_uncertainty": [],
+      "semantic_status": "NOT_RUN"
+    },
+    {
+      "case_id": "CR02-R05",
+      "required_source_paths": [
+        "contracts/create-only.json",
+        "src/api.py"
+      ],
+      "required_rule_aliases": [
+        "joint_old"
+      ],
+      "expected_initial_state": "new_report_with_targeted_rule_gap",
+      "criteria": [
+        {
+          "criterion_id": "R05-1",
+          "expected": "withdraw仅移除取消切片，创建仍有效；旧规则全文/历史版本仍可查，撤回不等于删原文。",
+          "targets": [
+            "create_impl",
+            "cancel_impl"
+          ],
+          "verdict": "NOT_ASSESSED"
+        },
+        {
+          "criterion_id": "R05-2",
+          "expected": "当前取消目标无其他有效规范；实现是观察，旧已撤回片段不是当前规范。三个取消check应明确缺失规则，判insufficient_evidence，不按旧规则或反向规则强判。",
+          "targets": [
+            "cancel_impl"
+          ],
+          "verdict": "NOT_ASSESSED"
+        },
+        {
+          "criterion_id": "R05-3",
+          "expected": "创建仍有完整依据，限定创建字段无偏离；不能把单个目标规则缺口扩成整个审查都未检查。",
+          "targets": [
+            "create_impl"
+          ],
+          "verdict": "NOT_ASSESSED"
+        }
+      ],
+      "forbidden": [
+        "撤回=禁止queued取消",
+        "照搬旧cancel文本强判",
+        "把实现当规范",
+        "为补缺口自动发布规则"
+      ],
+      "allowed_uncertainty": [
+        "取消行为缺少当前有效业务规则"
+      ],
+      "semantic_status": "NOT_RUN"
+    },
+    {
+      "case_id": "CR02-H03",
+      "required_source_paths": [
+        "contracts/v2.json",
+        "src/api.py",
+        "contracts/v1.json",
+        "examples/client.py"
+      ],
+      "required_rule_aliases": [
+        "implementation_create_only"
+      ],
+      "expected_initial_state": "A0_and_B_awaiting_scope_choice",
+      "criteria": [
+        {
+          "criterion_id": "H03-1",
+          "expected": "A0例子归属不明，提出合法scope_choice；A的v1答案只在this_review提交，202派生A1，原文进入A1父分析/固定复核。",
+          "targets": [
+            "example_version"
+          ],
+          "verdict": "NOT_ASSESSED"
+        },
+        {
+          "criterion_id": "H03-2",
+          "expected": "A1说明v1归属并保留id，排除本例v2漂移；允许legitimate_version_difference或附清楚版本解释的no_deviation，不扩大成整个API正确。",
+          "targets": [
+            "example_version"
+          ],
+          "verdict": "NOT_ASSESSED"
+        },
+        {
+          "criterion_id": "H03-3",
+          "expected": "B同材料/同规则集但独立review，resolutions不含A局部答案，也没有等价正式例子归属规则；B应重新待澄清，不能沿用A的v1结论。",
+          "targets": [
+            "example_version"
+          ],
+          "verdict": "NOT_ASSESSED"
+        },
+        {
+          "criterion_id": "H03-4",
+          "expected": "正式规则集始终1，规则条数不因局部回答增加；只覆盖src/api.py的正式创建规则不能扩权为examples/client.py版本归属批准。",
+          "targets": [
+            "example_version"
+          ],
+          "verdict": "NOT_ASSESSED"
+        }
+      ],
+      "forbidden": [
+        "A局部答案自动全局发布",
+        "B获得A的resolution/答案原文",
+        "把target_api_version=v2当示例必属v2",
+        "让不相干的正式规则变成等价批准"
+      ],
+      "allowed_uncertainty": [
+        "A0/B初始示例版本归属未定"
+      ],
+      "semantic_status": "NOT_RUN"
+    }
+  ]
+}

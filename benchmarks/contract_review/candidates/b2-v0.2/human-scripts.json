@@ -1,0 +1,55 @@
+{
+  "schema_version": "cr02-b2-human-candidate.v0.2",
+  "status": "PENDING_INDEPENDENT_REVIEW",
+  "never_initial_input": true,
+  "scripts": {
+    "R02.optional": {
+      "required_phase": "先保存R02冲突验收结果；可选后续，不影响原冲突检查",
+      "question_match": {
+        "kind": "rule_conflict",
+        "blocking": true,
+        "target_alias": "cancel_impl",
+        "required_answer_type": "clarify"
+      },
+      "answer": {
+        "answer_type": "clarify",
+        "scope": "this_review",
+        "text": "仅本次审查按queued允许取消处理，running/completed仍拒绝；保留另一规则冲突的历史。本次答案不发布为项目规则。"
+      }
+    },
+    "H03.A": {
+      "required_phase": "A0正式报告已提出示例版本归属问题",
+      "question_match": {
+        "kind": "scope_choice",
+        "blocking": true,
+        "target_alias": "example_version",
+        "required_answer_type": "clarify"
+      },
+      "answer": {
+        "answer_type": "clarify",
+        "scope": "this_review",
+        "text": "确认 examples/client.py 属于 API v1；其中 id 字段保留，不作为 v2 文档漂移处理。"
+      }
+    },
+    "ABC.A": {
+      "required_phase": "A0正式报告已指出两条取消规则冲突",
+      "question_match": {
+        "kind": "rule_conflict",
+        "blocking": true,
+        "target_alias": "cancel_impl",
+        "required_answer_type": "clarify"
+      },
+      "answer": {
+        "answer_type": "clarify",
+        "scope": "this_review",
+        "text": "仅Review A本次采用queued允许取消、running/completed拒绝的规则；不要将此答案发布为正式项目规则。"
+      }
+    }
+  },
+  "binding_rules": [
+    "question_id必须来自当前正式报告；target_alias通过实际投影targets映射宿主ID，不能自己生成ID。",
+    "遵守问题allowed_answer_types；没有匹配问题、非唯一匹配或不接受clarify时停止自动答题，保留真实输出。",
+    "answer前保存当前version/input/report快照；部分200继续等待合法人工处理；最后202跟踪自动派生job，不另发revision。",
+    "模板只给候选答案，不构成真实人工复核或正式规则发布批准。"
+  ]
+}

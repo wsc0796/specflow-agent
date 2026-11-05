@@ -1,0 +1,755 @@
+{
+  "schema_version": "cr02-b2-cases-candidate.v0.2",
+  "cases": [
+    {
+      "identity": {
+        "case_id": "CR02-R02",
+        "trial_id": "TR02-R02-COMMON-01",
+        "sample_id": "SP02-R02-COMMON-01",
+        "scope": "COMMON"
+      },
+      "title": "两条同范围规则真正互斥",
+      "status": "CANDIDATE_PENDING_REVIEW",
+      "purpose": "known_regression_candidate",
+      "materialization": "NOT_MATERIALIZED",
+      "materials": [
+        {
+          "path": "contracts/create-only.json",
+          "role": "contract",
+          "repo_fixture": "benchmarks/contract_review/candidates/b2-v0.2/materials/contract-create-only.json"
+        },
+        {
+          "path": "src/api.py",
+          "role": "implementation",
+          "repo_fixture": "benchmarks/contract_review/candidates/b2-v0.2/materials/api-v2-static.py"
+        }
+      ],
+      "request_fields": {
+        "target_api_version": "v2",
+        "request": "核对API v2取消实现与当前正式规则；若同范围规则矛盾，展示依据并提出需人工裁决的问题，不按发布时间选择。",
+        "targets": [
+          {
+            "alias": "cancel_impl",
+            "target": {
+              "api_version": "v2",
+              "endpoint": {
+                "method": "POST",
+                "path": "/exports/{job_id}/cancel"
+              },
+              "source_path": "src/api.py",
+              "checks": [
+                {
+                  "key": "allowed_states",
+                  "behavior": "分别核对queued/running/completed是否允许取消，不能漏掉合法或非法路径。"
+                },
+                {
+                  "key": "rejection_code",
+                  "behavior": "对本次规则要求拒绝的状态核对409/JOB_NOT_CANCELLABLE；先核对规则是否存在。"
+                },
+                {
+                  "key": "state_unchanged",
+                  "behavior": "对本次规则要求拒绝的路径核对拒绝前后状态不变；撤回规则不等于反向禁止。"
+                }
+              ]
+            }
+          }
+        ],
+        "authority_bindings": [
+          {
+            "path": "contracts/create-only.json",
+            "selector": {
+              "kind": "full"
+            },
+            "purpose": "仅采用创建字段规范；不提供取消规范。",
+            "scope": {
+              "api_versions": [
+                "v2"
+              ],
+              "endpoints": [
+                {
+                  "method": "POST",
+                  "path": "/exports"
+                }
+              ],
+              "source_paths": [
+                "src/api.py"
+              ]
+            }
+          }
+        ]
+      },
+      "steps": [
+        {
+          "action": "publish",
+          "save_as": "allow",
+          "request_fields": {
+            "operation": "confirm",
+            "expected_ruleset_version": 0,
+            "text": "API v2 POST /exports/{job_id}/cancel：已有任务的 state=queued 时必须允许取消，返回200且状态变为cancelled；state=running或completed时必须拒绝，返回409/JOB_NOT_CANCELLABLE且状态不变。",
+            "scope": {
+              "api_versions": [
+                "v2"
+              ],
+              "endpoints": [
+                {
+                  "method": "POST",
+                  "path": "/exports/{job_id}/cancel"
+                }
+              ],
+              "source_paths": [
+                "src/api.py"
+              ]
+            },
+            "provenance": {
+              "kind": "declared",
+              "text": "公开合成B2候选案例；只供后续获准的隔离试验，非真实项目规则。"
+            }
+          }
+        },
+        {
+          "action": "publish",
+          "save_as": "deny",
+          "request_fields": {
+            "operation": "confirm",
+            "expected_ruleset_version": 1,
+            "text": "API v2 POST /exports/{job_id}/cancel：已有任务的 state=queued、running或completed时均必须拒绝取消，返回409/JOB_NOT_CANCELLABLE且保持原状态；不允许queued例外。",
+            "scope": {
+              "api_versions": [
+                "v2"
+              ],
+              "endpoints": [
+                {
+                  "method": "POST",
+                  "path": "/exports/{job_id}/cancel"
+                }
+              ],
+              "source_paths": [
+                "src/api.py"
+              ]
+            },
+            "provenance": {
+              "kind": "declared",
+              "text": "公开合成B2候选案例；只供后续获准的隔离试验，非真实项目规则。"
+            }
+          }
+        },
+        {
+          "action": "create_review_and_observe",
+          "save_as": "A0",
+          "expected_ruleset_version": 2,
+          "ruleset_usage_mode": "applicable_confirmed"
+        }
+      ],
+      "semantic_evaluation": "NOT_RUN",
+      "oracle_status": "PENDING_INDEPENDENT_REVIEW"
+    },
+    {
+      "identity": {
+        "case_id": "CR02-R03",
+        "trial_id": "TR02-R03-MEMORY-01",
+        "sample_id": "SP02-R03-MEMORY-01",
+        "scope": "OPT-PROJECT-MEMORY"
+      },
+      "title": "正式规则在新review复用且无业务冲突",
+      "status": "CANDIDATE_PENDING_REVIEW",
+      "purpose": "known_regression_candidate",
+      "materialization": "NOT_MATERIALIZED",
+      "materials": [
+        {
+          "path": "contracts/create-only.json",
+          "role": "contract",
+          "repo_fixture": "benchmarks/contract_review/candidates/b2-v0.2/materials/contract-create-only.json"
+        },
+        {
+          "path": "src/api.py",
+          "role": "implementation",
+          "repo_fixture": "benchmarks/contract_review/candidates/b2-v0.2/materials/api-v2-static.py"
+        }
+      ],
+      "request_fields": {
+        "target_api_version": "v2",
+        "request": "按当前正式项目规则静态核对API v2取消实现；已明确的规则不重复要求批准。",
+        "targets": [
+          {
+            "alias": "cancel_impl",
+            "target": {
+              "api_version": "v2",
+              "endpoint": {
+                "method": "POST",
+                "path": "/exports/{job_id}/cancel"
+              },
+              "source_path": "src/api.py",
+              "checks": [
+                {
+                  "key": "allowed_states",
+                  "behavior": "分别核对queued/running/completed是否允许取消，不能漏掉合法或非法路径。"
+                },
+                {
+                  "key": "rejection_code",
+                  "behavior": "对本次规则要求拒绝的状态核对409/JOB_NOT_CANCELLABLE；先核对规则是否存在。"
+                },
+                {
+                  "key": "state_unchanged",
+                  "behavior": "对本次规则要求拒绝的路径核对拒绝前后状态不变；撤回规则不等于反向禁止。"
+                }
+              ]
+            }
+          }
+        ],
+        "authority_bindings": [
+          {
+            "path": "contracts/create-only.json",
+            "selector": {
+              "kind": "full"
+            },
+            "purpose": "仅采用创建字段规范；不提供取消规范。",
+            "scope": {
+              "api_versions": [
+                "v2"
+              ],
+              "endpoints": [
+                {
+                  "method": "POST",
+                  "path": "/exports"
+                }
+              ],
+              "source_paths": [
+                "src/api.py"
+              ]
+            }
+          }
+        ]
+      },
+      "steps": [
+        {
+          "action": "publish",
+          "save_as": "allow",
+          "request_fields": {
+            "operation": "confirm",
+            "expected_ruleset_version": 0,
+            "text": "API v2 POST /exports/{job_id}/cancel：已有任务的 state=queued 时必须允许取消，返回200且状态变为cancelled；state=running或completed时必须拒绝，返回409/JOB_NOT_CANCELLABLE且状态不变。",
+            "scope": {
+              "api_versions": [
+                "v2"
+              ],
+              "endpoints": [
+                {
+                  "method": "POST",
+                  "path": "/exports/{job_id}/cancel"
+                }
+              ],
+              "source_paths": [
+                "src/api.py"
+              ]
+            },
+            "provenance": {
+              "kind": "declared",
+              "text": "公开合成B2候选案例；只供后续获准的隔离试验，非真实项目规则。"
+            }
+          }
+        },
+        {
+          "action": "create_review_and_observe",
+          "save_as": "A",
+          "expected_ruleset_version": 1,
+          "ruleset_usage_mode": "applicable_confirmed"
+        },
+        {
+          "action": "create_review_and_observe",
+          "save_as": "B",
+          "expected_ruleset_version": 1,
+          "ruleset_usage_mode": "applicable_confirmed"
+        }
+      ],
+      "semantic_evaluation": "NOT_RUN",
+      "oracle_status": "PENDING_INDEPENDENT_REVIEW"
+    },
+    {
+      "identity": {
+        "case_id": "CR02-R04",
+        "trial_id": "TR02-R04-COMMON-01",
+        "sample_id": "SP02-R04-COMMON-01",
+        "scope": "COMMON"
+      },
+      "title": "仅替代取消切片，创建和历史保留",
+      "status": "CANDIDATE_PENDING_REVIEW",
+      "purpose": "known_regression_candidate",
+      "materialization": "NOT_MATERIALIZED",
+      "materials": [
+        {
+          "path": "contracts/create-only.json",
+          "role": "contract",
+          "repo_fixture": "benchmarks/contract_review/candidates/b2-v0.2/materials/contract-create-only.json"
+        },
+        {
+          "path": "src/api.py",
+          "role": "implementation",
+          "repo_fixture": "benchmarks/contract_review/candidates/b2-v0.2/materials/api-v2-static.py"
+        }
+      ],
+      "request_fields": {
+        "target_api_version": "v2",
+        "request": "分别核对创建和取消实现；按本次冻结规则集的生效切片判断，不因新规则只替代取消而停用旧规则的创建部分。",
+        "targets": [
+          {
+            "alias": "create_impl",
+            "target": {
+              "api_version": "v2",
+              "endpoint": {
+                "method": "POST",
+                "path": "/exports"
+              },
+              "source_path": "src/api.py",
+              "checks": [
+                {
+                  "key": "response_field",
+                  "behavior": "静态核对创建返回201及job_id；只依据本次适用规范，未运行被查应用。"
+                }
+              ]
+            }
+          },
+          {
+            "alias": "cancel_impl",
+            "target": {
+              "api_version": "v2",
+              "endpoint": {
+                "method": "POST",
+                "path": "/exports/{job_id}/cancel"
+              },
+              "source_path": "src/api.py",
+              "checks": [
+                {
+                  "key": "allowed_states",
+                  "behavior": "分别核对queued/running/completed是否允许取消，不能漏掉合法或非法路径。"
+                },
+                {
+                  "key": "rejection_code",
+                  "behavior": "对本次规则要求拒绝的状态核对409/JOB_NOT_CANCELLABLE；先核对规则是否存在。"
+                },
+                {
+                  "key": "state_unchanged",
+                  "behavior": "对本次规则要求拒绝的路径核对拒绝前后状态不变；撤回规则不等于反向禁止。"
+                }
+              ]
+            }
+          }
+        ],
+        "authority_bindings": [
+          {
+            "path": "contracts/create-only.json",
+            "selector": {
+              "kind": "full"
+            },
+            "purpose": "仅采用创建字段规范；不提供取消规范。",
+            "scope": {
+              "api_versions": [
+                "v2"
+              ],
+              "endpoints": [
+                {
+                  "method": "POST",
+                  "path": "/exports"
+                }
+              ],
+              "source_paths": [
+                "src/api.py"
+              ]
+            }
+          }
+        ]
+      },
+      "steps": [
+        {
+          "action": "publish",
+          "save_as": "joint_old",
+          "request_fields": {
+            "operation": "confirm",
+            "expected_ruleset_version": 0,
+            "text": "API v2 POST /exports创建成功返回201且包含job_id字段；API v2 POST /exports/{job_id}/cancel：已有任务的 state=queued 时必须允许取消，返回200且状态变为cancelled；state=running或completed时必须拒绝，返回409/JOB_NOT_CANCELLABLE且状态不变。",
+            "scope": {
+              "api_versions": [
+                "v2"
+              ],
+              "endpoints": [
+                {
+                  "method": "POST",
+                  "path": "/exports"
+                },
+                {
+                  "method": "POST",
+                  "path": "/exports/{job_id}/cancel"
+                }
+              ],
+              "source_paths": [
+                "src/api.py"
+              ]
+            },
+            "provenance": {
+              "kind": "declared",
+              "text": "公开合成B2候选案例；只供后续获准的隔离试验，非真实项目规则。"
+            }
+          }
+        },
+        {
+          "action": "create_review_and_observe",
+          "save_as": "A_old",
+          "expected_ruleset_version": 1,
+          "ruleset_usage_mode": "applicable_confirmed"
+        },
+        {
+          "action": "publish_effect",
+          "save_as": "cancel_new",
+          "request_fields": {
+            "operation": "supersede",
+            "expected_ruleset_version": 1,
+            "provenance": {
+              "kind": "declared",
+              "text": "公开候选场景的显式效力操作；本次人工答案不自动触发发布。"
+            },
+            "text": "API v2 POST /exports/{job_id}/cancel：已有任务的 state=queued、running或completed时均必须拒绝取消，返回409/JOB_NOT_CANCELLABLE且保持原状态；不允许queued例外。",
+            "scope": {
+              "api_versions": [
+                "v2"
+              ],
+              "endpoints": [
+                {
+                  "method": "POST",
+                  "path": "/exports/{job_id}/cancel"
+                }
+              ],
+              "source_paths": [
+                "src/api.py"
+              ]
+            }
+          },
+          "effect_binding": {
+            "field": "supersedes",
+            "project_decision_id_from": "joint_old.project_decision_id",
+            "effective_scope": {
+              "api_versions": [
+                "v2"
+              ],
+              "endpoints": [
+                {
+                  "method": "POST",
+                  "path": "/exports/{job_id}/cancel"
+                }
+              ],
+              "source_paths": [
+                "src/api.py"
+              ]
+            }
+          }
+        },
+        {
+          "action": "create_review_and_observe",
+          "save_as": "B_new",
+          "expected_ruleset_version": 2,
+          "ruleset_usage_mode": "applicable_confirmed"
+        }
+      ],
+      "semantic_evaluation": "NOT_RUN",
+      "oracle_status": "PENDING_INDEPENDENT_REVIEW"
+    },
+    {
+      "identity": {
+        "case_id": "CR02-R05",
+        "trial_id": "TR02-R05-MEMORY-01",
+        "sample_id": "SP02-R05-MEMORY-01",
+        "scope": "OPT-PROJECT-MEMORY"
+      },
+      "title": "撤回取消后缺规范，创建仍有效",
+      "status": "CANDIDATE_PENDING_REVIEW",
+      "purpose": "known_regression_candidate",
+      "materialization": "NOT_MATERIALIZED",
+      "materials": [
+        {
+          "path": "contracts/create-only.json",
+          "role": "contract",
+          "repo_fixture": "benchmarks/contract_review/candidates/b2-v0.2/materials/contract-create-only.json"
+        },
+        {
+          "path": "src/api.py",
+          "role": "implementation",
+          "repo_fixture": "benchmarks/contract_review/candidates/b2-v0.2/materials/api-v2-static.py"
+        }
+      ],
+      "request_fields": {
+        "target_api_version": "v2",
+        "request": "分别核对创建和取消实现；撤回切片若无其他有效规范，应说明规则缺口，不把实现现状当规范，也不把撤回解释为反向禁止。",
+        "targets": [
+          {
+            "alias": "create_impl",
+            "target": {
+              "api_version": "v2",
+              "endpoint": {
+                "method": "POST",
+                "path": "/exports"
+              },
+              "source_path": "src/api.py",
+              "checks": [
+                {
+                  "key": "response_field",
+                  "behavior": "静态核对创建返回201及job_id；只依据本次适用规范，未运行被查应用。"
+                }
+              ]
+            }
+          },
+          {
+            "alias": "cancel_impl",
+            "target": {
+              "api_version": "v2",
+              "endpoint": {
+                "method": "POST",
+                "path": "/exports/{job_id}/cancel"
+              },
+              "source_path": "src/api.py",
+              "checks": [
+                {
+                  "key": "allowed_states",
+                  "behavior": "分别核对queued/running/completed是否允许取消，不能漏掉合法或非法路径。"
+                },
+                {
+                  "key": "rejection_code",
+                  "behavior": "对本次规则要求拒绝的状态核对409/JOB_NOT_CANCELLABLE；先核对规则是否存在。"
+                },
+                {
+                  "key": "state_unchanged",
+                  "behavior": "对本次规则要求拒绝的路径核对拒绝前后状态不变；撤回规则不等于反向禁止。"
+                }
+              ]
+            }
+          }
+        ],
+        "authority_bindings": [
+          {
+            "path": "contracts/create-only.json",
+            "selector": {
+              "kind": "full"
+            },
+            "purpose": "仅采用创建字段规范；不提供取消规范。",
+            "scope": {
+              "api_versions": [
+                "v2"
+              ],
+              "endpoints": [
+                {
+                  "method": "POST",
+                  "path": "/exports"
+                }
+              ],
+              "source_paths": [
+                "src/api.py"
+              ]
+            }
+          }
+        ]
+      },
+      "steps": [
+        {
+          "action": "publish",
+          "save_as": "joint_old",
+          "request_fields": {
+            "operation": "confirm",
+            "expected_ruleset_version": 0,
+            "text": "API v2 POST /exports创建成功返回201且包含job_id字段；API v2 POST /exports/{job_id}/cancel：已有任务的 state=queued 时必须允许取消，返回200且状态变为cancelled；state=running或completed时必须拒绝，返回409/JOB_NOT_CANCELLABLE且状态不变。",
+            "scope": {
+              "api_versions": [
+                "v2"
+              ],
+              "endpoints": [
+                {
+                  "method": "POST",
+                  "path": "/exports"
+                },
+                {
+                  "method": "POST",
+                  "path": "/exports/{job_id}/cancel"
+                }
+              ],
+              "source_paths": [
+                "src/api.py"
+              ]
+            },
+            "provenance": {
+              "kind": "declared",
+              "text": "公开合成B2候选案例；只供后续获准的隔离试验，非真实项目规则。"
+            }
+          }
+        },
+        {
+          "action": "create_review_and_observe",
+          "save_as": "A_old",
+          "expected_ruleset_version": 1,
+          "ruleset_usage_mode": "applicable_confirmed"
+        },
+        {
+          "action": "publish_effect",
+          "save_as": "cancel_withdrawal",
+          "request_fields": {
+            "operation": "withdraw",
+            "expected_ruleset_version": 1,
+            "provenance": {
+              "kind": "declared",
+              "text": "公开候选场景的显式效力操作；本次人工答案不自动触发发布。"
+            },
+            "reason": "仅撤回取消切片，保留创建效力；不将撤回解释为反向禁止。"
+          },
+          "effect_binding": {
+            "field": "withdrawals",
+            "project_decision_id_from": "joint_old.project_decision_id",
+            "effective_scope": {
+              "api_versions": [
+                "v2"
+              ],
+              "endpoints": [
+                {
+                  "method": "POST",
+                  "path": "/exports/{job_id}/cancel"
+                }
+              ],
+              "source_paths": [
+                "src/api.py"
+              ]
+            }
+          }
+        },
+        {
+          "action": "create_review_and_observe",
+          "save_as": "B_new",
+          "expected_ruleset_version": 2,
+          "ruleset_usage_mode": "applicable_confirmed"
+        }
+      ],
+      "semantic_evaluation": "NOT_RUN",
+      "oracle_status": "PENDING_INDEPENDENT_REVIEW"
+    },
+    {
+      "identity": {
+        "case_id": "CR02-H03",
+        "trial_id": "TR02-H03-COMMON-01",
+        "sample_id": "SP02-H03-COMMON-01",
+        "scope": "COMMON"
+      },
+      "title": "本次示例归属答案不跨review",
+      "status": "CANDIDATE_PENDING_REVIEW",
+      "purpose": "known_regression_candidate",
+      "materialization": "NOT_MATERIALIZED",
+      "materials": [
+        {
+          "path": "contracts/v2.json",
+          "role": "contract",
+          "repo_fixture": "benchmarks/contract_review/materials/contract-v2.json"
+        },
+        {
+          "path": "src/api.py",
+          "role": "implementation",
+          "repo_fixture": "benchmarks/contract_review/materials/api-correct.py"
+        },
+        {
+          "path": "contracts/v1.json",
+          "role": "contract",
+          "repo_fixture": "benchmarks/contract_review/materials/contract-v1.json"
+        },
+        {
+          "path": "examples/client.py",
+          "role": "example",
+          "repo_fixture": "benchmarks/contract_review/materials/example-ambiguous.py"
+        }
+      ],
+      "request_fields": {
+        "target_api_version": "v2",
+        "request": "核对示例的版本归属及字段用法；缺少版本事实时提出归属问题，保留历史版本。",
+        "targets": [
+          {
+            "alias": "example_version",
+            "target": {
+              "api_version": "v2",
+              "endpoint": {
+                "method": "POST",
+                "path": "/exports"
+              },
+              "source_path": "examples/client.py",
+              "checks": [
+                {
+                  "key": "response_field",
+                  "behavior": "检查本次目标材料的版本归属及创建响应字段是否符合适用契约；v2 应使用 job_id，明确属于 v1 的 id 材料保留为历史。"
+                }
+              ]
+            }
+          }
+        ],
+        "authority_bindings": [
+          {
+            "path": "contracts/v2.json",
+            "selector": {
+              "kind": "full"
+            },
+            "purpose": "本次采用 v2 契约",
+            "scope": {
+              "api_versions": [
+                "v2"
+              ],
+              "endpoints": [
+                {
+                  "method": "POST",
+                  "path": "/exports"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "steps": [
+        {
+          "action": "publish",
+          "save_as": "implementation_create_only",
+          "request_fields": {
+            "operation": "confirm",
+            "expected_ruleset_version": 0,
+            "text": "API v2 POST /exports：创建成功返回201，响应必须包含job_id字段；本条不规定任何取消行为。",
+            "scope": {
+              "api_versions": [
+                "v2"
+              ],
+              "endpoints": [
+                {
+                  "method": "POST",
+                  "path": "/exports"
+                }
+              ],
+              "source_paths": [
+                "src/api.py"
+              ]
+            },
+            "provenance": {
+              "kind": "declared",
+              "text": "公开合成B2候选案例；只供后续获准的隔离试验，非真实项目规则。"
+            }
+          }
+        },
+        {
+          "action": "create_review_and_observe",
+          "save_as": "A0",
+          "expected_ruleset_version": 1,
+          "ruleset_usage_mode": "applicable_confirmed"
+        },
+        {
+          "action": "answer_current_formal_question",
+          "review_from": "A0.review_id",
+          "human_script_key": "H03.A",
+          "save_successor_as": "A1",
+          "successor_source": "resolution-batches的202响应；禁止再POST revisions"
+        },
+        {
+          "action": "create_review_and_observe",
+          "save_as": "B",
+          "expected_ruleset_version": 1,
+          "ruleset_usage_mode": "applicable_confirmed"
+        }
+      ],
+      "semantic_evaluation": "NOT_RUN",
+      "oracle_status": "PENDING_INDEPENDENT_REVIEW"
+    }
+  ]
+}

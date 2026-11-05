@@ -1,0 +1,136 @@
+{
+  "schema_version": "cr02-b2-candidate-manifest.v0.3",
+  "date": "2026-11-04",
+  "status": "DRAFT_PENDING_REVIEW",
+  "plan_scope": "PREP-04/05候选材料与执行规格；不是模型调用或正式规则发布批准",
+  "basis": {
+    "product_head": "99a8baa0c2de38751a6ccce48d8b97e85ad1ec90",
+    "b1_basis": "五个未提交工作树文件；99a8baa0本身不包含B1",
+    "b1_report": "docs/reports/CR02-PREP-B1-offline-readiness.md",
+    "b1_existing_full_suite": {
+      "passed": 1715,
+      "skipped": 3,
+      "warnings": 3,
+      "new_run_this_phase": false
+    }
+  },
+  "proposed_runtime": {
+    "profile_id": "b2-offline-memory-v2",
+    "engine_version": "contract-review-engine.v2",
+    "execution_mode": "test",
+    "options": {
+      "write": false,
+      "project_memory": true,
+      "delegate": false,
+      "replay": false
+    }
+  },
+  "cases": [
+    {
+      "case_id": "CR02-R02",
+      "trial_id": "TR02-R02-COMMON-01",
+      "sample_id": "SP02-R02-COMMON-01",
+      "scope": "COMMON",
+      "selection": "proposed_b2",
+      "fixture_status": "CANDIDATE",
+      "oracle_status": "PENDING_INDEPENDENT_REVIEW",
+      "snapshot_commit": null,
+      "execution_status": "NOT_RUN",
+      "semantic_status": "NOT_RUN"
+    },
+    {
+      "case_id": "CR02-R03",
+      "trial_id": "TR02-R03-MEMORY-01",
+      "sample_id": "SP02-R03-MEMORY-01",
+      "scope": "OPT-PROJECT-MEMORY",
+      "selection": "proposed_b2",
+      "fixture_status": "CANDIDATE",
+      "oracle_status": "PENDING_INDEPENDENT_REVIEW",
+      "snapshot_commit": null,
+      "execution_status": "NOT_RUN",
+      "semantic_status": "NOT_RUN"
+    },
+    {
+      "case_id": "CR02-R04",
+      "trial_id": "TR02-R04-COMMON-01",
+      "sample_id": "SP02-R04-COMMON-01",
+      "scope": "COMMON",
+      "selection": "proposed_b2",
+      "fixture_status": "CANDIDATE",
+      "oracle_status": "PENDING_INDEPENDENT_REVIEW",
+      "snapshot_commit": null,
+      "execution_status": "NOT_RUN",
+      "semantic_status": "NOT_RUN"
+    },
+    {
+      "case_id": "CR02-R05",
+      "trial_id": "TR02-R05-MEMORY-01",
+      "sample_id": "SP02-R05-MEMORY-01",
+      "scope": "OPT-PROJECT-MEMORY",
+      "selection": "proposed_b2",
+      "fixture_status": "CANDIDATE",
+      "oracle_status": "PENDING_INDEPENDENT_REVIEW",
+      "snapshot_commit": null,
+      "execution_status": "NOT_RUN",
+      "semantic_status": "NOT_RUN"
+    },
+    {
+      "case_id": "CR02-H03",
+      "trial_id": "TR02-H03-COMMON-01",
+      "sample_id": "SP02-H03-COMMON-01",
+      "scope": "COMMON",
+      "selection": "proposed_b2",
+      "fixture_status": "CANDIDATE",
+      "oracle_status": "PENDING_INDEPENDENT_REVIEW",
+      "snapshot_commit": null,
+      "execution_status": "NOT_RUN",
+      "semantic_status": "NOT_RUN"
+    }
+  ],
+  "files": {
+    "cases": "cases.json",
+    "oracles": "oracles.json",
+    "human_scripts": "human-scripts.json",
+    "demo": "demo-abc.json",
+    "review_record_template": "review-freeze.template.json",
+    "result_record_template": "result-record.template.json"
+  },
+  "data_flow": {
+    "model_input_allowlist": [
+      "密封材料所选正文",
+      "显式发布且本输入采用的正式规则正文/作用域/版本",
+      "实际工具观察",
+      "合法提交的本次人工答案"
+    ],
+    "never_model_input": [
+      "oracles.json",
+      "本manifest的预期/状态",
+      "案例steps中的预期标签",
+      "未触发的人工作答脚本",
+      "其他review的局部答案",
+      "review-freeze.template.json",
+      "result-record.template.json",
+      "oracle治理/判分协议中的逐例期望与结果标签"
+    ]
+  },
+  "live_configuration": {
+    "authorized": false,
+    "provider": null,
+    "model": null,
+    "trial_ids": [],
+    "call_limit": null,
+    "token_limit": null,
+    "budget_cny": null,
+    "window": null
+  },
+  "counting": {
+    "independent_candidate_cases": 5,
+    "demo_is_scored_case": false,
+    "derived_jobs_add_samples": false
+  },
+  "candidate_version": "0.3",
+  "review_status": "PENDING_INDEPENDENT_REVIEW",
+  "freeze_status": "NOT_FROZEN",
+  "binding_note": "打包生成候选文件清单与snapshot_id；这不是人工签收，真实材料Git SHA与trial尚未绑定。",
+  "revision_note": "保留五例/11AC/三个实现文件；局部拆分评审结果及补强材料完整性、历史规则负控制。判据有增补，不声称与v0.1字面完全一致。"
+}
